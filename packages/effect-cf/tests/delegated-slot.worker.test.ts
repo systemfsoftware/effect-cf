@@ -51,7 +51,7 @@ it.effect(
                 );
 
                 rowsSeenInDelegate.push((yield* cursor.toArray)[0]!.n);
-              }),
+              }).pipe(Effect.mapError((cause) => new DurableObjectAlarm.AlarmSlotError({ cause }))),
             cancel: Effect.void,
           },
         };
@@ -117,7 +117,7 @@ it.effect(
           .pipe(
             Effect.flatMap((cursor) => cursor.toArray),
             Effect.map((rows) => rows[0]?.n ?? 0),
-            Effect.catch(() => Effect.succeed(0)),
+            Effect.orElseSucceed(() => 0),
           );
 
         const first = yield* Effect.gen(function* () {
