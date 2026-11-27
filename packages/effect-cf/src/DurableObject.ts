@@ -2,30 +2,25 @@ import { DurableObject as CloudflareDurableObject } from "cloudflare:workers";
 import * as Effect from "effect/Effect";
 import type { Digest, SecureRandom } from "effect/crypto";
 import * as Layer from "effect/Layer";
-import * as Scheduler from "effect/Scheduler";
-import * as Tracer from "effect/Tracer";
-import type { ManagedRuntime, Scope } from "effect";
+import type { Scope } from "effect";
 
 import { NativeRequest } from "./Worker";
 import { WorkerEnvironment, type WorkerEnv } from "./Environment";
-import { DurableObjectState, fromDurableObjectState } from "./DurableObjectState";
+import { DurableObjectState } from "./DurableObjectState";
 import {
   DurableObjectAlarm,
-  DispatchAfterEvent,
-  HasDueAlarms,
-  RunAlarm,
-  ResponseEvent,
-  dispatchRawAlarm,
   type AlarmRegistration,
   type AlarmService,
-  type InvalidAlarmRegistrationError,
-  type InvalidScheduleConfigurationError,
 } from "./DurableObjectAlarm";
-import { fromWebSocket, type DurableWebSocket } from "./DurableObjectWebSocket";
+import type { DurableWebSocket } from "./DurableObjectWebSocket";
 import * as RpcDefinition from "./RpcDefinition";
 import * as Entrypoint from "./internal/Entrypoint";
+import {
+  makeInstance,
+  scheduleTelemetryFlush,
+  type DurableObjectInstance,
+} from "./internal/Instance";
 import * as Runtime from "./internal/Runtime";
-import * as Telemetry from "./internal/Telemetry";
 import type { ReceiverOptions, RpcInvocationInfo } from "./RpcTracing";
 
 export type { BindingNotFoundError, BindingValidationError } from "./Binding";
@@ -49,7 +44,7 @@ export type RuntimeContext<ROut> =
   | WorkerEnvironment
   | ROut;
 
-type HandlerContext<ROut> = RuntimeContext<ROut> | Scope.Scope;
+export type HandlerContext<ROut> = RuntimeContext<ROut> | Scope.Scope;
 
 type FetchContext<ROut> = HandlerContext<ROut> | NativeRequest;
 /** Metadata available before an event effect or its event layer starts. */
@@ -67,11 +62,6 @@ export interface RunOptions extends Runtime.RunOptions {
 
 /** Override to instrument the whole event, then call super[RunSymbol]. */
 export const RunSymbol = Symbol.for("effect-cf/DurableObject/run");
-
-const scheduleTelemetryFlush: Effect.Effect<void, never, DurableObjectState> =
-  Telemetry.scheduleTelemetryFlush((flush) =>
-    Effect.flatMap(DurableObjectState, (state) => state.waitUntil(flush)),
-  );
 
 /**
  * Effect type for Durable Object lifecycle and RPC handlers.
@@ -114,7 +104,7 @@ export type RpcHandlers<ROut, Api> = {
     : never;
 };
 
-interface DurableObjectOptionsBase<
+export interface DurableObjectOptionsBase<
   RRuntime,
   REvent = never,
   EventLayerError = never,
@@ -283,171 +273,41 @@ export function make<
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<NoInfer<RAlarm>>>,
   options: DurableObjectOptionsBase<ROut, REvent, EventLayerError, Rpc, RAlarm> = {},
 ): DurableObjectClass<Rpc, ROut | REvent | RAlarm> {
-  const registration =
-    options.alarms !== undefined && !Effect.isEffect(options.alarms) ? options.alarms : undefined;
-  const legacyAlarms = Effect.isEffect(options.alarms)
-    ? options.alarms.pipe(Effect.asVoid)
-    : undefined;
-
   class EffectDurableObject extends CloudflareDurableObject<WorkerEnv> {
-    readonly runtime: ManagedRuntime.ManagedRuntime<
-      RuntimeContext<ROut | RAlarm>,
-      LayerError | InvalidAlarmRegistrationError
-    >;
+    readonly runtime: DurableObjectInstance<ROut, REvent, RAlarm, LayerError>["runtime"];
+    readonly #instance: DurableObjectInstance<ROut, REvent, RAlarm, LayerError>;
 
     constructor(state: globalThis.DurableObjectState, env: WorkerEnv) {
       super(state, env);
 
-      const baseServices = DurableObjectAlarm.layer.pipe(
-        Layer.provideMerge(Layer.succeed(DurableObjectState, fromDurableObjectState(state))),
-      );
-      // SAFETY: RAlarm is inferred only from the registration's layer; without a registration it is never.
-      const services = (registration?.layer ?? Layer.empty).pipe(
-        Layer.provideMerge(baseServices),
-      ) as Layer.Layer<
-        DurableObjectState | DurableObjectAlarm | RAlarm,
-        InvalidAlarmRegistrationError
-      >;
+      const instance = makeInstance(layer, options, {
+        state,
+        env,
+        gate: (run) => state.blockConcurrencyWhile(run),
+      });
 
-      this.runtime = Runtime.makeEntrypointRuntime<
-        ROut,
-        LayerError,
-        DurableObjectState | DurableObjectAlarm | RAlarm,
-        InvalidAlarmRegistrationError
-      >(layer, env, services);
-
-      const initialize = options.initialize;
-
-      if (initialize !== undefined) {
-        state.waitUntil(
-          state.blockConcurrencyWhile(async () => {
-            // Build services before admitting the first event, then let the
-            // hook synchronously install its own gate if it needs one. Its
-            // background work and failure reporting keep their waitUntil owner.
-            await Effect.runPromise(this.runtime.contextEffect, {
-              scheduler: new Scheduler.MixedScheduler("sync"),
-            });
-            state.waitUntil(this[RunSymbol](initialize, { eventLayer: false }));
-          }),
-        );
-      }
+      this.#instance = instance;
+      this.runtime = instance.runtime;
+      instance.startInitialize();
     }
 
     [RunSymbol]<A, E>(
       effect: Effect.Effect<A, E, HandlerContext<ROut | REvent | RAlarm>>,
       runOptions: RunOptions = {},
     ): Promise<A> {
-      const eventLayer = runOptions.eventLayer === false ? undefined : options.eventLayer;
-      const parent = runOptions.rpc?.parent;
-      const parentSpan = parent === undefined ? undefined : Tracer.externalSpan(parent);
-      const afterResponse = runOptions.event === "rpc" || runOptions.event === "fetch";
-      let dispatchAfterEvent = false;
-      const handler = afterResponse
-        ? effect.pipe(
-            Effect.provideService(ResponseEvent, true),
-            Effect.onExit(() =>
-              Effect.flatMap(DurableObjectAlarm, (alarms) =>
-                Effect.map(alarms[DispatchAfterEvent], (enabled) => {
-                  dispatchAfterEvent = enabled;
-                }),
-              ),
-            ),
-          )
-        : effect;
-      let response: Promise<A>;
-
-      if (eventLayer === undefined) {
-        // SAFETY: initialize cannot require event services; without an event layer, all requirements are already provided.
-        response = Runtime.runEventPromise(
-          this.runtime,
-          // @effect-diagnostics-next-line unsafeEffectTypeAssertion:off
-          handler as Effect.Effect<A, E, HandlerContext<ROut | RAlarm>>,
-          undefined,
-          parentSpan,
-          runOptions.onFailure,
-        );
-      } else {
-        response = Runtime.runEventPromise<
-          A,
-          E,
-          RuntimeContext<ROut | RAlarm>,
-          REvent,
-          EventLayerError,
-          LayerError | InvalidAlarmRegistrationError
-        >(this.runtime, handler, eventLayer, parentSpan, runOptions.onFailure);
-      }
-
-      if (!afterResponse) return response;
-
-      return response.finally(() => {
-        if (dispatchAfterEvent) {
-          this.ctx.waitUntil(
-            // The default scheduler yields to a later task, after the response chain unwinds.
-            Effect.runPromise(
-              Effect.yieldNow.pipe(Effect.andThen(Effect.promise(() => this.#runAlarm(false)))),
-            ),
-          );
-        }
-      });
+      return this.#instance.run(effect, runOptions);
     }
 
     fetch(request: Request): Promise<Response> {
-      const fetchHandler = options.fetch;
-
-      if (fetchHandler === undefined) {
-        return Promise.resolve(new Response("Not Found", { status: 404 }));
-      }
-
-      return this[RunSymbol](Effect.provideService(fetchHandler, NativeRequest, request), {
-        event: "fetch",
-      });
+      return this.#instance.fetch(request);
     }
 
     alarm(alarmInfo?: globalThis.AlarmInvocationInfo): Promise<void> {
-      return this.#runAlarm(true, alarmInfo);
-    }
-
-    #runAlarm(native: boolean, alarmInfo?: globalThis.AlarmInvocationInfo): Promise<void> {
-      const event = (beginDispatch: Effect.Effect<void, InvalidScheduleConfigurationError>) => {
-        const alarmEffect = Effect.gen(function* () {
-          const alarms = yield* DurableObjectAlarm;
-
-          if (!native && !(yield* alarms[HasDueAlarms])) return;
-          const rawAlarm = options.alarm?.(alarmInfo);
-          const customAlarm =
-            legacyAlarms === undefined
-              ? (rawAlarm ?? Effect.void)
-              : legacyAlarms.pipe(Effect.andThen(rawAlarm ?? Effect.void));
-
-          yield* beginDispatch;
-          // Custom dispatchers, including Effect-form alarms, recover retained checkpoints.
-          yield* registration === undefined || rawAlarm !== undefined
-            ? dispatchRawAlarm(customAlarm, registration)
-            : registration.run.pipe(Effect.asVoid);
-        }).pipe(Effect.onExit(() => scheduleTelemetryFlush));
-
-        return Runtime.scopeEvent(
-          options.eventLayer === undefined
-            ? alarmEffect
-            : alarmEffect.pipe(Effect.provide(options.eventLayer, { local: true })),
-        );
-      };
-
-      return this[RunSymbol](
-        Effect.flatMap(DurableObjectAlarm, (alarms) => alarms[RunAlarm](event, native)),
-        {
-          event: "alarm",
-          eventLayer: false,
-        },
-      );
+      return this.#instance.runAlarm(true, alarmInfo);
     }
 
     webSocketMessage(socket: WebSocket, message: string | ArrayBuffer): Promise<void> | void {
-      if (options.webSocketMessage !== undefined) {
-        return this[RunSymbol](options.webSocketMessage(fromWebSocket(socket), message), {
-          event: "webSocketMessage",
-        });
-      }
+      return this.#instance.webSocketMessage(socket, message);
     }
 
     webSocketClose(
@@ -456,20 +316,11 @@ export function make<
       reason: string,
       wasClean: boolean,
     ): Promise<void> | void {
-      if (options.webSocketClose !== undefined) {
-        return this[RunSymbol](
-          options.webSocketClose(fromWebSocket(socket), code, reason, wasClean),
-          { event: "webSocketClose" },
-        );
-      }
+      return this.#instance.webSocketClose(socket, code, reason, wasClean);
     }
 
     webSocketError(socket: WebSocket, cause: unknown): Promise<void> | void {
-      if (options.webSocketError !== undefined) {
-        return this[RunSymbol](options.webSocketError(fromWebSocket(socket), cause), {
-          event: "webSocketError",
-        });
-      }
+      return this.#instance.webSocketError(socket, cause);
     }
   }
 
