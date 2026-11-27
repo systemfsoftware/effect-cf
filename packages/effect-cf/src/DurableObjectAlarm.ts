@@ -79,7 +79,7 @@ export interface ScheduleConfiguration {
 
 /** Optional policy overrides. Provide with Layer.succeed in the Durable Object's application layer. */
 export const ScheduleConfiguration = Context.Reference<ScheduleConfiguration>(
-  '@systemfsoftware/effect-cf/DurableObjectAlarm/ScheduleConfiguration',
+  'effect-cf/DurableObjectAlarm/ScheduleConfiguration',
   { defaultValue: () => ({}) },
 )
 
@@ -175,13 +175,13 @@ export type AlarmParked = typeof AlarmParked.Type
 
 /** Install with Layer.succeed / Effect.provideService. Reporting cannot undo a committed guard. */
 export const AlarmReporter = Context.Reference<(event: AlarmParked) => Effect.Effect<void>>(
-  '@systemfsoftware/effect-cf/DurableObjectAlarm/AlarmReporter',
+  'effect-cf/DurableObjectAlarm/AlarmReporter',
   { defaultValue: () => (event) => Effect.logWarning(event) },
 )
 
 const CurrentAlarmPass = Context.Reference<
   { readonly row: AlarmRow; readonly parked: AlarmParked[]; active: boolean } | undefined
->('@systemfsoftware/effect-cf/DurableObjectAlarm/CurrentAlarmPass', { defaultValue: () => undefined })
+>('effect-cf/DurableObjectAlarm/CurrentAlarmPass', { defaultValue: () => undefined })
 
 /** One dispatcher's view of a registration pass: its tags, shared manual permits, raw tracking. */
 const CurrentDispatch = Context.Reference<
@@ -192,8 +192,8 @@ const CurrentDispatch = Context.Reference<
     readonly raw?: { processed: boolean }
   }
   | undefined
->('@systemfsoftware/effect-cf/DurableObjectAlarm/CurrentDispatch', { defaultValue: () => undefined })
-const ManualTags: unique symbol = Symbol('@systemfsoftware/effect-cf/DurableObjectAlarm/ManualTags')
+>('effect-cf/DurableObjectAlarm/CurrentDispatch', { defaultValue: () => undefined })
+const ManualTags: unique symbol = Symbol('effect-cf/DurableObjectAlarm/ManualTags')
 
 interface NextAlarmRow extends Record<string, SqlStorageValue> {
   readonly run_at: number
@@ -255,7 +255,7 @@ export class InvalidAlarmRegistrationError extends Data.TaggedError(
 
 /** @internal RPC/fetch events check due work after releasing the response. */
 export const ResponseEvent = Context.Reference<boolean>(
-  '@systemfsoftware/effect-cf/DurableObjectAlarm/ResponseEvent',
+  'effect-cf/DurableObjectAlarm/ResponseEvent',
   { defaultValue: () => false },
 )
 
@@ -411,13 +411,13 @@ export interface AlarmStatus {
 }
 
 /** @internal */
-export const RunAlarm: unique symbol = Symbol('@systemfsoftware/effect-cf/DurableObjectAlarm/RunAlarm')
+export const RunAlarm: unique symbol = Symbol('effect-cf/DurableObjectAlarm/RunAlarm')
 /** @internal */
 export const DispatchAfterEvent: unique symbol = Symbol(
-  '@systemfsoftware/effect-cf/DurableObjectAlarm/DispatchAfterEvent',
+  'effect-cf/DurableObjectAlarm/DispatchAfterEvent',
 )
 /** @internal */
-export const HasDueAlarms: unique symbol = Symbol('@systemfsoftware/effect-cf/DurableObjectAlarm/HasDueAlarms')
+export const HasDueAlarms: unique symbol = Symbol('effect-cf/DurableObjectAlarm/HasDueAlarms')
 
 /** Own `storage.setAlarm()` exclusively: a Durable Object has one platform alarm timestamp. */
 export type AlarmScheduler = {
@@ -742,7 +742,7 @@ export interface DefinedAlarmTransaction<Definitions extends AlarmDefinitions> {
 }
 
 const TypedAlarmSchedulerTypeId: unique symbol = Symbol.for(
-  '@systemfsoftware/effect-cf/DurableObjectAlarm/TypedScheduler',
+  'effect-cf/DurableObjectAlarm/TypedScheduler',
 )
 
 /** Identifies service requirements whose scheduler needs a registered dispatcher. */
@@ -777,7 +777,7 @@ export interface AlarmRegistration<Self, R = never, E = never> {
   readonly [RegistrationParts]?: RegistrationParts<R, E>
 }
 
-const RegistrationParts: unique symbol = Symbol('@systemfsoftware/effect-cf/DurableObjectAlarm/RegistrationParts')
+const RegistrationParts: unique symbol = Symbol('effect-cf/DurableObjectAlarm/RegistrationParts')
 
 interface AlarmDispatcher<R, E> {
   readonly tags: readonly string[]
@@ -1162,7 +1162,7 @@ export const Tag = <Self>() =>
 }
 
 export class DurableObjectAlarm extends Context.Service<DurableObjectAlarm, AlarmScheduler>()(
-  '@systemfsoftware/effect-cf/DurableObjectAlarm',
+  'effect-cf/DurableObjectAlarm',
 ) {
   static readonly layer: Layer.Layer<DurableObjectAlarm, never, DurableObjectState> = Layer.effect(
     DurableObjectAlarm,

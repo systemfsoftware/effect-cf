@@ -210,7 +210,7 @@ const decodeResumableAttachment = Schema.decodeUnknownOption(ResumableAttachment
 export class DurableObjectRpcWebSocket extends Context.Service<
   DurableObjectRpcWebSocket,
   DurableObjectRpcWebSocketService
->()('@systemfsoftware/effect-cf/DurableObjectRpcWebSocket') {}
+>()('effect-cf/DurableObjectRpcWebSocket') {}
 
 /**
  * Builds a hibernation-aware transport that bridges Durable Object websocket

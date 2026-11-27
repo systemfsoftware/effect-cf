@@ -68,7 +68,7 @@ export interface DurableObjectStateService {
 export class DurableObjectState extends Context.Service<
   DurableObjectState,
   DurableObjectStateService
->()('@systemfsoftware/effect-cf/DurableObjectState') {}
+>()('effect-cf/DurableObjectState') {}
 
 export const fromDurableObjectState = (
   state: globalThis.DurableObjectState,

@@ -115,7 +115,7 @@ class OtlpCollector extends Context.Service<
     readonly endpoint: string
     readonly nextRequest: Effect.Effect<CollectorRequest>
   }
->()('@systemfsoftware/effect-cf/test/CloudflareOtlp/OtlpCollector') {
+>()('effect-cf/test/CloudflareOtlp/OtlpCollector') {
   static readonly layer = Layer.effect(
     OtlpCollector,
     Effect.gen(function*() {

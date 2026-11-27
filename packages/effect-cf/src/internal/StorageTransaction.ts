@@ -44,7 +44,7 @@ export const invalidateStorageCache = (
 }
 
 export const CurrentStorageTransaction = Context.Reference<StorageTransaction | undefined>(
-  '@systemfsoftware/effect-cf/internal/StorageTransaction',
+  'effect-cf/internal/StorageTransaction',
   { defaultValue: () => undefined },
 )
 

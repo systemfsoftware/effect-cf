@@ -92,7 +92,7 @@ const WireErrorSchema = S.Union([
   RpcSuccessEncodeError,
 ])
 
-const wireErrorKey = '@systemfsoftware/effect-cf/RpcDefinition/wireError'
+const wireErrorKey = 'effect-cf/RpcDefinition/wireError'
 
 type WireValue = typeof S.Unknown.Type
 
@@ -156,7 +156,7 @@ export type ReservedMethodName = (typeof reservedMethodNameValues)[number]
 
 export type ServiceFreeSchema = S.Codec<any, any, never, never>
 
-export const NativeSchemaTypeId: unique symbol = Symbol.for('@systemfsoftware/effect-cf/RpcDefinition/NativeSchema')
+export const NativeSchemaTypeId: unique symbol = Symbol.for('effect-cf/RpcDefinition/NativeSchema')
 
 /** A schema whose encoded value is passed directly to Workers RPC. */
 export interface NativeSchema<Schema extends ServiceFreeSchema = ServiceFreeSchema> {

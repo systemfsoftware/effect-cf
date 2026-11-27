@@ -34,7 +34,7 @@ export type {
 export class ExecutionContext extends Context.Service<
   ExecutionContext,
   globalThis.ExecutionContext
->()('@systemfsoftware/effect-cf/ExecutionContext') {}
+>()('effect-cf/ExecutionContext') {}
 
 export interface WorkerContextWaitUntilOptions<E, R> {
   /**
@@ -61,11 +61,11 @@ export interface WorkerContextService {
 }
 
 export class WorkerContext extends Context.Service<WorkerContext, WorkerContextService>()(
-  '@systemfsoftware/effect-cf/WorkerContext',
+  'effect-cf/WorkerContext',
 ) {}
 
 export class NativeRequest extends Context.Service<NativeRequest, Request>()(
-  '@systemfsoftware/effect-cf/NativeRequest',
+  'effect-cf/NativeRequest',
 ) {}
 
 export const isWebSocketUpgrade = (request: Request): boolean =>
@@ -112,8 +112,8 @@ type WorkerRpcContext<ROut> = WorkerBaseContext<ROut> | Scope.Scope
 
 type RuntimeContext<ROut> = WorkerBaseContext<ROut>
 /** Override to instrument the whole event, then call super[RunSymbol]. */
-export const RunSymbol = Symbol.for('@systemfsoftware/effect-cf/Worker/run')
-const FetchSymbol = Symbol.for('@systemfsoftware/effect-cf/Worker/fetch')
+export const RunSymbol = Symbol.for('effect-cf/Worker/run')
+const FetchSymbol = Symbol.for('effect-cf/Worker/fetch')
 
 /** Metadata available before an event effect or its event layer starts. */
 export interface RunOptions extends Runtime.RunOptions {

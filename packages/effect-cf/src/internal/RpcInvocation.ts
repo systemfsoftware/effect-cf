@@ -15,7 +15,7 @@ interface Invocation extends RpcInvocationInfo {
 
 /** Scoped to the incoming event effect, never the instance runtime or storage. */
 export class CurrentInvocation extends Context.Service<CurrentInvocation, Invocation>()(
-  '@systemfsoftware/effect-cf/internal/RpcInvocation',
+  'effect-cf/internal/RpcInvocation',
 ) {}
 
 export const recordDecodedArgs = (args: ReadonlyArray<unknown>): Effect.Effect<void> =>

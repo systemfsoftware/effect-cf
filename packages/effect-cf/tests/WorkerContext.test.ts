@@ -10,7 +10,7 @@ class TestService extends Context.Service<
     readonly completed: Array<string>
     readonly failures: Array<string>
   }
->()('@systemfsoftware/effect-cf/test/WorkerContext/TestService') {}
+>()('effect-cf/test/WorkerContext/TestService') {}
 
 const makeExecutionContext = () => {
   const waitUntilPromises: Array<Promise<unknown>> = []

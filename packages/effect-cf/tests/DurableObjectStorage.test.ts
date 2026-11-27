@@ -2,7 +2,7 @@ import { assert, it } from '@effect/vitest'
 import { Cause, Context, Deferred, Effect, Fiber } from 'effect'
 
 const TransactionMessage = Context.Service<{ readonly message: string }>(
-  '@systemfsoftware/effect-cf/test/TransactionMessage',
+  'effect-cf/test/TransactionMessage',
 )
 
 import { DurableObjectStorage } from '../src/index'

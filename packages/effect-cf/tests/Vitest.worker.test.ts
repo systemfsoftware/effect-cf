@@ -146,7 +146,7 @@ it.effect('invokes a typed queue consumer and reports acknowledgements', () =>
     assert.deepStrictEqual(result.retryMessages, [])
   }))
 
-class TestValue extends Context.Service<TestValue, string>()('@systemfsoftware/effect-cf/test/TestValue') {}
+class TestValue extends Context.Service<TestValue, string>()('effect-cf/test/TestValue') {}
 
 it.effect('runs Effects inside Durable Objects with caller services and state', () => {
   const namespace = env.TEST_COUNTER_DO!

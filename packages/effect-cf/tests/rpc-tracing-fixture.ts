@@ -30,7 +30,7 @@ export const capturedOtlpLayer = (bodies: Array<string>) =>
   )
 
 class CapturedOtlp extends Context.Service<CapturedOtlp, Array<string>>()(
-  '@systemfsoftware/effect-cf/test/RpcTracing/CapturedOtlp',
+  'effect-cf/test/RpcTracing/CapturedOtlp',
 ) {}
 
 const eventLayer = Layer.unwrap(Effect.map(CapturedOtlp, capturedOtlpLayer))

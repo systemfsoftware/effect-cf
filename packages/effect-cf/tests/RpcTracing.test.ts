@@ -15,7 +15,7 @@ import {
 import { makePartialTestDouble } from './TestDoubles'
 
 const remoteParent = {
-  _tag: '@systemfsoftware/effect-cf/RpcTraceContext/v1',
+  _tag: 'effect-cf/RpcTraceContext/v1',
   traceId: '1234567890abcdef1234567890abcdef',
   spanId: '1234567890abcdef',
   sampled: true,

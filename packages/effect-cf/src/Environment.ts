@@ -11,7 +11,7 @@ export type WorkerEnv = Cloudflare.Env
  * Context service for reading worker bindings from the current `env` object.
  */
 export class WorkerEnvironment extends Context.Service<WorkerEnvironment, WorkerEnv>()(
-  '@systemfsoftware/effect-cf/WorkerEnvironment',
+  'effect-cf/WorkerEnvironment',
 ) {}
 
 type ScalarConfigValue = string | number | boolean

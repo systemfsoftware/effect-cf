@@ -163,7 +163,7 @@ export interface DurableObjectContainerService {
 export class DurableObjectContainer extends Context.Service<
   DurableObjectContainer,
   DurableObjectContainerService
->()('@systemfsoftware/effect-cf/DurableObjectContainer') {}
+>()('effect-cf/DurableObjectContainer') {}
 
 const attempt = <A>(operation: string, evaluate: () => A): Effect.Effect<A, ContainerError> =>
   Effect.try({

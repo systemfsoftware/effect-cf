@@ -290,7 +290,7 @@ interface HibernationEventLogService {
 class HibernationEventLog extends Context.Service<
   HibernationEventLog,
   HibernationEventLogService
->()('@systemfsoftware/effect-cf/tests/HibernationEventLog') {}
+>()('effect-cf/tests/HibernationEventLog') {}
 
 const HibernationEventLogLive = Layer.effect(
   HibernationEventLog,

@@ -50,7 +50,7 @@ export interface WorkerConstructor<Instance> {
   new(context: globalThis.ExecutionContext, env: WorkerEnv): Instance
 }
 
-export const withExecutionContext = Effect.fn('@systemfsoftware/effect-cf/vitest/withExecutionContext')(function*<
+export const withExecutionContext = Effect.fn('effect-cf/vitest/withExecutionContext')(function*<
   A,
   E,
   R,
@@ -70,7 +70,7 @@ interface FetchWorker {
  * Invokes an Effect-backed Worker fetch handler and drains its `waitUntil`
  * work before returning the response.
  */
-export const fetch = Effect.fn('@systemfsoftware/effect-cf/vitest/fetch')(function*<Instance extends FetchWorker>(
+export const fetch = Effect.fn('effect-cf/vitest/fetch')(function*<Instance extends FetchWorker>(
   Worker: WorkerConstructor<Instance>,
   request: Request,
   workerEnv: WorkerEnv = currentEnv,
@@ -94,7 +94,7 @@ export interface ScheduledOptions {
 /**
  * Invokes a modules-format scheduled handler and drains its `waitUntil` work.
  */
-export const scheduled = Effect.fn('@systemfsoftware/effect-cf/vitest/scheduled')(function*(
+export const scheduled = Effect.fn('effect-cf/vitest/scheduled')(function*(
   handler: ScheduledHandler,
   options?: ScheduledOptions,
   workerEnv: WorkerEnv = currentEnv,
@@ -116,7 +116,7 @@ export type PagesEventContextInit<Function extends AnyPagesFunction> = Readonly<
  * Invokes a Pages Function with a typed event context and drains its
  * `waitUntil` work, including when the function fails.
  */
-export const pages = Effect.fn('@systemfsoftware/effect-cf/vitest/pages')(function*<
+export const pages = Effect.fn('effect-cf/vitest/pages')(function*<
   Function extends AnyPagesFunction,
 >(handler: Function, init: PagesEventContextInit<Function>) {
   return yield* Effect.acquireUseRelease(
@@ -154,7 +154,7 @@ export interface QueueRunResult<Body> {
  * Invokes an Effect-backed queue consumer, drains its `waitUntil` work, and
  * returns the Workers Vitest plugin's acknowledgement and retry result.
  */
-export const queue = Effect.fn('@systemfsoftware/effect-cf/vitest/queue')(function*<
+export const queue = Effect.fn('effect-cf/vitest/queue')(function*<
   Body,
   Instance extends QueueWorker,
 >(
@@ -184,7 +184,7 @@ export const queue = Effect.fn('@systemfsoftware/effect-cf/vitest/queue')(functi
  * provided as {@link DurableObjectState}. A wrapped state service is also
  * passed to `use` for direct access.
  */
-export const runInDurableObject = Effect.fn('@systemfsoftware/effect-cf/vitest/runInDurableObject')(function*<
+export const runInDurableObject = Effect.fn('effect-cf/vitest/runInDurableObject')(function*<
   Object extends RpcDurableObject,
   A,
   E,
@@ -211,7 +211,7 @@ export const runInDurableObject = Effect.fn('@systemfsoftware/effect-cf/vitest/r
   return yield* exit
 })
 
-export const runDurableObjectAlarm = Effect.fn('@systemfsoftware/effect-cf/vitest/runDurableObjectAlarm')(function*(
+export const runDurableObjectAlarm = Effect.fn('effect-cf/vitest/runDurableObjectAlarm')(function*(
   stub: globalThis.DurableObjectStub<RpcDurableObject>,
 ) {
   return yield* Effect.promise(() => runDurableObjectAlarmPromise(stub))
@@ -221,30 +221,30 @@ export interface DurableObjectEvictionOptions {
   readonly webSockets?: 'close' | 'hibernate'
 }
 
-export const evictDurableObject = Effect.fn('@systemfsoftware/effect-cf/vitest/evictDurableObject')(function*(
+export const evictDurableObject = Effect.fn('effect-cf/vitest/evictDurableObject')(function*(
   stub: globalThis.DurableObjectStub<RpcDurableObject>,
   options?: DurableObjectEvictionOptions,
 ) {
   yield* Effect.promise(() => evictDurableObjectPromise(stub, options))
 })
 
-export const listDurableObjectIds = Effect.fn('@systemfsoftware/effect-cf/vitest/listDurableObjectIds')(function*<
+export const listDurableObjectIds = Effect.fn('effect-cf/vitest/listDurableObjectIds')(function*<
   Object extends RpcDurableObject | undefined,
 >(namespace: globalThis.DurableObjectNamespace<Object>) {
   return yield* Effect.promise(() => listDurableObjectIdsPromise(namespace))
 })
 
-export const reset = Effect.fn('@systemfsoftware/effect-cf/vitest/reset')(function*() {
+export const reset = Effect.fn('effect-cf/vitest/reset')(function*() {
   yield* Effect.promise(resetPromise)
 })
 
-export const abortAllDurableObjects = Effect.fn('@systemfsoftware/effect-cf/vitest/abortAllDurableObjects')(
+export const abortAllDurableObjects = Effect.fn('effect-cf/vitest/abortAllDurableObjects')(
   function*() {
     yield* Effect.promise(abortAllDurableObjectsPromise)
   },
 )
 
-export const evictAllDurableObjects = Effect.fn('@systemfsoftware/effect-cf/vitest/evictAllDurableObjects')(
+export const evictAllDurableObjects = Effect.fn('effect-cf/vitest/evictAllDurableObjects')(
   function*(options?: DurableObjectEvictionOptions) {
     yield* Effect.promise(() => evictAllDurableObjectsPromise(options))
   },
@@ -255,7 +255,7 @@ export interface D1Migration {
   readonly queries: ReadonlyArray<string>
 }
 
-export const applyD1Migrations = Effect.fn('@systemfsoftware/effect-cf/vitest/applyD1Migrations')(function*(
+export const applyD1Migrations = Effect.fn('effect-cf/vitest/applyD1Migrations')(function*(
   database: globalThis.D1Database,
   migrations: ReadonlyArray<D1Migration>,
   migrationsTableName?: string,
@@ -290,7 +290,7 @@ export interface SecretsStoreAdmin {
 }
 
 /** Acquires an Effect-native admin client for a Secrets Store binding. */
-export const adminSecretsStore = Effect.fn('@systemfsoftware/effect-cf/vitest/adminSecretsStore')(function*(
+export const adminSecretsStore = Effect.fn('effect-cf/vitest/adminSecretsStore')(function*(
   binding: SecretsStoreBinding,
 ): Effect.fn.Return<SecretsStoreAdmin> {
   const admin = yield* Effect.sync(() => adminSecretsStoreNative(binding))
@@ -439,7 +439,7 @@ const wrapWorkflowIntrospector = (
  * Acquires an Effect-native Workflow introspector that is disposed when the
  * surrounding Effect scope closes.
  */
-export const introspectWorkflow = Effect.fn('@systemfsoftware/effect-cf/vitest/introspectWorkflow')(function*(
+export const introspectWorkflow = Effect.fn('effect-cf/vitest/introspectWorkflow')(function*(
   workflow: WorkflowBinding,
 ) {
   const introspector = yield* Effect.acquireDisposable(
@@ -453,7 +453,7 @@ export const introspectWorkflow = Effect.fn('@systemfsoftware/effect-cf/vitest/i
  * Acquires an Effect-native Workflow instance introspector that is disposed
  * when the surrounding Effect scope closes.
  */
-export const introspectWorkflowInstance = Effect.fn('@systemfsoftware/effect-cf/vitest/introspectWorkflowInstance')(
+export const introspectWorkflowInstance = Effect.fn('effect-cf/vitest/introspectWorkflowInstance')(
   function*(workflow: WorkflowBinding, instanceId: string) {
     const introspector = yield* Effect.acquireDisposable(
       Effect.promise(() => introspectWorkflowInstancePromise(workflow, instanceId)),

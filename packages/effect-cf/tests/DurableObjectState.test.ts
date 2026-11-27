@@ -5,7 +5,7 @@ import { DurableObjectState } from '../src/index'
 import { makePartialTestDouble } from './TestDoubles'
 
 const FailureMessage = Context.Service<{ readonly message: string }>(
-  '@systemfsoftware/effect-cf/test/FailureMessage',
+  'effect-cf/test/FailureMessage',
 )
 
 it.effect('blockConcurrencyWhile preserves typed failures without rejecting the callback', () =>

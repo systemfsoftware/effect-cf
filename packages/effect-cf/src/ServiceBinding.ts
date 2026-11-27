@@ -16,7 +16,7 @@ import type * as WorkerDefinition from './WorkerDefinition'
 
 export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
-const TypeId = '@systemfsoftware/effect-cf/ServiceBinding' as const
+const TypeId = 'effect-cf/ServiceBinding' as const
 const expectedServiceBinding = 'Worker service binding with fetch()'
 
 export interface ServiceFetcher {

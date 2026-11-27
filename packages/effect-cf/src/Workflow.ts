@@ -45,7 +45,7 @@ export interface WorkflowEventService<Payload = unknown> {
 }
 
 export class WorkflowEvent extends Context.Service<WorkflowEvent, WorkflowEventService>()(
-  '@systemfsoftware/effect-cf/WorkflowEvent',
+  'effect-cf/WorkflowEvent',
 ) {}
 
 export class WorkflowStepError extends Data.TaggedError('WorkflowStepError')<{
@@ -101,13 +101,13 @@ export interface WorkflowStepService {
 }
 
 export class WorkflowStep extends Context.Service<WorkflowStep, WorkflowStepService>()(
-  '@systemfsoftware/effect-cf/WorkflowStep',
+  'effect-cf/WorkflowStep',
 ) {}
 
 export class WorkflowStepContext extends Context.Service<
   WorkflowStepContext,
   CloudflareWorkflowStepContext
->()('@systemfsoftware/effect-cf/WorkflowStepContext') {}
+>()('effect-cf/WorkflowStepContext') {}
 
 const fromWorkflowEvent = <Payload>(
   event: CloudflareWorkflowEvent<Payload>,
@@ -226,7 +226,7 @@ type RuntimeContext<ROut> =
   | ROut
 
 /** Override to instrument the whole workflow run, then call super[RunSymbol]. */
-export const RunSymbol = Symbol.for('@systemfsoftware/effect-cf/Workflow/run')
+export const RunSymbol = Symbol.for('effect-cf/Workflow/run')
 
 export interface RunOptions extends Runtime.RunOptions {}
 

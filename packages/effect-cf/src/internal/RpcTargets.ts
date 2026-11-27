@@ -6,5 +6,5 @@ export interface Targets {
 }
 
 export class CurrentTargets extends Context.Service<CurrentTargets, Targets>()(
-  '@systemfsoftware/effect-cf/RpcTargets',
+  'effect-cf/RpcTargets',
 ) {}

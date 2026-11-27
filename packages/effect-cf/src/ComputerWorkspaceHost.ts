@@ -151,7 +151,7 @@ const toWorkspaceOptions = (config: ComputerWorkspaceHostConfig): WorkspaceOptio
 // remaining tuple open preserves arbitrary Effect-backed base constructors.
 type DurableObjectConstructor = new(...args: Array<any>) => object
 
-const HostArguments = Symbol('@systemfsoftware/effect-cf/ComputerWorkspaceHost/arguments')
+const HostArguments = Symbol('effect-cf/ComputerWorkspaceHost/arguments')
 
 interface CapturedHostArguments {
   readonly state: globalThis.DurableObjectState

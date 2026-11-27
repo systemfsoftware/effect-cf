@@ -46,7 +46,7 @@ export interface CacheStorageClient {
 }
 
 export class CacheStorage extends Context.Service<CacheStorage, CacheStorageClient>()(
-  '@systemfsoftware/effect-cf/CacheStorage',
+  'effect-cf/CacheStorage',
 ) {}
 
 const cacheError = (cache: string, operation: CacheOperation, cause: unknown) =>

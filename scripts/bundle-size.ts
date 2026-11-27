@@ -246,13 +246,14 @@ export const stageCheckout = Effect.fn('bundleSize.stageCheckout')(function*(
     JSON.stringify({ name: 'bundle-consumer', private: true, type: 'module' }),
   )
   for (const name of packages) {
-    const source = path.join(root, 'packages', name)
+    const dir = name.slice(name.lastIndexOf('/') + 1)
+    const source = path.join(root, 'packages', dir)
 
     if (!(yield* fs.exists(source))) continue
     const manifest = yield* Schema.decodeEffect(Schema.fromJsonString(Manifest))(
       yield* fs.readFileString(path.join(source, 'package.json')),
     )
-    const destination = path.join(stage, 'packages', name)
+    const destination = path.join(stage, 'packages', dir)
 
     yield* fs.makeDirectory(destination, { recursive: true })
     yield* fs.copyFile(path.join(source, 'package.json'), path.join(destination, 'package.json'))
@@ -273,7 +274,7 @@ export const stageCheckout = Effect.fn('bundleSize.stageCheckout')(function*(
   yield* linkDependencies(path.join(root, 'node_modules'), path.join(stage, 'node_modules'))
   for (const name of packages) {
     yield* linkDependencies(
-      path.join(root, 'packages', name, 'node_modules'),
+      path.join(root, 'packages', name.slice(name.lastIndexOf('/') + 1), 'node_modules'),
       path.join(stage, 'node_modules'),
     )
   }

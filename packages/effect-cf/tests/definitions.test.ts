@@ -935,9 +935,9 @@ test('queue, workflow, and container definitions with the same id resolve indepe
   assert.strictEqual(SharedQueue.id, 'Shared')
   assert.strictEqual(SharedWorkflow.id, 'Shared')
   assert.strictEqual(SharedContainers.id, 'Shared')
-  assert.strictEqual(SharedQueue.key, '@systemfsoftware/effect-cf/Queue/Shared')
-  assert.strictEqual(SharedWorkflow.key, '@systemfsoftware/effect-cf/Workflow/Shared')
-  assert.strictEqual(SharedContainers.key, '@systemfsoftware/effect-cf/Container/Shared')
+  assert.strictEqual(SharedQueue.key, 'effect-cf/Queue/Shared')
+  assert.strictEqual(SharedWorkflow.key, 'effect-cf/Workflow/Shared')
+  assert.strictEqual(SharedContainers.key, 'effect-cf/Container/Shared')
 
   const sent: Array<unknown> = []
   const created: Array<unknown> = []

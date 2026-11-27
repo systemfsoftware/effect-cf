@@ -7,17 +7,17 @@ import { DurableObject, DurableObjectDefinition, Worker, WorkerConfig, WorkerDef
 import { makePartialTestDouble } from './TestDoubles'
 
 class RenderValue extends Context.Service<RenderValue, string>()(
-  '@systemfsoftware/effect-cf/test/WorkerBoundary/RenderValue',
+  'effect-cf/test/WorkerBoundary/RenderValue',
 ) {}
 
 class EventValue extends Context.Service<EventValue, string>()(
-  '@systemfsoftware/effect-cf/test/WorkerBoundary/EventValue',
+  'effect-cf/test/WorkerBoundary/EventValue',
 ) {}
 
 class StreamResource extends Context.Service<
   StreamResource,
   { readonly read: Effect.Effect<string>; readonly release: () => void }
->()('@systemfsoftware/effect-cf/test/WorkerBoundary/StreamResource') {}
+>()('effect-cf/test/WorkerBoundary/StreamResource') {}
 
 class BoomError extends Data.TaggedError('BoomError') {}
 

@@ -59,7 +59,7 @@ class InitializationState extends Context.Service<
     readonly gated: boolean
     readonly control: DurableObjectStub<TestInitializationControl>
   }
->()('@systemfsoftware/effect-cf/tests/InitializationState') {}
+>()('effect-cf/tests/InitializationState') {}
 
 const InitializationLive = Layer.effect(
   InitializationState,

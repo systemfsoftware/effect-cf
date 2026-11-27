@@ -1160,7 +1160,7 @@ export const fromWorkspaceClient = (
 export class ComputerWorkspace extends Context.Service<
   ComputerWorkspace,
   ComputerWorkspaceService
->()('@systemfsoftware/effect-cf/ComputerWorkspace') {
+>()('effect-cf/ComputerWorkspace') {
   /**
    * Acquires the single workspace registered by `withComputerWorkspace` and
    * releases its RPC client when the layer scope closes.

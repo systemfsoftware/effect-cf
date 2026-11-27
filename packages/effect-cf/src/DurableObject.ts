@@ -66,7 +66,7 @@ export interface RunOptions extends Runtime.RunOptions {
 }
 
 /** Override to instrument the whole event, then call super[RunSymbol]. */
-export const RunSymbol = Symbol.for('@systemfsoftware/effect-cf/DurableObject/run')
+export const RunSymbol = Symbol.for('effect-cf/DurableObject/run')
 
 const scheduleTelemetryFlush: Effect.Effect<void, never, DurableObjectState> = Telemetry.scheduleTelemetryFlush((
   flush,

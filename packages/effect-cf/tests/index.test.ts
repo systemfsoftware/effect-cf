@@ -71,11 +71,11 @@ const executionContext = makePartialTestDouble<ExecutionContext>({
 })
 
 class TestService extends Context.Service<TestService, { readonly value: string }>()(
-  '@systemfsoftware/effect-cf/test/TestService',
+  'effect-cf/test/TestService',
 ) {}
 
 class DurableObjectEventValue extends Context.Service<DurableObjectEventValue, string>()(
-  '@systemfsoftware/effect-cf/test/DurableObjectEventValue',
+  'effect-cf/test/DurableObjectEventValue',
 ) {}
 
 const durableObjectId = makePartialTestDouble<DurableObjectId>({
