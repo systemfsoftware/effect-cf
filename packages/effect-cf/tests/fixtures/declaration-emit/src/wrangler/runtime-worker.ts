@@ -1,3 +1,3 @@
 export default {
-  fetch: () => new Response("ok"),
-};
+  fetch: () => new Response('ok'),
+}

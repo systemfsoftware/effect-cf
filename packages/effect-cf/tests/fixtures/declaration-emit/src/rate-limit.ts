@@ -1,13 +1,13 @@
-import { Effect } from "effect";
-import { RateLimit } from "effect-cf";
+import { RateLimit } from '@systemfsoftware/effect-cf'
+import { Effect } from 'effect'
 
-export class Requests extends RateLimit.Tag<Requests>()("Requests") {}
+export class Requests extends RateLimit.Tag<Requests>()('Requests') {}
 
-export const bindingLayer = Requests.layer({ binding: "MY_RATE_LIMITER" });
-export const NamedRequests = RateLimit.make("NamedRequests");
-export const check = Effect.gen(function* () {
-  const requests = yield* Requests;
+export const bindingLayer = Requests.layer({ binding: 'MY_RATE_LIMITER' })
+export const NamedRequests = RateLimit.make('NamedRequests')
+export const check = Effect.gen(function*() {
+  const requests = yield* Requests
 
-  return yield* requests.limit({ key: "example" });
-});
-export const wrap = RateLimit.makeClient({ binding: "MY_RATE_LIMITER" });
+  return yield* requests.limit({ key: 'example' })
+})
+export const wrap = RateLimit.makeClient({ binding: 'MY_RATE_LIMITER' })

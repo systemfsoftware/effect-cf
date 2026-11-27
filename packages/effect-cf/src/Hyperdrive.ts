@@ -1,62 +1,62 @@
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
-import type { Layer } from "effect";
+import type { Layer } from 'effect'
+import * as Context from 'effect/Context'
+import * as Effect from 'effect/Effect'
+import * as Predicate from 'effect/Predicate'
 
-import * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
+import * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
-const expectedHyperdrive = "Hyperdrive binding with connectionString";
+const expectedHyperdrive = 'Hyperdrive binding with connectionString'
 
 export interface HyperdriveDefinition {
-  readonly binding: string;
+  readonly binding: string
 }
 
 export interface HyperdriveClient {
-  readonly connectionString: string;
-  readonly rawUnsafe: Effect.Effect<Hyperdrive>;
-  readonly definition: HyperdriveDefinition;
+  readonly connectionString: string
+  readonly rawUnsafe: Effect.Effect<Hyperdrive>
+  readonly definition: HyperdriveDefinition
 }
 
-declare const HyperdriveServiceTypeId: unique symbol;
+declare const HyperdriveServiceTypeId: unique symbol
 
 export interface HyperdriveService<Id extends string> {
   readonly [HyperdriveServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-};
+  readonly binding: string
+}
 
-export interface TagClass<Self, Id extends string> extends Context.ServiceClass<
-  Self,
-  Id,
-  HyperdriveClient
-> {
-  readonly id: Id;
+export interface TagClass<Self, Id extends string> extends
+  Context.ServiceClass<
+    Self,
+    Id,
+    HyperdriveClient
+  >
+{
+  readonly id: Id
   readonly layer: (
     options: LayerOptions,
   ) => Layer.Layer<
     Self,
     Binding.BindingNotFoundError | Binding.BindingValidationError,
     WorkerEnvironment
-  >;
+  >
 }
 
 export const isHyperdrive = <Candidate>(value: Candidate): value is Candidate & Hyperdrive =>
-  Predicate.hasProperty(value, "connectionString") && Predicate.isString(value.connectionString);
+  Predicate.hasProperty(value, 'connectionString') && Predicate.isString(value.connectionString)
 
-export const makeClient =
-  (definition: HyperdriveDefinition) =>
-  (hyperdrive: Hyperdrive): HyperdriveClient => ({
-    definition,
-    connectionString: hyperdrive.connectionString,
-    rawUnsafe: Effect.succeed(hyperdrive),
-  });
+export const makeClient = (definition: HyperdriveDefinition) => (hyperdrive: Hyperdrive): HyperdriveClient => ({
+  definition,
+  connectionString: hyperdrive.connectionString,
+  rawUnsafe: Effect.succeed(hyperdrive),
+})
 
 export const layer = <Self>(
   tag: Context.Service<Self, HyperdriveClient>,
@@ -64,20 +64,18 @@ export const layer = <Self>(
 ) =>
   Binding.layer(tag, definition.binding, isHyperdrive, makeClient(definition), {
     expected: expectedHyperdrive,
-  });
+  })
 
-export const make = <Id extends string>(id: Id) => Tag<HyperdriveService<Id>>()<Id>(id);
+export const make = <Id extends string>(id: Id) => Tag<HyperdriveService<Id>>()<Id>(id)
 
-export const Tag =
-  <Self>() =>
-  <Id extends string>(id: Id) => {
-    const tag = Context.Service<Self, HyperdriveClient>()(id);
+export const Tag = <Self>() => <Id extends string>(id: Id) => {
+  const tag = Context.Service<Self, HyperdriveClient>()(id)
 
-    const makeLayer = (definition: LayerOptions) => layer(tag, definition);
+  const makeLayer = (definition: LayerOptions) => layer(tag, definition)
 
-    // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
-    return Object.assign(tag, {
-      id,
-      layer: makeLayer,
-    }) as TagClass<Self, Id>;
-  };
+  // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
+  return Object.assign(tag, {
+    id,
+    layer: makeLayer,
+  }) as TagClass<Self, Id>
+}

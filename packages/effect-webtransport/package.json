@@ -1,5 +1,5 @@
 {
-  "name": "effect-webtransport",
+  "name": "@systemfsoftware/effect-webtransport",
   "version": "0.6.1",
   "description": "Effect-native WebTransport sessions, streams, datagrams, and Socket/RPC adapters.",
   "license": "MIT",

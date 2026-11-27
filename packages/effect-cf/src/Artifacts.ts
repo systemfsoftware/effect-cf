@@ -1,56 +1,55 @@
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
-import * as Schema from "effect/Schema";
-import type { Layer } from "effect";
+import type { Layer } from 'effect'
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Predicate from 'effect/Predicate'
+import * as Schema from 'effect/Schema'
 
-import * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
-const expectedArtifactsBinding =
-  "Artifacts binding with create(), get(), import(), list(), and delete()";
+const expectedArtifactsBinding = 'Artifacts binding with create(), get(), import(), list(), and delete()'
 
 const expectedArtifactsRepo =
-  "Artifacts repo handle with createToken(), listTokens(), revokeToken(), fork(), log(), readCommit(), readTree(), and readBlob()";
+  'Artifacts repo handle with createToken(), listTokens(), revokeToken(), fork(), log(), readCommit(), readTree(), and readBlob()'
 
 export type ArtifactsOperation =
-  | "createClient"
-  | "create"
-  | "get"
-  | "import"
-  | "list"
-  | "delete"
-  | "createToken"
-  | "listTokens"
-  | "getToken"
-  | "revokeToken"
-  | "fork"
-  | "info"
-  | "log"
-  | "readCommit"
-  | "readTree"
-  | "readBlob"
-  | "cli";
+  | 'createClient'
+  | 'create'
+  | 'get'
+  | 'import'
+  | 'list'
+  | 'delete'
+  | 'createToken'
+  | 'listTokens'
+  | 'getToken'
+  | 'revokeToken'
+  | 'fork'
+  | 'info'
+  | 'log'
+  | 'readCommit'
+  | 'readTree'
+  | 'readBlob'
+  | 'cli'
 
 export const artifactsErrorCodes = [
-  "ALREADY_EXISTS",
-  "NOT_FOUND",
-  "CREATE_IN_PROGRESS",
-  "IMPORT_IN_PROGRESS",
-  "FORK_IN_PROGRESS",
-  "INVALID_INPUT",
-  "INVALID_REPO_NAME",
-  "INVALID_TTL",
-  "INVALID_URL",
-  "REMOTE_AUTH_REQUIRED",
-  "UPSTREAM_UNAVAILABLE",
-  "MEMORY_LIMIT",
-  "INTERNAL_ERROR",
-] as const satisfies ReadonlyArray<ArtifactsErrorCode>;
+  'ALREADY_EXISTS',
+  'NOT_FOUND',
+  'CREATE_IN_PROGRESS',
+  'IMPORT_IN_PROGRESS',
+  'FORK_IN_PROGRESS',
+  'INVALID_INPUT',
+  'INVALID_REPO_NAME',
+  'INVALID_TTL',
+  'INVALID_URL',
+  'REMOTE_AUTH_REQUIRED',
+  'UPSTREAM_UNAVAILABLE',
+  'MEMORY_LIMIT',
+  'INTERNAL_ERROR',
+] as const satisfies ReadonlyArray<ArtifactsErrorCode>
 
 /**
  * Numeric codes documented by Cloudflare. `CREATE_IN_PROGRESS` has no published
@@ -70,82 +69,84 @@ export const artifactsErrorNumericCodes = {
   UPSTREAM_UNAVAILABLE: 10401,
   MEMORY_LIMIT: 10402,
   INTERNAL_ERROR: 10400,
-} as const satisfies Readonly<Partial<Record<ArtifactsErrorCode, number>>>;
+} as const satisfies Readonly<Partial<Record<ArtifactsErrorCode, number>>>
 
-export type ArtifactsErrorCode = globalThis.ArtifactsErrorCode;
+export type ArtifactsErrorCode = globalThis.ArtifactsErrorCode
 
-export class ArtifactsOperationError extends Data.TaggedError("ArtifactsOperationError")<{
-  readonly binding: string;
-  readonly operation: ArtifactsOperation;
-  readonly cause: unknown;
-  readonly code?: ArtifactsErrorCode | (string & {});
-  readonly numericCode?: number;
+export class ArtifactsOperationError extends Data.TaggedError('ArtifactsOperationError')<{
+  readonly binding: string
+  readonly operation: ArtifactsOperation
+  readonly cause: unknown
+  readonly code?: ArtifactsErrorCode | (string & {})
+  readonly numericCode?: number
 }> {
   override get message(): string {
-    const code = this.code === undefined ? "" : ` (${this.code})`;
+    const code = this.code === undefined ? '' : ` (${this.code})`
 
-    return `Artifacts ${this.operation} failed for binding "${this.binding}"${code}: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Artifacts ${this.operation} failed for binding "${this.binding}"${code}: ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
 export interface ArtifactsDefinition {
-  readonly binding: string;
+  readonly binding: string
 }
 
-export type RepoName = string;
+export type RepoName = string
 
-export type Cursor = string;
+export type Cursor = string
 
 /** Scope granted to a repository token. */
-export type ArtifactsTokenScope = "read" | "write";
+export type ArtifactsTokenScope = 'read' | 'write'
 
 /** Lifecycle state of a repository token. */
-export type ArtifactsTokenState = "active" | "expired" | "revoked";
+export type ArtifactsTokenState = 'active' | 'expired' | 'revoked'
 
-export type ArtifactsRepoStatus = "ready" | "importing" | "forking";
+export type ArtifactsRepoStatus = 'ready' | 'importing' | 'forking'
 
-export type ArtifactsRepoInfo = globalThis.ArtifactsRepoInfo;
+export type ArtifactsRepoInfo = globalThis.ArtifactsRepoInfo
 
-export type ArtifactsCreateRepoResult = Readonly<globalThis.ArtifactsCreateRepoResult>;
+export type ArtifactsCreateRepoResult = Readonly<globalThis.ArtifactsCreateRepoResult>
 
 export interface ArtifactsRepoListEntry extends ArtifactsRepoInfo {
-  readonly status: ArtifactsRepoStatus;
+  readonly status: ArtifactsRepoStatus
 }
 
 export interface ArtifactsRepoListResult {
-  readonly repos: ReadonlyArray<ArtifactsRepoListEntry>;
-  readonly total: number;
-  readonly cursor?: Cursor;
+  readonly repos: ReadonlyArray<ArtifactsRepoListEntry>
+  readonly total: number
+  readonly cursor?: Cursor
 }
 
 /** Result of creating a repository token. */
-export type ArtifactsCreateTokenResult = globalThis.ArtifactsCreateTokenResult;
+export type ArtifactsCreateTokenResult = globalThis.ArtifactsCreateTokenResult
 
 /** Repository token metadata, excluding its plaintext secret. */
-export type ArtifactsTokenInfo = globalThis.ArtifactsTokenInfo;
+export type ArtifactsTokenInfo = globalThis.ArtifactsTokenInfo
 
 /** Repository token list result. */
-export type ArtifactsTokenListResult = globalThis.ArtifactsTokenListResult;
+export type ArtifactsTokenListResult = globalThis.ArtifactsTokenListResult
 
 /** Identity recorded for a Git commit author or committer. */
 export interface ArtifactsCommitIdentity {
-  readonly name: string;
-  readonly email: string;
+  readonly name: string
+  readonly email: string
 }
 
 /** Parsed Git commit returned by `readCommit()` and `log()`. */
 export interface ArtifactsCommit {
-  readonly hash: string;
-  readonly treeHash: string;
-  readonly message: string;
-  readonly author: ArtifactsCommitIdentity;
-  readonly committer: ArtifactsCommitIdentity;
-  readonly parents: ReadonlyArray<string>;
-  readonly authoredAt: number;
-  readonly committedAt: number;
+  readonly hash: string
+  readonly treeHash: string
+  readonly message: string
+  readonly author: ArtifactsCommitIdentity
+  readonly committer: ArtifactsCommitIdentity
+  readonly parents: ReadonlyArray<string>
+  readonly authoredAt: number
+  readonly committedAt: number
 }
 
-export type ArtifactsLogResult = ReadonlyArray<ArtifactsCommit>;
+export type ArtifactsLogResult = ReadonlyArray<ArtifactsCommit>
 
 /**
  * Parsed Git tree returned by `readTree()`.
@@ -154,57 +155,57 @@ export type ArtifactsLogResult = ReadonlyArray<ArtifactsCommit>;
  * publish its fields in the binding reference or Workers type declarations.
  */
 export interface ArtifactsTree<Field = unknown> {
-  readonly [field: string]: Field;
+  readonly [field: string]: Field
 }
 
 export interface ArtifactsCreateOptions {
-  readonly readOnly?: boolean;
-  readonly description?: string;
-  readonly setDefaultBranch?: string;
+  readonly readOnly?: boolean
+  readonly description?: string
+  readonly setDefaultBranch?: string
 }
 
 export interface ArtifactsListOptions {
-  readonly limit?: number;
-  readonly cursor?: Cursor;
+  readonly limit?: number
+  readonly cursor?: Cursor
 }
 
 /** External Git source used by `Artifacts.import()`. */
 export interface ArtifactsImportSource {
   /** Full HTTPS URL of the Git repository. */
-  readonly url: string;
-  readonly branch?: string;
-  readonly depth?: number;
+  readonly url: string
+  readonly branch?: string
+  readonly depth?: number
 }
 
 export interface ArtifactsImportTargetOptions {
-  readonly description?: string;
-  readonly readOnly?: boolean;
+  readonly description?: string
+  readonly readOnly?: boolean
 }
 
 export interface ArtifactsImportTarget {
-  readonly name: RepoName;
-  readonly opts?: ArtifactsImportTargetOptions;
+  readonly name: RepoName
+  readonly opts?: ArtifactsImportTargetOptions
 }
 
 export interface ArtifactsImportParams {
-  readonly source: ArtifactsImportSource;
-  readonly target: ArtifactsImportTarget;
+  readonly source: ArtifactsImportSource
+  readonly target: ArtifactsImportTarget
 }
 
 export interface ArtifactsForkOptions {
-  readonly description?: string;
-  readonly readOnly?: boolean;
-  readonly defaultBranchOnly?: boolean;
+  readonly description?: string
+  readonly readOnly?: boolean
+  readonly defaultBranchOnly?: boolean
 }
 
 export interface ArtifactsLogOptions {
-  readonly ref?: string;
-  readonly limit?: number;
-  readonly offset?: number;
+  readonly ref?: string
+  readonly limit?: number
+  readonly offset?: number
 }
 
 export interface ArtifactsRepoBinding extends Partial<ArtifactsRepoInfo> {
-  readonly [Symbol.dispose]?: () => void;
+  readonly [Symbol.dispose]?: () => void
   /**
    * Read repository metadata.
    *
@@ -212,7 +213,7 @@ export interface ArtifactsRepoBinding extends Partial<ArtifactsRepoInfo> {
    * through this method. It is optional solely for compatibility with older
    * local handles that expose metadata as data properties.
    */
-  readonly info?: () => Promise<ArtifactsRepoInfo>;
+  readonly info?: () => Promise<ArtifactsRepoInfo>
   /**
    * Create a Git token for the repository.
    *
@@ -222,34 +223,34 @@ export interface ArtifactsRepoBinding extends Partial<ArtifactsRepoInfo> {
   readonly createToken: (
     scope?: ArtifactsTokenScope,
     ttl?: number,
-  ) => Promise<ArtifactsCreateTokenResult>;
-  readonly listTokens: () => Promise<ArtifactsTokenListResult>;
-  readonly revokeToken: (tokenOrId: string) => Promise<boolean>;
+  ) => Promise<ArtifactsCreateTokenResult>
+  readonly listTokens: () => Promise<ArtifactsTokenListResult>
+  readonly revokeToken: (tokenOrId: string) => Promise<boolean>
   readonly fork: (
     name: RepoName,
     options?: ArtifactsForkOptions,
-  ) => Promise<ArtifactsCreateRepoResult>;
-  readonly log: (options?: ArtifactsLogOptions) => Promise<ArtifactsLogResult>;
-  readonly readCommit: (hash: string) => Promise<ArtifactsCommit | null>;
-  readonly readTree: (hash: string) => Promise<ArtifactsTree>;
-  readonly readBlob: (hash: string) => Promise<Blob | null>;
+  ) => Promise<ArtifactsCreateRepoResult>
+  readonly log: (options?: ArtifactsLogOptions) => Promise<ArtifactsLogResult>
+  readonly readCommit: (hash: string) => Promise<ArtifactsCommit | null>
+  readonly readTree: (hash: string) => Promise<ArtifactsTree>
+  readonly readBlob: (hash: string) => Promise<Blob | null>
 }
 
 export interface ArtifactsBinding {
   readonly create: (
     name: RepoName,
     options?: ArtifactsCreateOptions,
-  ) => Promise<ArtifactsCreateRepoResult>;
-  readonly get: (name: RepoName) => Promise<ArtifactsRepoBinding>;
-  readonly import: (params: ArtifactsImportParams) => Promise<ArtifactsCreateRepoResult>;
-  readonly list: (options?: ArtifactsListOptions) => Promise<ArtifactsRepoListResult>;
-  readonly delete: (name: RepoName) => Promise<boolean>;
+  ) => Promise<ArtifactsCreateRepoResult>
+  readonly get: (name: RepoName) => Promise<ArtifactsRepoBinding>
+  readonly import: (params: ArtifactsImportParams) => Promise<ArtifactsCreateRepoResult>
+  readonly list: (options?: ArtifactsListOptions) => Promise<ArtifactsRepoListResult>
+  readonly delete: (name: RepoName) => Promise<boolean>
 }
 
 export interface ArtifactsRepoClient extends ArtifactsRepoInfo {
   /** Release the native repository handle when its owning scope closes. */
-  readonly dispose: Effect.Effect<void>;
-  readonly info: Effect.Effect<ArtifactsRepoInfo, ArtifactsOperationError>;
+  readonly dispose: Effect.Effect<void>
+  readonly info: Effect.Effect<ArtifactsRepoInfo, ArtifactsOperationError>
   /**
    * Create a Git token for the repository.
    *
@@ -259,91 +260,93 @@ export interface ArtifactsRepoClient extends ArtifactsRepoInfo {
   readonly createToken: (
     scope?: ArtifactsTokenScope,
     ttl?: number,
-  ) => Effect.Effect<ArtifactsCreateTokenResult, ArtifactsOperationError>;
-  readonly listTokens: Effect.Effect<ArtifactsTokenListResult, ArtifactsOperationError>;
-  readonly revokeToken: (tokenOrId: string) => Effect.Effect<boolean, ArtifactsOperationError>;
+  ) => Effect.Effect<ArtifactsCreateTokenResult, ArtifactsOperationError>
+  readonly listTokens: Effect.Effect<ArtifactsTokenListResult, ArtifactsOperationError>
+  readonly revokeToken: (tokenOrId: string) => Effect.Effect<boolean, ArtifactsOperationError>
   readonly fork: (
     name: RepoName,
     options?: ArtifactsForkOptions,
-  ) => Effect.Effect<ArtifactsCreateRepoResult, ArtifactsOperationError>;
+  ) => Effect.Effect<ArtifactsCreateRepoResult, ArtifactsOperationError>
   readonly log: (
     options?: ArtifactsLogOptions,
-  ) => Effect.Effect<ArtifactsLogResult, ArtifactsOperationError>;
-  readonly readCommit: (hash: string) => Effect.Effect<ArtifactsCommit, ArtifactsOperationError>;
-  readonly readTree: (hash: string) => Effect.Effect<ArtifactsTree, ArtifactsOperationError>;
+  ) => Effect.Effect<ArtifactsLogResult, ArtifactsOperationError>
+  readonly readCommit: (hash: string) => Effect.Effect<ArtifactsCommit, ArtifactsOperationError>
+  readonly readTree: (hash: string) => Effect.Effect<ArtifactsTree, ArtifactsOperationError>
   /**
    * Read an untyped Git blob by its lowercase, 40-character SHA-1 object ID.
    * Fails with `NOT_FOUND` when the object is missing or is not a blob.
    */
-  readonly readBlob: (hash: string) => Effect.Effect<Blob, ArtifactsOperationError>;
-  readonly raw: ArtifactsRepoBinding;
+  readonly readBlob: (hash: string) => Effect.Effect<Blob, ArtifactsOperationError>
+  readonly raw: ArtifactsRepoBinding
 }
 
 export interface ArtifactsClient {
   readonly create: (
     name: RepoName,
     options?: ArtifactsCreateOptions,
-  ) => Effect.Effect<ArtifactsCreateRepoResult, ArtifactsOperationError>;
-  readonly get: (name: RepoName) => Effect.Effect<ArtifactsRepoClient, ArtifactsOperationError>;
+  ) => Effect.Effect<ArtifactsCreateRepoResult, ArtifactsOperationError>
+  readonly get: (name: RepoName) => Effect.Effect<ArtifactsRepoClient, ArtifactsOperationError>
   readonly import: (
     params: ArtifactsImportParams,
-  ) => Effect.Effect<ArtifactsCreateRepoResult, ArtifactsOperationError>;
+  ) => Effect.Effect<ArtifactsCreateRepoResult, ArtifactsOperationError>
   readonly list: (
     options?: ArtifactsListOptions,
-  ) => Effect.Effect<ArtifactsRepoListResult, ArtifactsOperationError>;
-  readonly delete: (name: RepoName) => Effect.Effect<boolean, ArtifactsOperationError>;
-  readonly rawUnsafe: Effect.Effect<ArtifactsBinding>;
-  readonly definition: ArtifactsDefinition;
+  ) => Effect.Effect<ArtifactsRepoListResult, ArtifactsOperationError>
+  readonly delete: (name: RepoName) => Effect.Effect<boolean, ArtifactsOperationError>
+  readonly rawUnsafe: Effect.Effect<ArtifactsBinding>
+  readonly definition: ArtifactsDefinition
 }
 
-declare const ArtifactsServiceTypeId: unique symbol;
+declare const ArtifactsServiceTypeId: unique symbol
 
 export interface ArtifactsService<Id extends string> {
   readonly [ArtifactsServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-};
-
-interface MutableArtifactsErrorDetails {
-  code?: ArtifactsOperationError["code"];
-  numericCode?: number;
+  readonly binding: string
 }
 
-export interface TagClass<Self, Id extends string> extends Context.ServiceClass<
-  Self,
-  Id,
-  ArtifactsClient
-> {
-  readonly id: Id;
+interface MutableArtifactsErrorDetails {
+  code?: ArtifactsOperationError['code']
+  numericCode?: number
+}
+
+export interface TagClass<Self, Id extends string> extends
+  Context.ServiceClass<
+    Self,
+    Id,
+    ArtifactsClient
+  >
+{
+  readonly id: Id
   readonly layer: (
     options: LayerOptions,
   ) => Layer.Layer<
     Self,
     Binding.BindingNotFoundError | Binding.BindingValidationError,
     WorkerEnvironment
-  >;
+  >
 }
 
 const artifactsErrorDetails = (
   cause: unknown,
-): Pick<ArtifactsOperationError, "code" | "numericCode"> => {
+): Pick<ArtifactsOperationError, 'code' | 'numericCode'> => {
   if (!Predicate.isObject(cause)) {
-    return {};
+    return {}
   }
 
-  const code = Predicate.hasProperty(cause, "code") ? cause.code : undefined;
-  const numericCode = Predicate.hasProperty(cause, "numericCode") ? cause.numericCode : undefined;
-  const details: MutableArtifactsErrorDetails = {};
+  const code = Predicate.hasProperty(cause, 'code') ? cause.code : undefined
+  const numericCode = Predicate.hasProperty(cause, 'numericCode') ? cause.numericCode : undefined
+  const details: MutableArtifactsErrorDetails = {}
 
-  if (Predicate.isString(code)) details.code = code;
-  if (Predicate.isNumber(numericCode)) details.numericCode = numericCode;
+  if (Predicate.isString(code)) details.code = code
+  if (Predicate.isNumber(numericCode)) details.numericCode = numericCode
 
-  return details;
-};
+  return details
+}
 
 const artifactsError = (binding: string, operation: ArtifactsOperation, cause: unknown) =>
   new ArtifactsOperationError({
@@ -351,7 +354,7 @@ const artifactsError = (binding: string, operation: ArtifactsOperation, cause: u
     operation,
     cause,
     ...artifactsErrorDetails(cause),
-  });
+  })
 
 const tryArtifactsPromise = <A>(
   binding: string,
@@ -361,17 +364,17 @@ const tryArtifactsPromise = <A>(
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => artifactsError(binding, operation, cause),
-  });
+  })
 
 const spanOptions = (binding: string, operation: ArtifactsOperation) => ({
   attributes: { binding, operation },
-});
+})
 
 const hasFunction = <Candidate, Key extends string>(
   value: Candidate,
   key: Key,
 ): value is Candidate & Record<Key, (...args: ReadonlyArray<any>) => any> =>
-  Predicate.hasProperty(value, key) && Predicate.isFunction(value[key]);
+  Predicate.hasProperty(value, key) && Predicate.isFunction(value[key])
 
 const ArtifactsRepoInfoSchema = Schema.Struct({
   id: Schema.String,
@@ -384,53 +387,53 @@ const ArtifactsRepoInfoSchema = Schema.Struct({
   source: Schema.NullOr(Schema.String),
   readOnly: Schema.Boolean,
   remote: Schema.String,
-});
+})
 
 const decodeRepoInfo = (
   binding: string,
   value: ArtifactsRepoInfo | ArtifactsRepoBinding,
 ): Effect.Effect<ArtifactsRepoInfo, ArtifactsOperationError> =>
   Schema.decodeUnknownEffect(ArtifactsRepoInfoSchema)(value).pipe(
-    Effect.mapError((cause) => artifactsError(binding, "info", cause)),
-  );
+    Effect.mapError((cause) => artifactsError(binding, 'info', cause)),
+  )
 
 const readRepoInfo = (
   binding: string,
   repo: ArtifactsRepoBinding,
 ): Effect.Effect<ArtifactsRepoInfo, ArtifactsOperationError> =>
   Effect.suspend(() => {
-    if (hasFunction(repo, "info")) {
-      return tryArtifactsPromise(binding, "info", () => repo.info()).pipe(
+    if (hasFunction(repo, 'info')) {
+      return tryArtifactsPromise(binding, 'info', () => repo.info()).pipe(
         Effect.flatMap((info) => decodeRepoInfo(binding, info)),
-        Effect.withSpan("Artifacts.info", spanOptions(binding, "info")),
-      );
+        Effect.withSpan('Artifacts.info', spanOptions(binding, 'info')),
+      )
     }
 
     return decodeRepoInfo(binding, repo).pipe(
-      Effect.withSpan("Artifacts.info", spanOptions(binding, "info")),
-    );
-  });
+      Effect.withSpan('Artifacts.info', spanOptions(binding, 'info')),
+    )
+  })
 
 export const isArtifactsRepoBinding = <Candidate>(
   value: Candidate,
 ): value is Candidate & ArtifactsRepoBinding =>
-  hasFunction(value, "createToken") &&
-  hasFunction(value, "listTokens") &&
-  hasFunction(value, "revokeToken") &&
-  hasFunction(value, "fork") &&
-  hasFunction(value, "log") &&
-  hasFunction(value, "readCommit") &&
-  hasFunction(value, "readTree") &&
-  hasFunction(value, "readBlob");
+  hasFunction(value, 'createToken') &&
+  hasFunction(value, 'listTokens') &&
+  hasFunction(value, 'revokeToken') &&
+  hasFunction(value, 'fork') &&
+  hasFunction(value, 'log') &&
+  hasFunction(value, 'readCommit') &&
+  hasFunction(value, 'readTree') &&
+  hasFunction(value, 'readBlob')
 
 export const isArtifactsBinding = <Candidate>(
   value: Candidate,
 ): value is Candidate & ArtifactsBinding =>
-  hasFunction(value, "create") &&
-  hasFunction(value, "get") &&
-  hasFunction(value, "import") &&
-  hasFunction(value, "list") &&
-  hasFunction(value, "delete");
+  hasFunction(value, 'create') &&
+  hasFunction(value, 'get') &&
+  hasFunction(value, 'import') &&
+  hasFunction(value, 'list') &&
+  hasFunction(value, 'delete')
 
 const wrapRepo = (
   binding: string,
@@ -441,123 +444,115 @@ const wrapRepo = (
   dispose: Effect.sync(() => repo[Symbol.dispose]?.()),
   info: readRepoInfo(binding, repo),
   createToken: Effect.fn(
-    "Artifacts.createToken",
-    spanOptions(binding, "createToken"),
+    'Artifacts.createToken',
+    spanOptions(binding, 'createToken'),
   )((scope?: ArtifactsTokenScope, ttl?: number) =>
-    tryArtifactsPromise(binding, "createToken", () => repo.createToken(scope, ttl)),
+    tryArtifactsPromise(binding, 'createToken', () => repo.createToken(scope, ttl))
   ),
-  listTokens: tryArtifactsPromise(binding, "listTokens", () => repo.listTokens()).pipe(
-    Effect.withSpan("Artifacts.listTokens", spanOptions(binding, "listTokens")),
+  listTokens: tryArtifactsPromise(binding, 'listTokens', () => repo.listTokens()).pipe(
+    Effect.withSpan('Artifacts.listTokens', spanOptions(binding, 'listTokens')),
   ),
   revokeToken: Effect.fn(
-    "Artifacts.revokeToken",
-    spanOptions(binding, "revokeToken"),
-  )((tokenOrId: string) =>
-    tryArtifactsPromise(binding, "revokeToken", () => repo.revokeToken(tokenOrId)),
-  ),
+    'Artifacts.revokeToken',
+    spanOptions(binding, 'revokeToken'),
+  )((tokenOrId: string) => tryArtifactsPromise(binding, 'revokeToken', () => repo.revokeToken(tokenOrId))),
   fork: Effect.fn(
-    "Artifacts.fork",
-    spanOptions(binding, "fork"),
+    'Artifacts.fork',
+    spanOptions(binding, 'fork'),
   )((name: RepoName, options?: ArtifactsForkOptions) =>
-    tryArtifactsPromise(binding, "fork", () => repo.fork(name, options)),
+    tryArtifactsPromise(binding, 'fork', () => repo.fork(name, options))
   ),
   log: Effect.fn(
-    "Artifacts.log",
-    spanOptions(binding, "log"),
-  )((options?: ArtifactsLogOptions) =>
-    tryArtifactsPromise(binding, "log", () => repo.log(options)),
-  ),
+    'Artifacts.log',
+    spanOptions(binding, 'log'),
+  )((options?: ArtifactsLogOptions) => tryArtifactsPromise(binding, 'log', () => repo.log(options))),
   readCommit: Effect.fn(
-    "Artifacts.readCommit",
-    spanOptions(binding, "readCommit"),
-  )(function* (hash: string) {
-    const commit = yield* tryArtifactsPromise(binding, "readCommit", () => repo.readCommit(hash));
+    'Artifacts.readCommit',
+    spanOptions(binding, 'readCommit'),
+  )(function*(hash: string) {
+    const commit = yield* tryArtifactsPromise(binding, 'readCommit', () => repo.readCommit(hash))
 
-    if (commit === null)
+    if (commit === null) {
       return yield* new ArtifactsOperationError({
         binding,
-        operation: "readCommit",
-        code: "NOT_FOUND",
+        operation: 'readCommit',
+        code: 'NOT_FOUND',
         numericCode: artifactsErrorNumericCodes.NOT_FOUND,
-        cause: new Error("Commit not found"),
-      });
+        cause: new Error('Commit not found'),
+      })
+    }
 
-    return commit;
+    return commit
   }),
   readTree: Effect.fn(
-    "Artifacts.readTree",
-    spanOptions(binding, "readTree"),
-  )((hash: string) => tryArtifactsPromise(binding, "readTree", () => repo.readTree(hash))),
+    'Artifacts.readTree',
+    spanOptions(binding, 'readTree'),
+  )((hash: string) => tryArtifactsPromise(binding, 'readTree', () => repo.readTree(hash))),
   readBlob: Effect.fn(
-    "Artifacts.readBlob",
-    spanOptions(binding, "readBlob"),
-  )(function* (hash: string) {
-    const blob = yield* tryArtifactsPromise(binding, "readBlob", () => repo.readBlob(hash));
+    'Artifacts.readBlob',
+    spanOptions(binding, 'readBlob'),
+  )(function*(hash: string) {
+    const blob = yield* tryArtifactsPromise(binding, 'readBlob', () => repo.readBlob(hash))
 
-    if (blob === null)
+    if (blob === null) {
       return yield* new ArtifactsOperationError({
         binding,
-        operation: "readBlob",
-        code: "NOT_FOUND",
+        operation: 'readBlob',
+        code: 'NOT_FOUND',
         numericCode: artifactsErrorNumericCodes.NOT_FOUND,
-        cause: "Blob not found",
-      });
+        cause: 'Blob not found',
+      })
+    }
 
-    return blob;
+    return blob
   }),
   raw: repo,
-});
+})
 
-export const makeClient =
-  (definition: ArtifactsDefinition) =>
-  (artifacts: ArtifactsBinding): ArtifactsClient => ({
-    definition,
-    create: Effect.fn(
-      "Artifacts.create",
-      spanOptions(definition.binding, "create"),
-    )((name: RepoName, options?: ArtifactsCreateOptions) =>
-      tryArtifactsPromise(definition.binding, "create", () => artifacts.create(name, options)),
-    ),
-    get: Effect.fn(
-      "Artifacts.get",
-      spanOptions(definition.binding, "get"),
-    )((name: RepoName) =>
-      tryArtifactsPromise(definition.binding, "get", () => artifacts.get(name)).pipe(
-        Effect.flatMap((repo) =>
-          isArtifactsRepoBinding(repo)
-            ? readRepoInfo(definition.binding, repo).pipe(
-                Effect.map((info) => wrapRepo(definition.binding, repo, info)),
-              )
-            : Effect.fail(
-                artifactsError(
-                  definition.binding,
-                  "get",
-                  new TypeError(`Expected ${expectedArtifactsRepo}`),
-                ),
-              ),
-        ),
+export const makeClient = (definition: ArtifactsDefinition) => (artifacts: ArtifactsBinding): ArtifactsClient => ({
+  definition,
+  create: Effect.fn(
+    'Artifacts.create',
+    spanOptions(definition.binding, 'create'),
+  )((name: RepoName, options?: ArtifactsCreateOptions) =>
+    tryArtifactsPromise(definition.binding, 'create', () => artifacts.create(name, options))
+  ),
+  get: Effect.fn(
+    'Artifacts.get',
+    spanOptions(definition.binding, 'get'),
+  )((name: RepoName) =>
+    tryArtifactsPromise(definition.binding, 'get', () => artifacts.get(name)).pipe(
+      Effect.flatMap((repo) =>
+        isArtifactsRepoBinding(repo)
+          ? readRepoInfo(definition.binding, repo).pipe(
+            Effect.map((info) => wrapRepo(definition.binding, repo, info)),
+          )
+          : Effect.fail(
+            artifactsError(
+              definition.binding,
+              'get',
+              new TypeError(`Expected ${expectedArtifactsRepo}`),
+            ),
+          )
       ),
-    ),
-    import: Effect.fn(
-      "Artifacts.import",
-      spanOptions(definition.binding, "import"),
-    )((params: ArtifactsImportParams) =>
-      tryArtifactsPromise(definition.binding, "import", () => artifacts.import(params)),
-    ),
-    list: Effect.fn(
-      "Artifacts.list",
-      spanOptions(definition.binding, "list"),
-    )((options?: ArtifactsListOptions) =>
-      tryArtifactsPromise(definition.binding, "list", () => artifacts.list(options)),
-    ),
-    delete: Effect.fn(
-      "Artifacts.delete",
-      spanOptions(definition.binding, "delete"),
-    )((name: RepoName) =>
-      tryArtifactsPromise(definition.binding, "delete", () => artifacts.delete(name)),
-    ),
-    rawUnsafe: Effect.succeed(artifacts),
-  });
+    )
+  ),
+  import: Effect.fn(
+    'Artifacts.import',
+    spanOptions(definition.binding, 'import'),
+  )((params: ArtifactsImportParams) =>
+    tryArtifactsPromise(definition.binding, 'import', () => artifacts.import(params))
+  ),
+  list: Effect.fn(
+    'Artifacts.list',
+    spanOptions(definition.binding, 'list'),
+  )((options?: ArtifactsListOptions) => tryArtifactsPromise(definition.binding, 'list', () => artifacts.list(options))),
+  delete: Effect.fn(
+    'Artifacts.delete',
+    spanOptions(definition.binding, 'delete'),
+  )((name: RepoName) => tryArtifactsPromise(definition.binding, 'delete', () => artifacts.delete(name))),
+  rawUnsafe: Effect.succeed(artifacts),
+})
 
 export const layer = <Self>(
   tag: Context.Service<Self, ArtifactsClient>,
@@ -565,20 +560,18 @@ export const layer = <Self>(
 ) =>
   Binding.layer(tag, definition.binding, isArtifactsBinding, makeClient(definition), {
     expected: expectedArtifactsBinding,
-  });
+  })
 
-export const make = <Id extends string>(id: Id) => Tag<ArtifactsService<Id>>()<Id>(id);
+export const make = <Id extends string>(id: Id) => Tag<ArtifactsService<Id>>()<Id>(id)
 
-export const Tag =
-  <Self>() =>
-  <Id extends string>(id: Id) => {
-    const tag = Context.Service<Self, ArtifactsClient>()(id);
+export const Tag = <Self>() => <Id extends string>(id: Id) => {
+  const tag = Context.Service<Self, ArtifactsClient>()(id)
 
-    const makeLayer = (definition: LayerOptions) => layer(tag, definition);
+  const makeLayer = (definition: LayerOptions) => layer(tag, definition)
 
-    // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
-    return Object.assign(tag, {
-      id,
-      layer: makeLayer,
-    }) as TagClass<Self, Id>;
-  };
+  // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
+  return Object.assign(tag, {
+    id,
+    layer: makeLayer,
+  }) as TagClass<Self, Id>
+}

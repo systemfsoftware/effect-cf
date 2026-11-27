@@ -4,30 +4,30 @@
  * flush explicitly. Scheduled flush failures cannot fail user events. Exporter
  * layer finalizers run separately and follow their configured shutdown timeout.
  */
-import * as ConfigProvider from "effect/ConfigProvider";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import type * as Tracer from "effect/Tracer";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import type { Headers } from "effect/http";
-import * as OtlpExporter from "effect/observability/OtlpExporter";
-import * as OtlpLogger from "effect/observability/OtlpLogger";
-import * as OtlpMetrics from "effect/observability/OtlpMetrics";
-import * as OtlpResource from "effect/observability/OtlpResource";
-import * as OtlpSerialization from "effect/observability/OtlpSerialization";
-import * as OtlpTracer from "effect/observability/OtlpTracer";
+import * as ConfigProvider from 'effect/ConfigProvider'
+import * as Effect from 'effect/Effect'
+import type { Headers } from 'effect/http'
+import * as FetchHttpClient from 'effect/http/FetchHttpClient'
+import * as Layer from 'effect/Layer'
+import * as OtlpExporter from 'effect/observability/OtlpExporter'
+import * as OtlpLogger from 'effect/observability/OtlpLogger'
+import * as OtlpMetrics from 'effect/observability/OtlpMetrics'
+import * as OtlpResource from 'effect/observability/OtlpResource'
+import * as OtlpSerialization from 'effect/observability/OtlpSerialization'
+import * as OtlpTracer from 'effect/observability/OtlpTracer'
+import * as Option from 'effect/Option'
+import type * as Tracer from 'effect/Tracer'
 
-import { DurableObjectState } from "./DurableObjectState";
-import { WorkerConfig, WorkerEnvironment } from "./Environment";
+import { DurableObjectState } from './DurableObjectState'
+import { WorkerConfig, WorkerEnvironment } from './Environment'
 
-type ResourceAttributes = NonNullable<Parameters<typeof OtlpResource.make>[0]["attributes"]>;
+type ResourceAttributes = NonNullable<Parameters<typeof OtlpResource.make>[0]['attributes']>
 
 /** Telemetry signal groups supported by the Cloudflare OTLP layers. */
-export type Signal = "logs" | "traces" | "metrics";
+export type Signal = 'logs' | 'traces' | 'metrics'
 
 /** OTLP payload serialization used by the Effect OTLP exporters. */
-export type Serialization = "json" | "protobuf";
+export type Serialization = 'json' | 'protobuf'
 
 /**
  * Resource metadata shared by Worker and Durable Object OTLP layers.
@@ -40,11 +40,11 @@ export type Serialization = "json" | "protobuf";
  */
 export interface ResourceOptions {
   /** Explicit service name. Takes precedence over OTEL environment variables. */
-  readonly serviceName?: string;
+  readonly serviceName?: string
   /** Explicit service version. Takes precedence over OTEL environment variables. */
-  readonly serviceVersion?: string;
+  readonly serviceVersion?: string
   /** Additional resource attributes attached to exported telemetry. */
-  readonly attributes?: ResourceAttributes;
+  readonly attributes?: ResourceAttributes
 }
 
 /** Options shared by all Cloudflare OTLP telemetry layers. */
@@ -55,55 +55,56 @@ export interface LayerOptions {
    * Each selected signal is still controlled by standard OTEL exporter config,
    * such as `OTEL_TRACES_EXPORTER=otlp`.
    */
-  readonly signals?: ReadonlyArray<Signal>;
+  readonly signals?: ReadonlyArray<Signal>
   /** OTLP payload serialization. Defaults to protobuf. */
-  readonly serialization?: Serialization;
-  readonly resource?: ResourceOptions;
-  readonly headers?: Headers.Input;
-  readonly loggerExcludeLogSpans?: boolean;
-  readonly loggerMergeWithExisting?: boolean;
-  readonly tracerContext?: <X>(primitive: Tracer.EffectPrimitive<X>, span: Tracer.AnySpan) => X;
+  readonly serialization?: Serialization
+  readonly resource?: ResourceOptions
+  readonly headers?: Headers.Input
+  readonly loggerExcludeLogSpans?: boolean
+  readonly loggerMergeWithExisting?: boolean
+  readonly tracerContext?: <X>(primitive: Tracer.EffectPrimitive<X>, span: Tracer.AnySpan) => X
 }
 
 export interface WorkerLayerOptions extends LayerOptions {
-  readonly workerName?: string;
+  readonly workerName?: string
 }
 
 export interface DurableObjectLayerOptions extends LayerOptions {
-  readonly className?: string;
+  readonly className?: string
   /**
    * Include the Durable Object id as `cloudflare.durable_object.id`.
    *
    * This is disabled by default because object ids can be high-cardinality.
    */
-  readonly includeObjectId?: boolean;
+  readonly includeObjectId?: boolean
 }
 
-const allSignals: ReadonlyArray<Signal> = ["logs", "traces", "metrics"];
+const allSignals: ReadonlyArray<Signal> = ['logs', 'traces', 'metrics']
 
-const emptyConfigProvider = ConfigProvider.fromUnknown({});
+const emptyConfigProvider = ConfigProvider.fromUnknown({})
 
 const cloudflareConfigProviderLayer = ConfigProvider.layerAdd(
-  Effect.map(Effect.serviceOption(WorkerEnvironment), (env) =>
-    Option.isSome(env) ? WorkerConfig.providerFromEnv(env.value) : emptyConfigProvider,
+  Effect.map(
+    Effect.serviceOption(WorkerEnvironment),
+    (env) => Option.isSome(env) ? WorkerConfig.providerFromEnv(env.value) : emptyConfigProvider,
   ),
   { asPrimary: true },
-);
+)
 
 const selectedSignals = (signals: ReadonlyArray<Signal> | undefined): ReadonlySet<Signal> =>
-  new Set(signals ?? allSignals);
+  new Set(signals ?? allSignals)
 
 const withDefinedAttributes = (attributes: ResourceAttributes): ResourceAttributes => {
-  const out: ResourceAttributes = {};
+  const out: ResourceAttributes = {}
 
   for (const [key, value] of Object.entries(attributes)) {
     if (value !== undefined) {
-      out[key] = value;
+      out[key] = value
     }
   }
 
-  return out;
-};
+  return out
+}
 
 const makeResource = (
   options: LayerOptions,
@@ -115,32 +116,32 @@ const makeResource = (
     ...withDefinedAttributes(runtimeAttributes),
     ...options.resource?.attributes,
   },
-});
+})
 
 const serializationLayer = (serialization: Serialization | undefined) =>
-  serialization === "json" ? OtlpSerialization.layerJson : OtlpSerialization.layerProtobuf;
+  serialization === 'json' ? OtlpSerialization.layerJson : OtlpSerialization.layerProtobuf
 
-type SignalLayer = ReturnType<typeof OtlpLogger.layerFromConfig>;
+type SignalLayer = ReturnType<typeof OtlpLogger.layerFromConfig>
 
 const mergeSignalLayers = (layers: ReadonlyArray<SignalLayer>): SignalLayer => {
-  let merged = layers[0]!;
+  let merged = layers[0]!
 
   for (let index = 1; index < layers.length; index++) {
-    merged = Layer.mergeAll(merged, layers[index]!);
+    merged = Layer.mergeAll(merged, layers[index]!)
   }
 
-  return merged;
-};
+  return merged
+}
 
 const makeLayer = (
   options: LayerOptions = {},
   runtimeAttributes: ResourceAttributes = {},
 ): Layer.Layer<OtlpExporter.Flusher> => {
-  const signals = selectedSignals(options.signals);
-  const resource = makeResource(options, runtimeAttributes);
-  const layers: Array<SignalLayer> = [];
+  const signals = selectedSignals(options.signals)
+  const resource = makeResource(options, runtimeAttributes)
+  const layers: Array<SignalLayer> = []
 
-  if (signals.has("logs")) {
+  if (signals.has('logs')) {
     layers.push(
       OtlpLogger.layerFromConfig({
         resource,
@@ -148,38 +149,38 @@ const makeLayer = (
         excludeLogSpans: options.loggerExcludeLogSpans,
         mergeWithExisting: options.loggerMergeWithExisting,
       }),
-    );
+    )
   }
 
-  if (signals.has("traces")) {
+  if (signals.has('traces')) {
     layers.push(
       OtlpTracer.layerFromConfig({
         resource,
         headers: options.headers,
         context: options.tracerContext,
       }),
-    );
+    )
   }
 
-  if (signals.has("metrics")) {
+  if (signals.has('metrics')) {
     layers.push(
       OtlpMetrics.layerFromConfig({
         resource,
         headers: options.headers,
       }),
-    );
+    )
   }
 
   if (layers.length === 0) {
-    return OtlpExporter.layerFlusher;
+    return OtlpExporter.layerFlusher
   }
 
   return mergeSignalLayers(layers).pipe(
     Layer.provide(cloudflareConfigProviderLayer),
     Layer.provide(serializationLayer(options.serialization)),
     Layer.provide(FetchHttpClient.layer),
-  );
-};
+  )
+}
 
 /**
  * Base OTLP telemetry layer for Cloudflare-compatible runtimes.
@@ -192,18 +193,17 @@ const makeLayer = (
  * The layer provides {@link OtlpExporter.Flusher} for draining buffered
  * telemetry before the isolate freezes.
  */
-export const layer = (options: LayerOptions = {}): Layer.Layer<OtlpExporter.Flusher> =>
-  makeLayer(options);
+export const layer = (options: LayerOptions = {}): Layer.Layer<OtlpExporter.Flusher> => makeLayer(options)
 
 /** Base OTLP telemetry layer forced to JSON serialization. */
 export const layerJson = (
-  options: Omit<LayerOptions, "serialization"> = {},
-): Layer.Layer<OtlpExporter.Flusher> => layer({ ...options, serialization: "json" });
+  options: Omit<LayerOptions, 'serialization'> = {},
+): Layer.Layer<OtlpExporter.Flusher> => layer({ ...options, serialization: 'json' })
 
 /** Base OTLP telemetry layer forced to protobuf serialization. */
 export const layerProtobuf = (
-  options: Omit<LayerOptions, "serialization"> = {},
-): Layer.Layer<OtlpExporter.Flusher> => layer({ ...options, serialization: "protobuf" });
+  options: Omit<LayerOptions, 'serialization'> = {},
+): Layer.Layer<OtlpExporter.Flusher> => layer({ ...options, serialization: 'protobuf' })
 
 /**
  * OTLP layer with Cloudflare Worker resource attributes.
@@ -220,9 +220,9 @@ export const layerProtobuf = (
  */
 export const layerWorker = (options: WorkerLayerOptions = {}): Layer.Layer<OtlpExporter.Flusher> =>
   makeLayer(options, {
-    "cloudflare.resource_type": "worker",
-    "cloudflare.worker.name": options.workerName,
-  });
+    'cloudflare.resource_type': 'worker',
+    'cloudflare.worker.name': options.workerName,
+  })
 
 /**
  * OTLP layer with Cloudflare Durable Object resource attributes.
@@ -237,9 +237,8 @@ export const layerDurableObject = (
   Layer.unwrap(
     Effect.map(DurableObjectState, (state) =>
       makeLayer(options, {
-        "cloudflare.resource_type": "durable_object",
-        "cloudflare.durable_object.class": options.className,
-        "cloudflare.durable_object.id": options.includeObjectId ? state.id.toString() : undefined,
-      }),
-    ),
-  );
+        'cloudflare.resource_type': 'durable_object',
+        'cloudflare.durable_object.class': options.className,
+        'cloudflare.durable_object.id': options.includeObjectId ? state.id.toString() : undefined,
+      })),
+  )

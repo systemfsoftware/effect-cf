@@ -1,153 +1,157 @@
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import * as Schema from "effect/Schema";
-import type { Layer } from "effect";
+import type { Layer } from 'effect'
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Predicate from 'effect/Predicate'
+import * as Schema from 'effect/Schema'
 
-import * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
 const expectedR2Bucket =
-  "R2 bucket binding with head(), get(), put(), createMultipartUpload(), resumeMultipartUpload(), delete(), and list()";
+  'R2 bucket binding with head(), get(), put(), createMultipartUpload(), resumeMultipartUpload(), delete(), and list()'
 
 export type R2Operation =
-  | "head"
-  | "get"
-  | "put"
-  | "delete"
-  | "list"
-  | "createMultipartUpload"
-  | "resumeMultipartUpload"
-  | "uploadPart"
-  | "abortMultipartUpload"
-  | "completeMultipartUpload"
-  | "arrayBuffer"
-  | "bytes"
-  | "text"
-  | "json"
-  | "blob";
+  | 'head'
+  | 'get'
+  | 'put'
+  | 'delete'
+  | 'list'
+  | 'createMultipartUpload'
+  | 'resumeMultipartUpload'
+  | 'uploadPart'
+  | 'abortMultipartUpload'
+  | 'completeMultipartUpload'
+  | 'arrayBuffer'
+  | 'bytes'
+  | 'text'
+  | 'json'
+  | 'blob'
 
-export class R2OperationError extends Data.TaggedError("R2OperationError")<{
-  readonly binding: string;
-  readonly operation: R2Operation;
-  readonly cause: unknown;
+export class R2OperationError extends Data.TaggedError('R2OperationError')<{
+  readonly binding: string
+  readonly operation: R2Operation
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `R2 ${this.operation} failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`;
+    return `R2 ${this.operation} failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
 export interface R2Definition {
-  readonly binding: string;
+  readonly binding: string
 }
 
-export type R2GetOptions = globalThis.R2GetOptions;
-export type R2ListOptions = globalThis.R2ListOptions;
-export type R2MultipartOptions = globalThis.R2MultipartOptions;
-export type R2PutOptions = globalThis.R2PutOptions;
-export type R2UploadPartOptions = globalThis.R2UploadPartOptions;
-export type R2PutValue = ReadableStream | ArrayBuffer | ArrayBufferView | string | null | Blob;
-export type R2UploadPartValue = ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob;
+export type R2GetOptions = globalThis.R2GetOptions
+export type R2ListOptions = globalThis.R2ListOptions
+export type R2MultipartOptions = globalThis.R2MultipartOptions
+export type R2PutOptions = globalThis.R2PutOptions
+export type R2UploadPartOptions = globalThis.R2UploadPartOptions
+export type R2PutValue = ReadableStream | ArrayBuffer | ArrayBufferView | string | null | Blob
+export type R2UploadPartValue = ReadableStream | ArrayBuffer | ArrayBufferView | string | Blob
 
-export interface R2ObjectBodyClient extends Omit<
-  R2ObjectBody,
-  "arrayBuffer" | "blob" | "bytes" | "json" | "text"
-> {
-  readonly raw: R2ObjectBody;
-  readonly arrayBuffer: Effect.Effect<ArrayBuffer, R2OperationError>;
-  readonly bytes: Effect.Effect<Uint8Array, R2OperationError>;
-  readonly text: Effect.Effect<string, R2OperationError>;
-  readonly json: <T = unknown>() => Effect.Effect<T, R2OperationError>;
-  readonly blob: Effect.Effect<Blob, R2OperationError>;
+export interface R2ObjectBodyClient extends
+  Omit<
+    R2ObjectBody,
+    'arrayBuffer' | 'blob' | 'bytes' | 'json' | 'text'
+  >
+{
+  readonly raw: R2ObjectBody
+  readonly arrayBuffer: Effect.Effect<ArrayBuffer, R2OperationError>
+  readonly bytes: Effect.Effect<Uint8Array, R2OperationError>
+  readonly text: Effect.Effect<string, R2OperationError>
+  readonly json: <T = unknown>() => Effect.Effect<T, R2OperationError>
+  readonly blob: Effect.Effect<Blob, R2OperationError>
 }
 
 export interface R2MultipartUploadClient {
-  readonly raw: R2MultipartUpload;
-  readonly key: string;
-  readonly uploadId: string;
+  readonly raw: R2MultipartUpload
+  readonly key: string
+  readonly uploadId: string
   readonly uploadPart: (
     partNumber: number,
     value: R2UploadPartValue,
     options?: R2UploadPartOptions,
-  ) => Effect.Effect<R2UploadedPart, R2OperationError>;
-  readonly abort: Effect.Effect<void, R2OperationError>;
+  ) => Effect.Effect<R2UploadedPart, R2OperationError>
+  readonly abort: Effect.Effect<void, R2OperationError>
   readonly complete: (
     uploadedParts: ReadonlyArray<R2UploadedPart>,
-  ) => Effect.Effect<R2Object, R2OperationError>;
+  ) => Effect.Effect<R2Object, R2OperationError>
 }
 
 export interface R2Client {
-  readonly head: (key: string) => Effect.Effect<Option.Option<R2Object>, R2OperationError>;
+  readonly head: (key: string) => Effect.Effect<Option.Option<R2Object>, R2OperationError>
   readonly get: {
     (
       key: string,
       options: R2GetOptions & { readonly onlyIf: R2Conditional | Headers },
-    ): Effect.Effect<Option.Option<R2ObjectBodyClient | R2Object>, R2OperationError>;
+    ): Effect.Effect<Option.Option<R2ObjectBodyClient | R2Object>, R2OperationError>
     (
       key: string,
       options?: R2GetOptions,
-    ): Effect.Effect<Option.Option<R2ObjectBodyClient>, R2OperationError>;
-  };
+    ): Effect.Effect<Option.Option<R2ObjectBodyClient>, R2OperationError>
+  }
   readonly put: {
     (
       key: string,
       value: R2PutValue,
       options: R2PutOptions & { readonly onlyIf: R2Conditional | Headers },
-    ): Effect.Effect<Option.Option<R2Object>, R2OperationError>;
+    ): Effect.Effect<Option.Option<R2Object>, R2OperationError>
     (
       key: string,
       value: R2PutValue,
       options?: R2PutOptions,
-    ): Effect.Effect<R2Object, R2OperationError>;
-  };
+    ): Effect.Effect<R2Object, R2OperationError>
+  }
   readonly createMultipartUpload: (
     key: string,
     options?: R2MultipartOptions,
-  ) => Effect.Effect<R2MultipartUploadClient, R2OperationError>;
+  ) => Effect.Effect<R2MultipartUploadClient, R2OperationError>
   readonly resumeMultipartUpload: (
     key: string,
     uploadId: string,
-  ) => Effect.Effect<R2MultipartUploadClient, R2OperationError>;
-  readonly delete: (keys: string | ReadonlyArray<string>) => Effect.Effect<void, R2OperationError>;
-  readonly list: (options?: R2ListOptions) => Effect.Effect<R2Objects, R2OperationError>;
-  readonly rawUnsafe: Effect.Effect<R2Bucket>;
-  readonly definition: R2Definition;
+  ) => Effect.Effect<R2MultipartUploadClient, R2OperationError>
+  readonly delete: (keys: string | ReadonlyArray<string>) => Effect.Effect<void, R2OperationError>
+  readonly list: (options?: R2ListOptions) => Effect.Effect<R2Objects, R2OperationError>
+  readonly rawUnsafe: Effect.Effect<R2Bucket>
+  readonly definition: R2Definition
 }
 
-declare const R2ServiceTypeId: unique symbol;
+declare const R2ServiceTypeId: unique symbol
 
 export interface R2Service<Id extends string> {
   readonly [R2ServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-};
+  readonly binding: string
+}
 
-export interface TagClass<Self, Id extends string> extends Context.ServiceClass<
-  Self,
-  Id,
-  R2Client
-> {
-  readonly id: Id;
+export interface TagClass<Self, Id extends string> extends
+  Context.ServiceClass<
+    Self,
+    Id,
+    R2Client
+  >
+{
+  readonly id: Id
   readonly layer: (
     options: LayerOptions,
   ) => Layer.Layer<
     Self,
     Binding.BindingNotFoundError | Binding.BindingValidationError,
     WorkerEnvironment
-  >;
+  >
 }
 
 const r2Error = (binding: string, operation: R2Operation, cause: unknown) =>
-  new R2OperationError({ binding, operation, cause });
+  new R2OperationError({ binding, operation, cause })
 
 const tryR2Promise = <A>(
   binding: string,
@@ -157,7 +161,7 @@ const tryR2Promise = <A>(
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => r2Error(binding, operation, cause),
-  });
+  })
 
 const tryR2Sync = <A>(
   binding: string,
@@ -167,19 +171,19 @@ const tryR2Sync = <A>(
   Effect.try({
     try: evaluate,
     catch: (cause) => r2Error(binding, operation, cause),
-  });
+  })
 
 const spanOptions = (binding: string, operation: R2Operation) => ({
   attributes: { binding, operation },
-});
+})
 
 const isR2ObjectBody = (value: R2ObjectBody | R2Object): value is R2ObjectBody =>
-  "body" in value &&
+  'body' in value &&
   Predicate.isFunction(value.arrayBuffer) &&
   Predicate.isFunction(value.bytes) &&
   Predicate.isFunction(value.text) &&
   Predicate.isFunction(value.json) &&
-  Predicate.isFunction(value.blob);
+  Predicate.isFunction(value.blob)
 
 const wrapObjectBody = (binding: string, object: R2ObjectBody): R2ObjectBodyClient => ({
   key: object.key,
@@ -198,183 +202,175 @@ const wrapObjectBody = (binding: string, object: R2ObjectBody): R2ObjectBodyClie
   raw: object,
   body: object.body,
   get bodyUsed() {
-    return object.bodyUsed;
+    return object.bodyUsed
   },
-  arrayBuffer: tryR2Promise(binding, "arrayBuffer", () => object.arrayBuffer()).pipe(
-    Effect.withSpan("R2.arrayBuffer", spanOptions(binding, "arrayBuffer")),
+  arrayBuffer: tryR2Promise(binding, 'arrayBuffer', () => object.arrayBuffer()).pipe(
+    Effect.withSpan('R2.arrayBuffer', spanOptions(binding, 'arrayBuffer')),
   ),
-  bytes: tryR2Promise(binding, "bytes", () => object.bytes()).pipe(
-    Effect.withSpan("R2.bytes", spanOptions(binding, "bytes")),
+  bytes: tryR2Promise(binding, 'bytes', () => object.bytes()).pipe(
+    Effect.withSpan('R2.bytes', spanOptions(binding, 'bytes')),
   ),
-  text: tryR2Promise(binding, "text", () => object.text()).pipe(
-    Effect.withSpan("R2.text", spanOptions(binding, "text")),
+  text: tryR2Promise(binding, 'text', () => object.text()).pipe(
+    Effect.withSpan('R2.text', spanOptions(binding, 'text')),
   ),
   json: <T = unknown>() =>
-    tryR2Promise(binding, "json", () => object.json<T>()).pipe(
-      Effect.withSpan("R2.json", spanOptions(binding, "json")),
+    tryR2Promise(binding, 'json', () => object.json<T>()).pipe(
+      Effect.withSpan('R2.json', spanOptions(binding, 'json')),
     ),
-  blob: tryR2Promise(binding, "blob", () => object.blob()).pipe(
-    Effect.withSpan("R2.blob", spanOptions(binding, "blob")),
+  blob: tryR2Promise(binding, 'blob', () => object.blob()).pipe(
+    Effect.withSpan('R2.blob', spanOptions(binding, 'blob')),
   ),
-});
+})
 
 const wrapGetResult = (
   binding: string,
   object: R2ObjectBody | R2Object | null,
 ): R2ObjectBodyClient | R2Object | null => {
   if (object === null || !isR2ObjectBody(object)) {
-    return object;
+    return object
   }
 
-  return wrapObjectBody(binding, object);
-};
+  return wrapObjectBody(binding, object)
+}
 
-type R2BindingValue = typeof Schema.Unknown.Type;
+type R2BindingValue = typeof Schema.Unknown.Type
 
 const R2BucketSchema = Schema.declare(
   (value: R2BindingValue): value is R2Bucket =>
-    Predicate.hasProperty(value, "head") &&
+    Predicate.hasProperty(value, 'head') &&
     Predicate.isFunction(value.head) &&
-    Predicate.hasProperty(value, "get") &&
+    Predicate.hasProperty(value, 'get') &&
     Predicate.isFunction(value.get) &&
-    Predicate.hasProperty(value, "put") &&
+    Predicate.hasProperty(value, 'put') &&
     Predicate.isFunction(value.put) &&
-    Predicate.hasProperty(value, "createMultipartUpload") &&
+    Predicate.hasProperty(value, 'createMultipartUpload') &&
     Predicate.isFunction(value.createMultipartUpload) &&
-    Predicate.hasProperty(value, "resumeMultipartUpload") &&
+    Predicate.hasProperty(value, 'resumeMultipartUpload') &&
     Predicate.isFunction(value.resumeMultipartUpload) &&
-    Predicate.hasProperty(value, "delete") &&
+    Predicate.hasProperty(value, 'delete') &&
     Predicate.isFunction(value.delete) &&
-    Predicate.hasProperty(value, "list") &&
+    Predicate.hasProperty(value, 'list') &&
     Predicate.isFunction(value.list),
-);
-const decodeR2Bucket = Schema.decodeUnknownOption(R2BucketSchema);
+)
+const decodeR2Bucket = Schema.decodeUnknownOption(R2BucketSchema)
 
-export const isR2Bucket = (value: R2BindingValue): value is R2Bucket =>
-  Option.isSome(decodeR2Bucket(value));
+export const isR2Bucket = (value: R2BindingValue): value is R2Bucket => Option.isSome(decodeR2Bucket(value))
 
-export const makeClient = (definition: R2Definition): ((bucket: R2Bucket) => R2Client) => {
+export const makeClient = (definition: R2Definition): (bucket: R2Bucket) => R2Client => {
   const wrapUpload = (upload: R2MultipartUpload): R2MultipartUploadClient => ({
     raw: upload,
     key: upload.key,
     uploadId: upload.uploadId,
     uploadPart: Effect.fn(
-      "R2.uploadPart",
-      spanOptions(definition.binding, "uploadPart"),
+      'R2.uploadPart',
+      spanOptions(definition.binding, 'uploadPart'),
     )((partNumber: number, value: R2UploadPartValue, options?: R2UploadPartOptions) =>
-      tryR2Promise(definition.binding, "uploadPart", () =>
-        upload.uploadPart(partNumber, value, options),
-      ),
+      tryR2Promise(definition.binding, 'uploadPart', () => upload.uploadPart(partNumber, value, options))
     ),
-    abort: tryR2Promise(definition.binding, "abortMultipartUpload", () => upload.abort()).pipe(
+    abort: tryR2Promise(definition.binding, 'abortMultipartUpload', () => upload.abort()).pipe(
       Effect.withSpan(
-        "R2.abortMultipartUpload",
-        spanOptions(definition.binding, "abortMultipartUpload"),
+        'R2.abortMultipartUpload',
+        spanOptions(definition.binding, 'abortMultipartUpload'),
       ),
     ),
     complete: Effect.fn(
-      "R2.completeMultipartUpload",
-      spanOptions(definition.binding, "completeMultipartUpload"),
+      'R2.completeMultipartUpload',
+      spanOptions(definition.binding, 'completeMultipartUpload'),
     )((uploadedParts: ReadonlyArray<R2UploadedPart>) =>
-      tryR2Promise(definition.binding, "completeMultipartUpload", () =>
-        upload.complete([...uploadedParts]),
-      ),
+      tryR2Promise(definition.binding, 'completeMultipartUpload', () => upload.complete([...uploadedParts]))
     ),
-  });
+  })
 
   return (bucket) => {
     // SAFETY: the implementation preserves Cloudflare's get overload distinction for onlyIf options.
     const get = Effect.fn(
-      "R2.get",
-      spanOptions(definition.binding, "get"),
+      'R2.get',
+      spanOptions(definition.binding, 'get'),
     )((key: string, options?: R2GetOptions) =>
-      tryR2Promise(definition.binding, "get", () => bucket.get(key, options)).pipe(
+      tryR2Promise(definition.binding, 'get', () => bucket.get(key, options)).pipe(
         Effect.map((object) => Option.fromNullOr(wrapGetResult(definition.binding, object))),
-      ),
-    ) as R2Client["get"];
+      )
+    ) as R2Client['get']
 
     return {
       definition,
       head: Effect.fn(
-        "R2.head",
-        spanOptions(definition.binding, "head"),
+        'R2.head',
+        spanOptions(definition.binding, 'head'),
       )((key: string) =>
-        tryR2Promise(definition.binding, "head", () => bucket.head(key)).pipe(
+        tryR2Promise(definition.binding, 'head', () => bucket.head(key)).pipe(
           Effect.map(Option.fromNullOr),
-        ),
+        )
       ),
       get,
       // SAFETY: the implementation preserves Cloudflare's put overload distinction for onlyIf options.
       put: Effect.fn(
-        "R2.put",
-        spanOptions(definition.binding, "put"),
+        'R2.put',
+        spanOptions(definition.binding, 'put'),
       )((key: string, value: R2PutValue, options?: R2PutOptions) =>
-        tryR2Promise(definition.binding, "put", () => bucket.put(key, value, options)).pipe(
+        tryR2Promise(definition.binding, 'put', () => bucket.put(key, value, options)).pipe(
           Effect.map((object) => {
             if (object === null) {
-              return Option.none<R2Object>();
+              return Option.none<R2Object>()
             }
 
-            if (options !== undefined && "onlyIf" in options) {
-              return Option.some(object);
+            if (options !== undefined && 'onlyIf' in options) {
+              return Option.some(object)
             }
 
-            return object;
+            return object
           }),
-        ),
-      ) as R2Client["put"],
+        )
+      ) as R2Client['put'],
       createMultipartUpload: Effect.fn(
-        "R2.createMultipartUpload",
-        spanOptions(definition.binding, "createMultipartUpload"),
+        'R2.createMultipartUpload',
+        spanOptions(definition.binding, 'createMultipartUpload'),
       )((key: string, options?: R2MultipartOptions) =>
-        tryR2Promise(definition.binding, "createMultipartUpload", () =>
-          bucket.createMultipartUpload(key, options),
-        ).pipe(Effect.map(wrapUpload)),
+        tryR2Promise(definition.binding, 'createMultipartUpload', () => bucket.createMultipartUpload(key, options))
+          .pipe(Effect.map(wrapUpload))
       ),
       resumeMultipartUpload: Effect.fn(
-        "R2.resumeMultipartUpload",
-        spanOptions(definition.binding, "resumeMultipartUpload"),
+        'R2.resumeMultipartUpload',
+        spanOptions(definition.binding, 'resumeMultipartUpload'),
       )((key: string, uploadId: string) =>
-        tryR2Sync(definition.binding, "resumeMultipartUpload", () =>
-          wrapUpload(bucket.resumeMultipartUpload(key, uploadId)),
-        ),
+        tryR2Sync(
+          definition.binding,
+          'resumeMultipartUpload',
+          () => wrapUpload(bucket.resumeMultipartUpload(key, uploadId)),
+        )
       ),
       delete: Effect.fn(
-        "R2.delete",
-        spanOptions(definition.binding, "delete"),
+        'R2.delete',
+        spanOptions(definition.binding, 'delete'),
       )((keys: string | ReadonlyArray<string>) => {
-        const nativeKeys = Predicate.isString(keys) ? keys : [...keys];
+        const nativeKeys = Predicate.isString(keys) ? keys : [...keys]
 
-        return tryR2Promise(definition.binding, "delete", () => bucket.delete(nativeKeys));
+        return tryR2Promise(definition.binding, 'delete', () => bucket.delete(nativeKeys))
       }),
       list: Effect.fn(
-        "R2.list",
-        spanOptions(definition.binding, "list"),
-      )((options?: R2ListOptions) =>
-        tryR2Promise(definition.binding, "list", () => bucket.list(options)),
-      ),
+        'R2.list',
+        spanOptions(definition.binding, 'list'),
+      )((options?: R2ListOptions) => tryR2Promise(definition.binding, 'list', () => bucket.list(options))),
       rawUnsafe: Effect.succeed(bucket),
-    };
-  };
-};
+    }
+  }
+}
 
 export const layer = <Self>(tag: Context.Service<Self, R2Client>, definition: R2Definition) =>
   Binding.layer(tag, definition.binding, isR2Bucket, makeClient(definition), {
     expected: expectedR2Bucket,
-  });
+  })
 
-export const make = <Id extends string>(id: Id) => Tag<R2Service<Id>>()<Id>(id);
+export const make = <Id extends string>(id: Id) => Tag<R2Service<Id>>()<Id>(id)
 
-export const Tag =
-  <Self>() =>
-  <Id extends string>(id: Id) => {
-    const tag = Context.Service<Self, R2Client>()(id);
+export const Tag = <Self>() => <Id extends string>(id: Id) => {
+  const tag = Context.Service<Self, R2Client>()(id)
 
-    const makeLayer = (definition: LayerOptions) => layer(tag, definition);
+  const makeLayer = (definition: LayerOptions) => layer(tag, definition)
 
-    // SAFETY: Object.assign attaches exactly the static id/layer members declared by TagClass.
-    return Object.assign(tag, {
-      id,
-      layer: makeLayer,
-    }) as TagClass<Self, Id>;
-  };
+  // SAFETY: Object.assign attaches exactly the static id/layer members declared by TagClass.
+  return Object.assign(tag, {
+    id,
+    layer: makeLayer,
+  }) as TagClass<Self, Id>
+}

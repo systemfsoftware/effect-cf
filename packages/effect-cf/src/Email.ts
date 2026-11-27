@@ -1,17 +1,17 @@
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
-import type { Layer } from "effect";
+import type { Layer } from 'effect'
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Predicate from 'effect/Predicate'
 
-import * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
-const expectedSendEmailBinding = "Send Email binding with send()";
-const textEncoder = new TextEncoder();
+const expectedSendEmailBinding = 'Send Email binding with send()'
+const textEncoder = new TextEncoder()
 
 export const sendLimits = {
   maxRecipients: 50,
@@ -21,7 +21,7 @@ export const sendLimits = {
   maxHeaderValueBytes: 2048,
   maxHeadersBytes: 16 * 1024,
   maxAllowlistHeaders: 20,
-} as const;
+} as const
 
 /**
  * Error codes reported by Cloudflare Email Sending.
@@ -32,34 +32,34 @@ export const sendLimits = {
  * (miniflare remote bindings serialize errors and can strip it).
  */
 export const emailErrorCodes = [
-  "E_VALIDATION_ERROR",
-  "E_FIELD_MISSING",
-  "E_TOO_MANY_RECIPIENTS",
-  "E_TOO_MANY_ATTACHMENTS",
-  "E_SENDER_NOT_VERIFIED",
-  "E_RECIPIENT_NOT_ALLOWED",
-  "E_RECIPIENT_SUPPRESSED",
-  "E_SENDER_DOMAIN_NOT_AVAILABLE",
-  "E_CONTENT_TOO_LARGE",
-  "E_DELIVERY_FAILED",
-  "E_RATE_LIMIT_EXCEEDED",
-  "E_DAILY_LIMIT_EXCEEDED",
-  "E_INTERNAL_SERVER_ERROR",
-  "E_HEADER_NOT_ALLOWED",
-  "E_HEADER_USE_API_FIELD",
-  "E_HEADER_VALUE_INVALID",
-  "E_HEADER_VALUE_TOO_LONG",
-  "E_HEADER_NAME_INVALID",
-  "E_HEADERS_TOO_LARGE",
-  "E_HEADERS_TOO_MANY",
-] as const;
+  'E_VALIDATION_ERROR',
+  'E_FIELD_MISSING',
+  'E_TOO_MANY_RECIPIENTS',
+  'E_TOO_MANY_ATTACHMENTS',
+  'E_SENDER_NOT_VERIFIED',
+  'E_RECIPIENT_NOT_ALLOWED',
+  'E_RECIPIENT_SUPPRESSED',
+  'E_SENDER_DOMAIN_NOT_AVAILABLE',
+  'E_CONTENT_TOO_LARGE',
+  'E_DELIVERY_FAILED',
+  'E_RATE_LIMIT_EXCEEDED',
+  'E_DAILY_LIMIT_EXCEEDED',
+  'E_INTERNAL_SERVER_ERROR',
+  'E_HEADER_NOT_ALLOWED',
+  'E_HEADER_USE_API_FIELD',
+  'E_HEADER_VALUE_INVALID',
+  'E_HEADER_VALUE_TOO_LONG',
+  'E_HEADER_NAME_INVALID',
+  'E_HEADERS_TOO_LARGE',
+  'E_HEADERS_TOO_MANY',
+] as const
 
-export type EmailErrorCode = (typeof emailErrorCodes)[number];
+export type EmailErrorCode = (typeof emailErrorCodes)[number]
 
-export class EmailOperationError extends Data.TaggedError("EmailOperationError")<{
-  readonly binding: string;
-  readonly operation: string;
-  readonly cause: unknown;
+export class EmailOperationError extends Data.TaggedError('EmailOperationError')<{
+  readonly binding: string
+  readonly operation: string
+  readonly cause: unknown
   /**
    * Cloudflare error code taken from the thrown error, when present.
    *
@@ -67,85 +67,91 @@ export class EmailOperationError extends Data.TaggedError("EmailOperationError")
    * proxying — miniflare remote bindings (`"remote": true`) serialize thrown
    * errors and can strip the non-standard `code` property.
    */
-  readonly code?: EmailErrorCode | (string & {});
+  readonly code?: EmailErrorCode | (string & {})
 }> {
   override get message(): string {
-    const code = this.code === undefined ? "" : ` (${this.code})`;
+    const code = this.code === undefined ? '' : ` (${this.code})`
 
-    return `Email ${this.operation} failed for binding "${this.binding}"${code}: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Email ${this.operation} failed for binding "${this.binding}"${code}: ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
 export interface EmailViolation {
-  readonly path: string;
-  readonly message: string;
-  readonly limit?: number;
-  readonly actual?: number;
+  readonly path: string
+  readonly message: string
+  readonly limit?: number
+  readonly actual?: number
 }
 
-export class EmailValidationError extends Data.TaggedError("EmailValidationError")<{
-  readonly binding: string;
-  readonly operation: string;
-  readonly violations: ReadonlyArray<EmailViolation>;
+export class EmailValidationError extends Data.TaggedError('EmailValidationError')<{
+  readonly binding: string
+  readonly operation: string
+  readonly violations: ReadonlyArray<EmailViolation>
 }> {
   override get message(): string {
-    return `Email ${this.operation} for binding "${this.binding}" failed validation: ${ErrorMessage.violationsMessage(this.violations)}`;
+    return `Email ${this.operation} for binding "${this.binding}" failed validation: ${
+      ErrorMessage.violationsMessage(this.violations)
+    }`
   }
 }
 
 export interface EmailDefinition {
-  readonly binding: string;
+  readonly binding: string
 }
 
-export type EmailAddress = globalThis.EmailAddress;
-export type EmailAttachment = globalThis.EmailAttachment;
-export type EmailSendResult = globalThis.EmailSendResult;
-export type EmailMessageBuilder = Parameters<SendEmail["send"]>[0];
-export type EmailBinding = SendEmail;
-export type EmailRecipients = string | EmailAddress | ReadonlyArray<string | EmailAddress>;
-export type EmailSendError = EmailOperationError | EmailValidationError;
-type EmailFieldCandidate = Parameters<typeof Predicate.isUnknown>[0];
+export type EmailAddress = globalThis.EmailAddress
+export type EmailAttachment = globalThis.EmailAttachment
+export type EmailSendResult = globalThis.EmailSendResult
+export type EmailMessageBuilder = Parameters<SendEmail['send']>[0]
+export type EmailBinding = SendEmail
+export type EmailRecipients = string | EmailAddress | ReadonlyArray<string | EmailAddress>
+export type EmailSendError = EmailOperationError | EmailValidationError
+type EmailFieldCandidate = Parameters<typeof Predicate.isUnknown>[0]
 
 export interface EmailSendOptions {
-  readonly validate?: boolean;
+  readonly validate?: boolean
 }
 
 interface EmailRuntimeBinding {
-  readonly send: (message: EmailMessageBuilder) => Promise<EmailSendResult>;
+  readonly send: (message: EmailMessageBuilder) => Promise<EmailSendResult>
 }
 
 export interface EmailClient {
-  readonly send: (message: EmailMessageBuilder) => Effect.Effect<EmailSendResult, EmailSendError>;
-  readonly rawUnsafe: Effect.Effect<EmailBinding>;
-  readonly definition: EmailDefinition;
+  readonly send: (message: EmailMessageBuilder) => Effect.Effect<EmailSendResult, EmailSendError>
+  readonly rawUnsafe: Effect.Effect<EmailBinding>
+  readonly definition: EmailDefinition
 }
 
-declare const EmailServiceTypeId: unique symbol;
+declare const EmailServiceTypeId: unique symbol
 
 export interface EmailService<Id extends string> {
   readonly [EmailServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-  readonly send?: EmailSendOptions;
-};
+  readonly binding: string
+  readonly send?: EmailSendOptions
+}
 
-export interface TagClass<Self, Id extends string> extends Context.ServiceClass<
-  Self,
-  Id,
-  EmailClient
-> {
-  readonly id: Id;
+export interface TagClass<Self, Id extends string> extends
+  Context.ServiceClass<
+    Self,
+    Id,
+    EmailClient
+  >
+{
+  readonly id: Id
   readonly layer: (
     options: LayerOptions,
   ) => Layer.Layer<
     Self,
     Binding.BindingNotFoundError | Binding.BindingValidationError,
     WorkerEnvironment
-  >;
+  >
 }
 
 /**
@@ -154,24 +160,24 @@ export interface TagClass<Self, Id extends string> extends Context.ServiceClass<
  * proxy such as a miniflare remote binding (`"remote": true`) serializes the
  * error and strips non-standard properties.
  */
-const emailErrorCode = (cause: unknown): EmailOperationError["code"] => {
+const emailErrorCode = (cause: unknown): EmailOperationError['code'] => {
   if (!Predicate.isObject(cause)) {
-    return undefined;
+    return undefined
   }
 
-  const code = Predicate.hasProperty(cause, "code") ? cause.code : undefined;
+  const code = Predicate.hasProperty(cause, 'code') ? cause.code : undefined
 
-  return Predicate.isString(code) ? code : undefined;
-};
+  return Predicate.isString(code) ? code : undefined
+}
 
 const emailError = (binding: string, operation: string, cause: unknown) =>
-  new EmailOperationError({ binding, operation, cause, code: emailErrorCode(cause) });
+  new EmailOperationError({ binding, operation, cause, code: emailErrorCode(cause) })
 
 const emailValidationError = (
   binding: string,
   operation: string,
   violations: ReadonlyArray<EmailViolation>,
-) => new EmailValidationError({ binding, operation, violations });
+) => new EmailValidationError({ binding, operation, violations })
 
 const tryEmailPromise = <A>(
   binding: string,
@@ -181,9 +187,9 @@ const tryEmailPromise = <A>(
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => emailError(binding, operation, cause),
-  });
+  })
 
-const byteLength = (value: string) => textEncoder.encode(value).byteLength;
+const byteLength = (value: string) => textEncoder.encode(value).byteLength
 
 const limitViolation = (
   path: string,
@@ -195,142 +201,142 @@ const limitViolation = (
   message: `${label} exceeds Cloudflare Email Sending limit`,
   actual,
   limit,
-});
+})
 
 const addressList = (value: EmailRecipients | undefined): ReadonlyArray<string | EmailAddress> => {
   if (value === undefined) {
-    return [];
+    return []
   }
 
   // SAFETY: the non-array branch is exactly the scalar member of EmailRecipients.
-  return Array.isArray(value) ? value : [value as string | EmailAddress];
-};
+  return Array.isArray(value) ? value : [value as string | EmailAddress]
+}
 
 const addressViolations = (
   path: string,
   value: EmailFieldCandidate,
 ): ReadonlyArray<EmailViolation> => {
   if (Predicate.isString(value)) {
-    return value.includes("@") ? [] : [{ path, message: "Email address must contain an @ symbol" }];
+    return value.includes('@') ? [] : [{ path, message: 'Email address must contain an @ symbol' }]
   }
 
   if (!Predicate.isObject(value)) {
-    return [{ path, message: "Email address must be a string or { name, email } object" }];
+    return [{ path, message: 'Email address must be a string or { name, email } object' }]
   }
 
-  const email = Predicate.hasProperty(value, "email") ? value.email : undefined;
+  const email = Predicate.hasProperty(value, 'email') ? value.email : undefined
 
-  if (!Predicate.isString(email) || !email.includes("@")) {
-    return [{ path: `${path}.email`, message: "Email address must contain an @ symbol" }];
+  if (!Predicate.isString(email) || !email.includes('@')) {
+    return [{ path: `${path}.email`, message: 'Email address must contain an @ symbol' }]
   }
 
-  return [];
-};
+  return []
+}
 
 const recipientViolations = (
-  field: "to" | "cc" | "bcc",
+  field: 'to' | 'cc' | 'bcc',
   value: EmailRecipients | undefined,
 ): ReadonlyArray<EmailViolation> =>
-  addressList(value).flatMap((address, index) => addressViolations(`${field}[${index}]`, address));
+  addressList(value).flatMap((address, index) => addressViolations(`${field}[${index}]`, address))
 
 const attachmentViolations = (
   attachments: ReadonlyArray<EmailAttachment>,
 ): ReadonlyArray<EmailViolation> => {
-  const violations: Array<EmailViolation> = [];
+  const violations: Array<EmailViolation> = []
 
   if (attachments.length > sendLimits.maxAttachments) {
     violations.push(
-      limitViolation("attachments", "attachments", attachments.length, sendLimits.maxAttachments),
-    );
+      limitViolation('attachments', 'attachments', attachments.length, sendLimits.maxAttachments),
+    )
   }
 
   for (let index = 0; index < attachments.length; index++) {
-    const attachment = attachments[index];
-    const path = `attachments[${index}]`;
+    const attachment = attachments[index]
+    const path = `attachments[${index}]`
 
     if (!Predicate.isObject(attachment)) {
-      violations.push({ path, message: "Attachment must be an object" });
-      continue;
+      violations.push({ path, message: 'Attachment must be an object' })
+      continue
     }
 
-    if (!Predicate.isString(attachment.filename) || attachment.filename === "") {
-      violations.push({ path: `${path}.filename`, message: "Attachment filename is required" });
+    if (!Predicate.isString(attachment.filename) || attachment.filename === '') {
+      violations.push({ path: `${path}.filename`, message: 'Attachment filename is required' })
     }
 
-    if (!Predicate.isString(attachment.type) || attachment.type === "") {
-      violations.push({ path: `${path}.type`, message: "Attachment MIME type is required" });
+    if (!Predicate.isString(attachment.type) || attachment.type === '') {
+      violations.push({ path: `${path}.type`, message: 'Attachment MIME type is required' })
     }
 
     if (attachment.content === undefined || attachment.content === null) {
-      violations.push({ path: `${path}.content`, message: "Attachment content is required" });
+      violations.push({ path: `${path}.content`, message: 'Attachment content is required' })
     }
 
-    if (attachment.disposition === "inline" && !Predicate.isString(attachment.contentId)) {
+    if (attachment.disposition === 'inline' && !Predicate.isString(attachment.contentId)) {
       violations.push({
         path: `${path}.contentId`,
-        message: "Inline attachments require a contentId",
-      });
+        message: 'Inline attachments require a contentId',
+      })
     }
   }
 
-  return violations;
-};
+  return violations
+}
 
 const headerViolations = (headers: Record<string, string>): ReadonlyArray<EmailViolation> => {
-  const violations: Array<EmailViolation> = [];
-  const entries = Object.entries(headers);
-  let totalBytes = 0;
-  let allowlistHeaders = 0;
+  const violations: Array<EmailViolation> = []
+  const entries = Object.entries(headers)
+  let totalBytes = 0
+  let allowlistHeaders = 0
 
   for (const [name, value] of entries) {
-    const path = `headers["${name}"]`;
-    const nameBytes = byteLength(name);
+    const path = `headers["${name}"]`
+    const nameBytes = byteLength(name)
 
     if (nameBytes > sendLimits.maxHeaderNameBytes) {
       violations.push(
-        limitViolation(path, "header name bytes", nameBytes, sendLimits.maxHeaderNameBytes),
-      );
+        limitViolation(path, 'header name bytes', nameBytes, sendLimits.maxHeaderNameBytes),
+      )
     }
 
     if (!Predicate.isString(value)) {
-      violations.push({ path, message: "Header value must be a string" });
-      continue;
+      violations.push({ path, message: 'Header value must be a string' })
+      continue
     }
 
-    const valueBytes = byteLength(value);
+    const valueBytes = byteLength(value)
 
     if (valueBytes > sendLimits.maxHeaderValueBytes) {
       violations.push(
-        limitViolation(path, "header value bytes", valueBytes, sendLimits.maxHeaderValueBytes),
-      );
+        limitViolation(path, 'header value bytes', valueBytes, sendLimits.maxHeaderValueBytes),
+      )
     }
 
-    totalBytes += nameBytes + valueBytes;
+    totalBytes += nameBytes + valueBytes
 
-    if (!name.toLowerCase().startsWith("x-")) {
-      allowlistHeaders += 1;
+    if (!name.toLowerCase().startsWith('x-')) {
+      allowlistHeaders += 1
     }
   }
 
   if (totalBytes > sendLimits.maxHeadersBytes) {
     violations.push(
-      limitViolation("headers", "header bytes", totalBytes, sendLimits.maxHeadersBytes),
-    );
+      limitViolation('headers', 'header bytes', totalBytes, sendLimits.maxHeadersBytes),
+    )
   }
 
   if (allowlistHeaders > sendLimits.maxAllowlistHeaders) {
     violations.push(
       limitViolation(
-        "headers",
-        "allowlisted custom headers",
+        'headers',
+        'allowlisted custom headers',
         allowlistHeaders,
         sendLimits.maxAllowlistHeaders,
       ),
-    );
+    )
   }
 
-  return violations;
-};
+  return violations
+}
 
 /**
  * Validates a structured message against documented Cloudflare Email Sending
@@ -338,128 +344,124 @@ const headerViolations = (headers: Record<string, string>): ReadonlyArray<EmailV
  * because the encoded MIME size is only known once Cloudflare composes it.
  */
 export const validateMessage = (message: EmailMessageBuilder): ReadonlyArray<EmailViolation> => {
-  const violations: Array<EmailViolation> = [];
+  const violations: Array<EmailViolation> = []
   // SAFETY: this wider view exists solely to validate runtime callers that bypass TypeScript.
   const fields = message as {
-    readonly to?: EmailRecipients;
-    readonly cc?: EmailRecipients;
-    readonly bcc?: EmailRecipients;
-    readonly from?: unknown;
-    readonly replyTo?: unknown;
-    readonly subject?: unknown;
-    readonly text?: unknown;
-    readonly html?: unknown;
-    readonly attachments?: ReadonlyArray<EmailAttachment>;
-    readonly headers?: Record<string, string>;
-  };
+    readonly to?: EmailRecipients
+    readonly cc?: EmailRecipients
+    readonly bcc?: EmailRecipients
+    readonly from?: unknown
+    readonly replyTo?: unknown
+    readonly subject?: unknown
+    readonly text?: unknown
+    readonly html?: unknown
+    readonly attachments?: ReadonlyArray<EmailAttachment>
+    readonly headers?: Record<string, string>
+  }
 
   if (fields.from === undefined) {
-    violations.push({ path: "from", message: "A from address is required" });
+    violations.push({ path: 'from', message: 'A from address is required' })
   } else {
-    violations.push(...addressViolations("from", fields.from));
+    violations.push(...addressViolations('from', fields.from))
   }
 
   if (fields.replyTo !== undefined) {
-    violations.push(...addressViolations("replyTo", fields.replyTo));
+    violations.push(...addressViolations('replyTo', fields.replyTo))
   }
 
-  if (!Predicate.isString(fields.subject) || fields.subject === "") {
-    violations.push({ path: "subject", message: "A subject is required" });
+  if (!Predicate.isString(fields.subject) || fields.subject === '') {
+    violations.push({ path: 'subject', message: 'A subject is required' })
   }
 
   if (!Predicate.isString(fields.text) && !Predicate.isString(fields.html)) {
-    violations.push({ path: "$", message: "A message requires either text or html content" });
+    violations.push({ path: '$', message: 'A message requires either text or html content' })
   }
 
-  const recipients =
-    addressList(fields.to).length + addressList(fields.cc).length + addressList(fields.bcc).length;
+  const recipients = addressList(fields.to).length + addressList(fields.cc).length + addressList(fields.bcc).length
 
   if (recipients === 0) {
     violations.push({
-      path: "$",
-      message: "A message requires at least one to, cc, or bcc address",
-    });
+      path: '$',
+      message: 'A message requires at least one to, cc, or bcc address',
+    })
   }
 
   if (recipients > sendLimits.maxRecipients) {
     violations.push(
       limitViolation(
-        "$",
-        "combined to, cc, and bcc addresses",
+        '$',
+        'combined to, cc, and bcc addresses',
         recipients,
         sendLimits.maxRecipients,
       ),
-    );
+    )
   }
 
-  violations.push(...recipientViolations("to", fields.to));
-  violations.push(...recipientViolations("cc", fields.cc));
-  violations.push(...recipientViolations("bcc", fields.bcc));
+  violations.push(...recipientViolations('to', fields.to))
+  violations.push(...recipientViolations('cc', fields.cc))
+  violations.push(...recipientViolations('bcc', fields.bcc))
 
   if (fields.attachments !== undefined) {
-    violations.push(...attachmentViolations(fields.attachments));
+    violations.push(...attachmentViolations(fields.attachments))
   }
 
   if (fields.headers !== undefined) {
-    violations.push(...headerViolations(fields.headers));
+    violations.push(...headerViolations(fields.headers))
   }
 
-  return violations;
-};
+  return violations
+}
 
 const validateSendInput = (
   binding: string,
   operation: string,
   message: EmailMessageBuilder,
 ): Effect.Effect<EmailMessageBuilder, EmailValidationError> => {
-  const violations = validateMessage(message);
+  const violations = validateMessage(message)
 
   return violations.length > 0
     ? Effect.fail(emailValidationError(binding, operation, violations))
-    : Effect.succeed(message);
-};
+    : Effect.succeed(message)
+}
 
 export const isEmailBinding = <Candidate>(value: Candidate): value is Candidate & EmailBinding =>
-  Predicate.hasProperty(value, "send") && Predicate.isFunction(value.send);
+  Predicate.hasProperty(value, 'send') && Predicate.isFunction(value.send)
 
 export const makeClient =
-  (definition: EmailDefinition, options?: EmailSendOptions) =>
-  (email: EmailBinding): EmailClient => {
+  (definition: EmailDefinition, options?: EmailSendOptions) => (email: EmailBinding): EmailClient => {
     // SAFETY: EmailBinding.send is the native promise API represented by EmailRuntimeBinding.
-    const runtime = email as EmailRuntimeBinding;
-    const validate = options?.validate ?? true;
-    const send = Effect.fn("Email.send")(function* (message: EmailMessageBuilder) {
+    const runtime = email as EmailRuntimeBinding
+    const validate = options?.validate ?? true
+    const send = Effect.fn('Email.send')(function*(message: EmailMessageBuilder) {
       if (validate) {
-        yield* validateSendInput(definition.binding, "send", message);
+        yield* validateSendInput(definition.binding, 'send', message)
       }
 
-      return yield* tryEmailPromise(definition.binding, "send", () => runtime.send(message));
-    });
+      return yield* tryEmailPromise(definition.binding, 'send', () => runtime.send(message))
+    })
 
     return {
       definition,
       send,
       rawUnsafe: Effect.succeed(email),
-    };
-  };
+    }
+  }
 
 export const layer = <Self>(tag: Context.Service<Self, EmailClient>, definition: LayerOptions) =>
   Binding.layer(tag, definition.binding, isEmailBinding, makeClient(definition, definition.send), {
     expected: expectedSendEmailBinding,
-  });
+  })
 
-export const make = <Id extends string>(id: Id) => Tag<EmailService<Id>>()<Id>(id);
+export const make = <Id extends string>(id: Id) => Tag<EmailService<Id>>()<Id>(id)
 
-export const Tag =
-  <Self>() =>
-  <Id extends string>(id: Id) => {
-    const tag = Context.Service<Self, EmailClient>()(id);
+export const Tag = <Self>() => <Id extends string>(id: Id) => {
+  const tag = Context.Service<Self, EmailClient>()(id)
 
-    const makeLayer = (definition: LayerOptions) => layer(tag, definition);
+  const makeLayer = (definition: LayerOptions) => layer(tag, definition)
 
-    // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
-    return Object.assign(tag, {
-      id,
-      layer: makeLayer,
-    }) as TagClass<Self, Id>;
-  };
+  // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
+  return Object.assign(tag, {
+    id,
+    layer: makeLayer,
+  }) as TagClass<Self, Id>
+}

@@ -1,22 +1,22 @@
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
-import * as S from "effect/Schema";
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Predicate from 'effect/Predicate'
+import * as S from 'effect/Schema'
 
-import type * as Rpc from "./Rpc";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import * as ErrorMessage from './internal/ErrorMessage'
+import type * as Rpc from './Rpc'
 
-export class RpcReservedMethodNameError extends Data.TaggedError("RpcReservedMethodNameError")<{
-  readonly definition: string;
-  readonly method: string;
+export class RpcReservedMethodNameError extends Data.TaggedError('RpcReservedMethodNameError')<{
+  readonly definition: string
+  readonly method: string
 }> {
   override get message() {
-    return `${this.definition} RPC method "${this.method}" is reserved by Cloudflare Workers RPC`;
+    return `${this.definition} RPC method "${this.method}" is reserved by Cloudflare Workers RPC`
   }
 }
 
 export class RpcArgumentCountError extends S.TaggedError<RpcArgumentCountError>()(
-  "RpcArgumentCountError",
+  'RpcArgumentCountError',
   {
     definition: S.String,
     method: S.String,
@@ -25,12 +25,12 @@ export class RpcArgumentCountError extends S.TaggedError<RpcArgumentCountError>(
   },
 ) {
   override get message(): string {
-    return `${this.definition} RPC method "${this.method}" expected ${this.expected} arguments but received ${this.actual}`;
+    return `${this.definition} RPC method "${this.method}" expected ${this.expected} arguments but received ${this.actual}`
   }
 }
 
 export class RpcArgumentDecodeError extends S.TaggedError<RpcArgumentDecodeError>()(
-  "RpcArgumentDecodeError",
+  'RpcArgumentDecodeError',
   {
     definition: S.String,
     method: S.String,
@@ -38,32 +38,38 @@ export class RpcArgumentDecodeError extends S.TaggedError<RpcArgumentDecodeError
   },
 ) {
   override get message(): string {
-    return `${this.definition} RPC method "${this.method}" argument decode failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `${this.definition} RPC method "${this.method}" argument decode failed: ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
-export class RpcArgumentEncodeError extends Data.TaggedError("RpcArgumentEncodeError")<{
-  readonly definition: string;
-  readonly method: string;
-  readonly cause: unknown;
+export class RpcArgumentEncodeError extends Data.TaggedError('RpcArgumentEncodeError')<{
+  readonly definition: string
+  readonly method: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `${this.definition} RPC method "${this.method}" argument encode failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `${this.definition} RPC method "${this.method}" argument encode failed: ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
-export class RpcSuccessDecodeError extends Data.TaggedError("RpcSuccessDecodeError")<{
-  readonly definition: string;
-  readonly method: string;
-  readonly cause: unknown;
+export class RpcSuccessDecodeError extends Data.TaggedError('RpcSuccessDecodeError')<{
+  readonly definition: string
+  readonly method: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `${this.definition} RPC method "${this.method}" success decode failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `${this.definition} RPC method "${this.method}" success decode failed: ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
 export class RpcSuccessEncodeError extends S.TaggedError<RpcSuccessEncodeError>()(
-  "RpcSuccessEncodeError",
+  'RpcSuccessEncodeError',
   {
     definition: S.String,
     method: S.String,
@@ -71,27 +77,29 @@ export class RpcSuccessEncodeError extends S.TaggedError<RpcSuccessEncodeError>(
   },
 ) {
   override get message(): string {
-    return `${this.definition} RPC method "${this.method}" success encode failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `${this.definition} RPC method "${this.method}" success encode failed: ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
 /** Errors raised server-side that must survive the Cloudflare RPC wire. */
-export type WireError = RpcArgumentCountError | RpcArgumentDecodeError | RpcSuccessEncodeError;
+export type WireError = RpcArgumentCountError | RpcArgumentDecodeError | RpcSuccessEncodeError
 
 const WireErrorSchema = S.Union([
   RpcArgumentCountError,
   RpcArgumentDecodeError,
   RpcSuccessEncodeError,
-]);
+])
 
-const wireErrorKey = "effect-cf/RpcDefinition/wireError";
+const wireErrorKey = '@systemfsoftware/effect-cf/RpcDefinition/wireError'
 
-type WireValue = typeof S.Unknown.Type;
+type WireValue = typeof S.Unknown.Type
 
 export const isWireError = (error: WireValue): error is WireError =>
   S.is(RpcArgumentCountError)(error) ||
   S.is(RpcArgumentDecodeError)(error) ||
-  S.is(RpcSuccessEncodeError)(error);
+  S.is(RpcSuccessEncodeError)(error)
 
 /**
  * Encodes package RPC errors into a plain `Error` envelope so their tags
@@ -99,76 +107,73 @@ export const isWireError = (error: WireValue): error is WireError =>
  */
 export const encodeWireError = (error: WireValue): WireValue => {
   if (!isWireError(error)) {
-    return error;
+    return error
   }
 
   try {
-    return new Error(JSON.stringify({ [wireErrorKey]: S.encodeSync(WireErrorSchema)(error) }));
+    return new Error(JSON.stringify({ [wireErrorKey]: S.encodeSync(WireErrorSchema)(error) }))
   } catch {
-    return error;
+    return error
   }
-};
+}
 
 export const decodeWireError = (cause: WireValue): WireValue => {
   if (!(cause instanceof Error)) {
-    return cause;
+    return cause
   }
 
   try {
-    const parsed: WireValue = S.decodeUnknownSync(S.Unknown)(JSON.parse(cause.message));
+    const parsed: WireValue = S.decodeUnknownSync(S.Unknown)(JSON.parse(cause.message))
 
     if (!Predicate.hasProperty(parsed, wireErrorKey)) {
-      return cause;
+      return cause
     }
 
-    return S.decodeUnknownSync(WireErrorSchema)(parsed[wireErrorKey]);
+    return S.decodeUnknownSync(WireErrorSchema)(parsed[wireErrorKey])
   } catch {
-    return cause;
+    return cause
   }
-};
+}
 
 const reservedMethodNameValues = [
-  "constructor",
-  "fetch",
-  "connect",
-  "alarm",
-  "webSocketMessage",
-  "webSocketClose",
-  "webSocketError",
-  "then",
-  "dup",
-  "dispose",
-  "serialize",
-  "deserialize",
-] as const;
+  'constructor',
+  'fetch',
+  'connect',
+  'alarm',
+  'webSocketMessage',
+  'webSocketClose',
+  'webSocketError',
+  'then',
+  'dup',
+  'dispose',
+  'serialize',
+  'deserialize',
+] as const
 
-export const reservedMethodNames = new Set<string>(reservedMethodNameValues);
+export const reservedMethodNames = new Set<string>(reservedMethodNameValues)
 
-export type ReservedMethodName = (typeof reservedMethodNameValues)[number];
+export type ReservedMethodName = (typeof reservedMethodNameValues)[number]
 
-export type ServiceFreeSchema = S.Codec<any, any, never, never>;
+export type ServiceFreeSchema = S.Codec<any, any, never, never>
 
-export const NativeSchemaTypeId: unique symbol = Symbol.for("effect-cf/RpcDefinition/NativeSchema");
+export const NativeSchemaTypeId: unique symbol = Symbol.for('@systemfsoftware/effect-cf/RpcDefinition/NativeSchema')
 
 /** A schema whose encoded value is passed directly to Workers RPC. */
 export interface NativeSchema<Schema extends ServiceFreeSchema = ServiceFreeSchema> {
-  readonly [NativeSchemaTypeId]: typeof NativeSchemaTypeId;
-  readonly schema: Schema;
+  readonly [NativeSchemaTypeId]: typeof NativeSchemaTypeId
+  readonly schema: Schema
 }
 
-export type RpcSchema = ServiceFreeSchema | NativeSchema;
+export type RpcSchema = ServiceFreeSchema | NativeSchema
 
-export type SchemaType<Schema extends RpcSchema> =
-  Schema extends NativeSchema<infer Native extends ServiceFreeSchema>
-    ? S.Schema.Type<Native>
-    : Schema extends ServiceFreeSchema
-      ? S.Schema.Type<Schema>
-      : never;
+export type SchemaType<Schema extends RpcSchema> = Schema extends NativeSchema<infer Native extends ServiceFreeSchema>
+  ? S.Schema.Type<Native>
+  : Schema extends ServiceFreeSchema ? S.Schema.Type<Schema>
+  : never
 
-export type WireEncoded<Schema extends RpcSchema> =
-  Schema extends NativeSchema<infer Native extends ServiceFreeSchema>
-    ? S.Codec.Encoded<Native>
-    : S.Json;
+export type WireEncoded<Schema extends RpcSchema> = Schema extends NativeSchema<infer Native extends ServiceFreeSchema>
+  ? S.Codec.Encoded<Native>
+  : S.Json
 
 /**
  * Marks a schema to use its declared encoded form directly at the Workers RPC
@@ -178,14 +183,14 @@ export const native = <Schema extends ServiceFreeSchema>(schema: Schema): Native
   const nativeSchema: NativeSchema<Schema> = {
     [NativeSchemaTypeId]: NativeSchemaTypeId,
     schema,
-  };
+  }
 
-  return Object.freeze(nativeSchema);
-};
+  return Object.freeze(nativeSchema)
+}
 
 const isNativeSchema = (schema: RpcSchema): schema is NativeSchema =>
   Predicate.hasProperty(schema, NativeSchemaTypeId) &&
-  schema[NativeSchemaTypeId] === NativeSchemaTypeId;
+  schema[NativeSchemaTypeId] === NativeSchemaTypeId
 
 /**
  * Workers RPC structured-clones every value that crosses an isolate boundary
@@ -195,74 +200,72 @@ const isNativeSchema = (schema: RpcSchema): schema is NativeSchema =>
  * unless explicitly wrapped with `native`.
  */
 const wireCodec = (schema: RpcSchema): ServiceFreeSchema =>
-  isNativeSchema(schema) ? schema.schema : S.toCodecJson(schema);
+  isNativeSchema(schema) ? schema.schema : S.toCodecJson(schema)
 
 export interface Method<
   Args extends ReadonlyArray<RpcSchema> = ReadonlyArray<RpcSchema>,
   Success extends RpcSchema = RpcSchema,
 > {
-  readonly args: Args;
-  readonly success: Success;
+  readonly args: Args
+  readonly success: Success
 }
 
 export namespace Method {
-  export type Any = Method<ReadonlyArray<RpcSchema>, RpcSchema>;
+  export type Any = Method<ReadonlyArray<RpcSchema>, RpcSchema>
 
-  type ArgsFromSchemas<Args extends ReadonlyArray<RpcSchema>> = Args extends readonly []
-    ? []
+  type ArgsFromSchemas<Args extends ReadonlyArray<RpcSchema>> = Args extends readonly [] ? []
     : Args extends readonly [
-          infer Head extends RpcSchema,
-          ...infer Tail extends ReadonlyArray<RpcSchema>,
-        ]
-      ? [SchemaType<Head>, ...ArgsFromSchemas<Tail>]
-      : Array<SchemaType<Args[number]>>;
+      infer Head extends RpcSchema,
+      ...infer Tail extends ReadonlyArray<RpcSchema>,
+    ] ? [SchemaType<Head>, ...ArgsFromSchemas<Tail>]
+    : Array<SchemaType<Args[number]>>
 
   type EncodedArgsFromSchemas<Args extends ReadonlyArray<RpcSchema>> = {
-    [Index in keyof Args]: WireEncoded<Args[Index]>;
-  };
+    [Index in keyof Args]: WireEncoded<Args[Index]>
+  }
 
-  export type Args<Self extends Any> = ArgsFromSchemas<Self["args"]>;
+  export type Args<Self extends Any> = ArgsFromSchemas<Self['args']>
 
-  export type EncodedArgs<Self extends Any> = EncodedArgsFromSchemas<Self["args"]>;
+  export type EncodedArgs<Self extends Any> = EncodedArgsFromSchemas<Self['args']>
 
-  export type Success<Self extends Any> = SchemaType<Self["success"]>;
+  export type Success<Self extends Any> = SchemaType<Self['success']>
 
-  export type EncodedSuccess<Self extends Any> = WireEncoded<Self["success"]>;
+  export type EncodedSuccess<Self extends Any> = WireEncoded<Self['success']>
 }
 
-export type Methods = Record<string, Method.Any>;
+export type Methods = Record<string, Method.Any>
 
 export type NoReservedMethods<
   MethodDefinitions extends Methods,
   Reserved extends string = ReservedMethodName,
-> = Extract<keyof MethodDefinitions, Reserved> extends never ? MethodDefinitions : never;
+> = Extract<keyof MethodDefinitions, Reserved> extends never ? MethodDefinitions : never
 
 export interface Definition<
   Id extends string = string,
   MethodDefinitions extends Methods = Methods,
 > {
-  readonly id: Id;
-  readonly methods: MethodDefinitions;
+  readonly id: Id
+  readonly methods: MethodDefinitions
 }
 
 export namespace Definition {
-  export type Any = Definition<string, Methods>;
+  export type Any = Definition<string, Methods>
 
   export type ServerApi<Self extends Any> = {
-    readonly [Key in keyof Self["methods"]]: (
-      ...args: Method.Args<Self["methods"][Key]>
-    ) => Promise<Method.Success<Self["methods"][Key]>>;
-  };
+    readonly [Key in keyof Self['methods']]: (
+      ...args: Method.Args<Self['methods'][Key]>
+    ) => Promise<Method.Success<Self['methods'][Key]>>
+  }
 
   export type Api<Self extends Any, Reserved extends string = never> = Rpc.Provider<
     ServerApi<Self>,
     Reserved
-  >;
+  >
 
-  export type MethodNames<Self extends Any> = Extract<keyof Self["methods"], string>;
+  export type MethodNames<Self extends Any> = Extract<keyof Self['methods'], string>
 }
 
-type ReservedMethodValue = typeof S.Unknown.Type;
+type ReservedMethodValue = typeof S.Unknown.Type
 
 export const assertNoReservedMethods = <
   MethodDefinitions extends Readonly<Record<string, ReservedMethodValue>>,
@@ -273,29 +276,29 @@ export const assertNoReservedMethods = <
 ) => {
   for (const method of Object.keys(methods)) {
     if (reserved.has(method)) {
-      throw new RpcReservedMethodNameError({ definition: target, method });
+      throw new RpcReservedMethodNameError({ definition: target, method })
     }
   }
-};
+}
 
 export function method<Success extends RpcSchema>(definition: {
-  readonly success: Success;
-}): Method<readonly [], Success>;
+  readonly success: Success
+}): Method<readonly [], Success>
 export function method<
   const Args extends ReadonlyArray<RpcSchema>,
   Success extends RpcSchema,
->(definition: { readonly args: Args; readonly success: Success }): Method<Args, Success>;
+>(definition: { readonly args: Args; readonly success: Success }): Method<Args, Success>
 export function method(definition: {
-  readonly args?: ReadonlyArray<RpcSchema>;
-  readonly success: RpcSchema;
+  readonly args?: ReadonlyArray<RpcSchema>
+  readonly success: RpcSchema
 }) {
   return {
     args: definition.args ?? [],
     success: definition.success,
-  };
+  }
 }
 
-export const decodeArgs = Effect.fnUntraced(function* <
+export const decodeArgs = Effect.fnUntraced(function*<
   const Self extends Definition.Any,
   MethodName extends Definition.MethodNames<Self>,
 >(
@@ -303,10 +306,10 @@ export const decodeArgs = Effect.fnUntraced(function* <
   methodName: MethodName,
   args: ReadonlyArray<unknown>,
 ): Effect.fn.Return<
-  Method.Args<Self["methods"][MethodName]>,
+  Method.Args<Self['methods'][MethodName]>,
   RpcArgumentCountError | RpcArgumentDecodeError
 > {
-  const methodDefinition = definition.methods[methodName];
+  const methodDefinition = definition.methods[methodName]
 
   if (args.length !== methodDefinition.args.length) {
     return yield* RpcArgumentCountError.make({
@@ -314,36 +317,36 @@ export const decodeArgs = Effect.fnUntraced(function* <
       method: methodName,
       expected: methodDefinition.args.length,
       actual: args.length,
-    });
+    })
   }
 
-  const codecs = methodDefinition.args.map((schema) => wireCodec(schema));
+  const codecs = methodDefinition.args.map((schema) => wireCodec(schema))
   const decoded = yield* S.decodeUnknownEffect(S.Tuple(codecs))(args).pipe(
     Effect.mapError((cause) =>
       RpcArgumentDecodeError.make({
         definition: definition.id,
         method: methodName,
         cause,
-      }),
+      })
     ),
-  );
+  )
 
   // SAFETY: the tuple codec is constructed from this exact method's argument schemas.
-  return decoded as Method.Args<Self["methods"][MethodName]>;
-});
+  return decoded as Method.Args<Self['methods'][MethodName]>
+})
 
-export const encodeArgs = Effect.fnUntraced(function* <
+export const encodeArgs = Effect.fnUntraced(function*<
   const Self extends Definition.Any,
   MethodName extends Definition.MethodNames<Self>,
 >(
   definition: Self,
   methodName: MethodName,
-  args: Method.Args<Self["methods"][MethodName]>,
+  args: Method.Args<Self['methods'][MethodName]>,
 ): Effect.fn.Return<
-  Method.EncodedArgs<Self["methods"][MethodName]>,
+  Method.EncodedArgs<Self['methods'][MethodName]>,
   RpcArgumentCountError | RpcArgumentEncodeError
 > {
-  const methodDefinition = definition.methods[methodName];
+  const methodDefinition = definition.methods[methodName]
 
   if (args.length !== methodDefinition.args.length) {
     return yield* RpcArgumentCountError.make({
@@ -351,10 +354,10 @@ export const encodeArgs = Effect.fnUntraced(function* <
       method: methodName,
       expected: methodDefinition.args.length,
       actual: args.length,
-    });
+    })
   }
 
-  const codecs = methodDefinition.args.map((schema) => wireCodec(schema));
+  const codecs = methodDefinition.args.map((schema) => wireCodec(schema))
   const encoded = yield* S.encodeUnknownEffect(S.Tuple(codecs))(args).pipe(
     Effect.mapError(
       (cause) =>
@@ -364,11 +367,11 @@ export const encodeArgs = Effect.fnUntraced(function* <
           cause,
         }),
     ),
-  );
+  )
 
   // SAFETY: the tuple codec is constructed from this exact method's argument schemas.
-  return encoded as Method.EncodedArgs<Self["methods"][MethodName]>;
-});
+  return encoded as Method.EncodedArgs<Self['methods'][MethodName]>
+})
 
 export const encodeSuccess = <
   const Self extends Definition.Any,
@@ -376,9 +379,9 @@ export const encodeSuccess = <
 >(
   definition: Self,
   methodName: MethodName,
-  value: Method.Success<Self["methods"][MethodName]>,
-): Effect.Effect<Method.EncodedSuccess<Self["methods"][MethodName]>, RpcSuccessEncodeError> => {
-  const methodDefinition = definition.methods[methodName];
+  value: Method.Success<Self['methods'][MethodName]>,
+): Effect.Effect<Method.EncodedSuccess<Self['methods'][MethodName]>, RpcSuccessEncodeError> => {
+  const methodDefinition = definition.methods[methodName]
 
   return S.encodeUnknownEffect(wireCodec(methodDefinition.success))(value).pipe(
     Effect.mapError((cause) =>
@@ -386,10 +389,10 @@ export const encodeSuccess = <
         definition: definition.id,
         method: methodName,
         cause,
-      }),
+      })
     ),
-  );
-};
+  )
+}
 
 export const decodeSuccess = <
   const Self extends Definition.Any,
@@ -398,8 +401,8 @@ export const decodeSuccess = <
   definition: Self,
   methodName: MethodName,
   value: WireValue,
-): Effect.Effect<Method.Success<Self["methods"][MethodName]>, RpcSuccessDecodeError> => {
-  const methodDefinition = definition.methods[methodName];
+): Effect.Effect<Method.Success<Self['methods'][MethodName]>, RpcSuccessDecodeError> => {
+  const methodDefinition = definition.methods[methodName]
 
   return S.decodeUnknownEffect(wireCodec(methodDefinition.success))(value).pipe(
     Effect.mapError(
@@ -410,14 +413,14 @@ export const decodeSuccess = <
           cause,
         }),
     ),
-  );
-};
+  )
+}
 
 export const make = <Id extends string, const MethodDefinitions extends Methods>(
   id: Id,
   methods: MethodDefinitions,
 ): Definition<Id, MethodDefinitions> => {
-  assertNoReservedMethods(id, methods, reservedMethodNames);
+  assertNoReservedMethods(id, methods, reservedMethodNames)
 
-  return { id, methods };
-};
+  return { id, methods }
+}

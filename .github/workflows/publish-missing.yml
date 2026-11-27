@@ -33,10 +33,14 @@ jobs:
 
       - name: Put Node.js on the PATH
         run: echo "$(nix build --no-link --print-out-paths nixpkgs#nodejs_26)/bin" >> "$GITHUB_PATH"
+      - name: Put the pinned pnpm on the PATH
+        run: echo "$(nix build --no-link --print-out-paths nixpkgs#pnpm_12)/bin" >> "$GITHUB_PATH"
 
       # Same contract as the shared release workflow: upload every version npm lacks, one wait
       # afterwards so a partial upload is visible before the job reports success.
       - name: Publish every version npm does not hold yet
+        env:
+          NPM_CONFIG_PROVENANCE: "true"
         run: |
           out=$(nix build --no-link --print-out-paths .#workspace-tarballs)
           published=()
@@ -46,7 +50,7 @@ jobs:
             case "$status" in
               200) echo "$name@$version is on npm" ;;
               404)
-                npx --yes pnpm@12.21.0 publish "$out/$file" --access public --no-git-checks
+                pnpm publish "$out/$file" --access public --no-git-checks
                 published+=("$name@$version")
                 ;;
               *) echo "::error::npm answered $status for $name@$version"; exit 1 ;;

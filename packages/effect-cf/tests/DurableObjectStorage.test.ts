@@ -1,137 +1,128 @@
-import { assert, it } from "@effect/vitest";
-import { Cause, Context, Deferred, Effect, Fiber } from "effect";
+import { assert, it } from '@effect/vitest'
+import { Cause, Context, Deferred, Effect, Fiber } from 'effect'
 
 const TransactionMessage = Context.Service<{ readonly message: string }>(
-  "effect-cf/test/TransactionMessage",
-);
+  '@systemfsoftware/effect-cf/test/TransactionMessage',
+)
 
-import { DurableObjectStorage } from "../src/index";
+import { DurableObjectStorage } from '../src/index'
 
-it.effect("wraps transaction with Effect-native callbacks", () =>
-  Effect.gen(function* () {
-    const { raw, tracker } = makeRawDurableObjectStorage();
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
+it.effect('wraps transaction with Effect-native callbacks', () =>
+  Effect.gen(function*() {
+    const { raw, tracker } = makeRawDurableObjectStorage()
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
 
     const result = yield* storage.transaction((txn) =>
-      Effect.gen(function* () {
-        yield* txn.put("count", 42);
+      Effect.gen(function*() {
+        yield* txn.put('count', 42)
 
-        return yield* txn.get<number>("count");
-      }),
-    );
+        return yield* txn.get<number>('count')
+      })
+    )
 
-    assert.strictEqual(result, 42);
-    assert.strictEqual(yield* storage.get("count"), 42);
-    assert.strictEqual(tracker.transactionCalls, 1);
-  }),
-);
+    assert.strictEqual(result, 42)
+    assert.strictEqual(yield* storage.get('count'), 42)
+    assert.strictEqual(tracker.transactionCalls, 1)
+  }))
 
-it.effect("exposes no raw platform alarm mutations on storage or transactions", () =>
-  Effect.gen(function* () {
-    const { raw } = makeRawDurableObjectStorage();
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
+it.effect('exposes no raw platform alarm mutations on storage or transactions', () =>
+  Effect.gen(function*() {
+    const { raw } = makeRawDurableObjectStorage()
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
 
-    for (const method of ["setAlarm", "setAlarmAfter", "deleteAlarm"]) {
-      assert.isFalse(method in storage);
-      yield* storage.transaction((txn) => Effect.sync(() => assert.isFalse(method in txn)));
+    for (const method of ['setAlarm', 'setAlarmAfter', 'deleteAlarm']) {
+      assert.isFalse(method in storage)
+      yield* storage.transaction((txn) => Effect.sync(() => assert.isFalse(method in txn)))
     }
-  }),
-);
+  }))
 
-it.effect("preserves Effect context inside transaction callbacks", () =>
-  Effect.gen(function* () {
-    const { raw } = makeRawDurableObjectStorage();
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
+it.effect('preserves Effect context inside transaction callbacks', () =>
+  Effect.gen(function*() {
+    const { raw } = makeRawDurableObjectStorage()
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
 
     const message = yield* storage
       .transaction(() => Effect.service(TransactionMessage).pipe(Effect.map((_) => _.message)))
-      .pipe(Effect.provideService(TransactionMessage, { message: "from context" }));
+      .pipe(Effect.provideService(TransactionMessage, { message: 'from context' }))
 
-    assert.strictEqual(message, "from context");
-  }),
-);
+    assert.strictEqual(message, 'from context')
+  }))
 
-it.effect("preserves the caller Scope inside transaction callbacks", () =>
-  Effect.gen(function* () {
-    const { raw } = makeRawDurableObjectStorage();
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
-    let releases = 0;
+it.effect('preserves the caller Scope inside transaction callbacks', () =>
+  Effect.gen(function*() {
+    const { raw } = makeRawDurableObjectStorage()
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
+    let releases = 0
 
     yield* Effect.scoped(
       storage
         .transaction(() =>
           Effect.acquireRelease(Effect.void, () =>
             Effect.sync(() => {
-              releases += 1;
-            }),
-          ),
+              releases += 1
+            }))
         )
         .pipe(Effect.tap(() => Effect.sync(() => assert.strictEqual(releases, 0)))),
-    );
+    )
 
-    assert.strictEqual(releases, 1);
-  }),
-);
+    assert.strictEqual(releases, 1)
+  }))
 
-it.effect("rolls back transaction on typed Effect failure", () =>
-  Effect.gen(function* () {
-    const { raw, tracker } = makeRawDurableObjectStorage();
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
+it.effect('rolls back transaction on typed Effect failure', () =>
+  Effect.gen(function*() {
+    const { raw, tracker } = makeRawDurableObjectStorage()
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
 
     const exit = yield* Effect.exit(
       storage.transaction((txn) =>
-        Effect.gen(function* () {
-          yield* txn.put("count", 42);
+        Effect.gen(function*() {
+          yield* txn.put('count', 42)
 
-          return yield* Effect.fail("rollback requested");
-        }),
+          return yield* Effect.fail('rollback requested')
+        })
       ),
-    );
+    )
 
-    assert.strictEqual(tracker.transactionRollbacks, 1);
-    assert.strictEqual(yield* storage.get("count"), undefined);
-    assert.strictEqual(exit._tag, "Failure");
-    if (exit._tag === "Failure") {
-      assert.strictEqual(Cause.squash(exit.cause), "rollback requested");
+    assert.strictEqual(tracker.transactionRollbacks, 1)
+    assert.strictEqual(yield* storage.get('count'), undefined)
+    assert.strictEqual(exit._tag, 'Failure')
+    if (exit._tag === 'Failure') {
+      assert.strictEqual(Cause.squash(exit.cause), 'rollback requested')
     }
-  }),
-);
+  }))
 
-it.effect("wraps transactionSync and preserves typed failures", () =>
-  Effect.gen(function* () {
-    const { raw, tracker } = makeRawDurableObjectStorage();
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
+it.effect('wraps transactionSync and preserves typed failures', () =>
+  Effect.gen(function*() {
+    const { raw, tracker } = makeRawDurableObjectStorage()
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
 
-    assert.strictEqual(yield* storage.transactionSync(() => Effect.succeed(7)), 7);
+    assert.strictEqual(yield* storage.transactionSync(() => Effect.succeed(7)), 7)
     assert.strictEqual(
       yield* storage
-        .transactionSync(() =>
-          Effect.service(TransactionMessage).pipe(Effect.map((_) => _.message.length)),
-        )
-        .pipe(Effect.provideService(TransactionMessage, { message: "sync context" })),
+        .transactionSync(() => Effect.service(TransactionMessage).pipe(Effect.map((_) => _.message.length)))
+        .pipe(Effect.provideService(TransactionMessage, { message: 'sync context' })),
       12,
-    );
+    )
 
-    const exit = yield* Effect.exit(storage.transactionSync(() => Effect.fail("sync rollback")));
+    const exit = yield* Effect.exit(storage.transactionSync(() => Effect.fail('sync rollback')))
 
-    assert.strictEqual(tracker.transactionSyncCalls, 3);
-    assert.strictEqual(tracker.transactionSyncRollbacks, 1);
-    assert.strictEqual(exit._tag, "Failure");
-    if (exit._tag === "Failure") {
-      assert.strictEqual(Cause.squash(exit.cause), "sync rollback");
+    assert.strictEqual(tracker.transactionSyncCalls, 3)
+    assert.strictEqual(tracker.transactionSyncRollbacks, 1)
+    assert.strictEqual(exit._tag, 'Failure')
+    if (exit._tag === 'Failure') {
+      assert.strictEqual(Cause.squash(exit.cause), 'sync rollback')
     }
-  }),
-);
+  }))
 
-it.effect("transactionSync interrupts and joins accidentally asynchronous callbacks", () =>
-  Effect.gen(function* () {
-    const { raw, tracker } = makeRawDurableObjectStorage();
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
-    const started = yield* Deferred.make<void>();
-    const continueCallback = yield* Deferred.make<void>();
-    const releaseFinalizer = yield* Deferred.make<void>();
-    const finalized = yield* Deferred.make<void>();
-    let resumed = false;
+it.effect('transactionSync interrupts and joins accidentally asynchronous callbacks', () =>
+  Effect.gen(function*() {
+    const { raw, tracker } = makeRawDurableObjectStorage()
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
+    const started = yield* Deferred.make<void>()
+    const continueCallback = yield* Deferred.make<void>()
+    const releaseFinalizer = yield* Deferred.make<void>()
+    const finalized = yield* Deferred.make<void>()
+    let resumed = false
 
     const fiber = yield* Effect.forkChild(
       storage.transactionSync(() =>
@@ -139,20 +130,20 @@ it.effect("transactionSync interrupts and joins accidentally asynchronous callba
           Effect.andThen(Deferred.await(continueCallback)),
           Effect.tap(() =>
             Effect.sync(() => {
-              resumed = true;
-            }),
+              resumed = true
+            })
           ),
           Effect.ensuring(
             Deferred.await(releaseFinalizer).pipe(
               Effect.andThen(Deferred.succeed(finalized, undefined)),
             ),
           ),
-        ),
+        )
       ),
-    );
+    )
 
-    yield* Deferred.await(started);
-    yield* Effect.yieldNow;
+    yield* Deferred.await(started)
+    yield* Effect.yieldNow
 
     yield* Effect.sync(() => assert.isUndefined(fiber.pollUnsafe())).pipe(
       Effect.ensuring(
@@ -160,108 +151,104 @@ it.effect("transactionSync interrupts and joins accidentally asynchronous callba
           Effect.andThen(Deferred.succeed(releaseFinalizer, undefined)),
         ),
       ),
-    );
-    yield* Deferred.await(finalized);
-    const [exit] = yield* Fiber.awaitAll([fiber]);
+    )
+    yield* Deferred.await(finalized)
+    const [exit] = yield* Fiber.awaitAll([fiber])
 
-    assert.isFalse(resumed);
-    assert.strictEqual(tracker.transactionSyncRollbacks, 1);
-    assert.strictEqual(exit?._tag, "Failure");
-    if (exit?._tag === "Failure") {
-      assert.isTrue(Cause.isAsyncFiberError(Cause.squash(exit.cause)));
+    assert.isFalse(resumed)
+    assert.strictEqual(tracker.transactionSyncRollbacks, 1)
+    assert.strictEqual(exit?._tag, 'Failure')
+    if (exit?._tag === 'Failure') {
+      assert.isTrue(Cause.isAsyncFiberError(Cause.squash(exit.cause)))
     }
-  }),
-);
+  }))
 
-it.effect("maps rejected platform operations to StorageOperationError", () =>
-  Effect.gen(function* () {
-    const platformError = new Error("platform sync failed");
-    const { raw } = makeRawDurableObjectStorage({ syncError: platformError });
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
+it.effect('maps rejected platform operations to StorageOperationError', () =>
+  Effect.gen(function*() {
+    const platformError = new Error('platform sync failed')
+    const { raw } = makeRawDurableObjectStorage({ syncError: platformError })
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
 
-    const exit = yield* Effect.exit(storage.sync);
+    const exit = yield* Effect.exit(storage.sync)
 
-    assert.strictEqual(exit._tag, "Failure");
-    if (exit._tag === "Failure") {
-      const error = Cause.squash(exit.cause);
+    assert.strictEqual(exit._tag, 'Failure')
+    if (exit._tag === 'Failure') {
+      const error = Cause.squash(exit.cause)
 
-      assert.instanceOf(error, DurableObjectStorage.StorageOperationError);
-      assert.strictEqual(error._tag, "StorageOperationError");
-      assert.strictEqual(error.operation, "sync");
-      assert.strictEqual(error.cause, platformError);
+      assert.instanceOf(error, DurableObjectStorage.StorageOperationError)
+      assert.strictEqual(error._tag, 'StorageOperationError')
+      assert.strictEqual(error.operation, 'sync')
+      assert.strictEqual(error.cause, platformError)
     }
-  }),
-);
+  }))
 
-it.effect("maps platform transaction failures to StorageOperationError", () =>
-  Effect.gen(function* () {
-    const platformError = new Error("transaction storage unavailable");
-    const { raw } = makeRawDurableObjectStorage({ transactionError: platformError });
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
+it.effect('maps platform transaction failures to StorageOperationError', () =>
+  Effect.gen(function*() {
+    const platformError = new Error('transaction storage unavailable')
+    const { raw } = makeRawDurableObjectStorage({ transactionError: platformError })
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
 
-    const exit = yield* Effect.exit(storage.transaction(() => Effect.succeed("unreachable")));
+    const exit = yield* Effect.exit(storage.transaction(() => Effect.succeed('unreachable')))
 
-    assert.strictEqual(exit._tag, "Failure");
-    if (exit._tag === "Failure") {
-      const error = Cause.squash(exit.cause);
+    assert.strictEqual(exit._tag, 'Failure')
+    if (exit._tag === 'Failure') {
+      const error = Cause.squash(exit.cause)
 
-      assert.instanceOf(error, DurableObjectStorage.StorageOperationError);
-      assert.strictEqual(error._tag, "StorageOperationError");
-      assert.strictEqual(error.operation, "transaction");
-      assert.strictEqual(error.cause, platformError);
+      assert.instanceOf(error, DurableObjectStorage.StorageOperationError)
+      assert.strictEqual(error._tag, 'StorageOperationError')
+      assert.strictEqual(error.operation, 'transaction')
+      assert.strictEqual(error.cause, platformError)
     }
-  }),
-);
+  }))
 
-it.effect("maps platform transactionSync failures to StorageOperationError", () =>
-  Effect.gen(function* () {
-    const platformError = new Error("sync transaction storage unavailable");
-    const { raw } = makeRawDurableObjectStorage({ transactionError: platformError });
-    const storage = DurableObjectStorage.fromDurableObjectStorage(raw);
+it.effect('maps platform transactionSync failures to StorageOperationError', () =>
+  Effect.gen(function*() {
+    const platformError = new Error('sync transaction storage unavailable')
+    const { raw } = makeRawDurableObjectStorage({ transactionError: platformError })
+    const storage = DurableObjectStorage.fromDurableObjectStorage(raw)
 
-    const exit = yield* Effect.exit(storage.transactionSync(() => Effect.succeed("unreachable")));
+    const exit = yield* Effect.exit(storage.transactionSync(() => Effect.succeed('unreachable')))
 
-    assert.strictEqual(exit._tag, "Failure");
-    if (exit._tag === "Failure") {
-      const error = Cause.squash(exit.cause);
+    assert.strictEqual(exit._tag, 'Failure')
+    if (exit._tag === 'Failure') {
+      const error = Cause.squash(exit.cause)
 
-      assert.instanceOf(error, DurableObjectStorage.StorageOperationError);
-      assert.strictEqual(error._tag, "StorageOperationError");
-      assert.strictEqual(error.operation, "transactionSync");
-      assert.strictEqual(error.cause, platformError);
+      assert.instanceOf(error, DurableObjectStorage.StorageOperationError)
+      assert.strictEqual(error._tag, 'StorageOperationError')
+      assert.strictEqual(error.operation, 'transactionSync')
+      assert.strictEqual(error.cause, platformError)
     }
-  }),
-);
+  }))
 
 interface StorageTracker {
   readonly alarms: Array<{
-    readonly options: globalThis.DurableObjectSetAlarmOptions | undefined;
-    readonly scheduledTime: number | Date;
-  }>;
+    readonly options: globalThis.DurableObjectSetAlarmOptions | undefined
+    readonly scheduledTime: number | Date
+  }>
   readonly transactionAlarms: Array<{
-    readonly options: globalThis.DurableObjectSetAlarmOptions | undefined;
-    readonly scheduledTime: number | Date;
-  }>;
-  transactionCalls: number;
-  transactionRollbacks: number;
-  transactionSyncCalls: number;
-  transactionSyncRollbacks: number;
+    readonly options: globalThis.DurableObjectSetAlarmOptions | undefined
+    readonly scheduledTime: number | Date
+  }>
+  transactionCalls: number
+  transactionRollbacks: number
+  transactionSyncCalls: number
+  transactionSyncRollbacks: number
 }
 
 interface StorageOptions {
-  readonly syncError?: unknown;
-  readonly transactionError?: unknown;
+  readonly syncError?: unknown
+  readonly transactionError?: unknown
 }
 
 interface RawStorageFixture {
-  readonly raw: globalThis.DurableObjectStorage;
-  readonly tracker: StorageTracker;
+  readonly raw: globalThis.DurableObjectStorage
+  readonly tracker: StorageTracker
 }
 
-type StorageFixtureValue = number | string;
+type StorageFixtureValue = number | string
 
 function makeRawDurableObjectStorage(options: StorageOptions = {}): RawStorageFixture {
-  const values = new Map<string, StorageFixtureValue>();
+  const values = new Map<string, StorageFixtureValue>()
   const tracker: StorageTracker = {
     alarms: [],
     transactionAlarms: [],
@@ -269,28 +256,28 @@ function makeRawDurableObjectStorage(options: StorageOptions = {}): RawStorageFi
     transactionRollbacks: 0,
     transactionSyncCalls: 0,
     transactionSyncRollbacks: 0,
-  };
+  }
 
   const implementation = {
     get: async (key: string) => values.get(key),
     put: async (key: string, value: StorageFixtureValue) => {
-      values.set(key, value);
+      values.set(key, value)
     },
     delete: async (key: string) => values.delete(key),
     transaction: async <T>(closure: (txn: globalThis.DurableObjectTransaction) => Promise<T>) => {
-      tracker.transactionCalls += 1;
-      const snapshot = new Map(values);
+      tracker.transactionCalls += 1
+      const snapshot = new Map(values)
 
       if (options.transactionError !== undefined) {
-        throw options.transactionError;
+        throw options.transactionError
       }
 
       try {
-        return await closure(makeRawDurableObjectTransaction(values, tracker));
+        return await closure(makeRawDurableObjectTransaction(values, tracker))
       } catch (error) {
-        tracker.transactionRollbacks += 1;
-        restore(values, snapshot);
-        throw error;
+        tracker.transactionRollbacks += 1
+        restore(values, snapshot)
+        throw error
       }
     },
     getAlarm: async () => null,
@@ -298,51 +285,51 @@ function makeRawDurableObjectStorage(options: StorageOptions = {}): RawStorageFi
       scheduledTime: number | Date,
       alarmOptions?: globalThis.DurableObjectSetAlarmOptions,
     ) => {
-      tracker.alarms.push({ options: alarmOptions, scheduledTime });
+      tracker.alarms.push({ options: alarmOptions, scheduledTime })
     },
     deleteAlarm: async () => undefined,
     sync: async () => {
       if (options.syncError !== undefined) {
-        throw options.syncError;
+        throw options.syncError
       }
     },
     transactionSync: <T>(closure: () => T) => {
-      tracker.transactionSyncCalls += 1;
-      const snapshot = new Map(values);
+      tracker.transactionSyncCalls += 1
+      const snapshot = new Map(values)
 
       if (options.transactionError !== undefined) {
-        throw options.transactionError;
+        throw options.transactionError
       }
 
       try {
-        return closure();
+        return closure()
       } catch (error) {
-        tracker.transactionSyncRollbacks += 1;
-        restore(values, snapshot);
-        throw error;
+        tracker.transactionSyncRollbacks += 1
+        restore(values, snapshot)
+        throw error
       }
     },
     sql: {
       exec: () => {
-        throw new Error("not used");
+        throw new Error('not used')
       },
       databaseSize: 0,
     },
     kv: {
       get: (key: string) => values.get(key),
       put: (key: string, value: StorageFixtureValue) => {
-        values.set(key, value);
+        values.set(key, value)
       },
       delete: (key: string) => values.delete(key),
       list: () => values.entries(),
     },
-  };
+  }
 
   // SAFETY: This fixture owns a concrete string/number store covering every value exercised here.
   // The native storage interface's caller-selected generics are adapted only at this host boundary.
-  const raw = implementation as typeof implementation & globalThis.DurableObjectStorage;
+  const raw = implementation as typeof implementation & globalThis.DurableObjectStorage
 
-  return { raw, tracker };
+  return { raw, tracker }
 }
 
 function makeRawDurableObjectTransaction(
@@ -353,33 +340,33 @@ function makeRawDurableObjectTransaction(
     get: async (key: string) => values.get(key),
     list: async () => new Map(values),
     put: async (key: string, value: StorageFixtureValue) => {
-      values.set(key, value);
+      values.set(key, value)
     },
     delete: async (key: string) => values.delete(key),
     rollback: () => {
-      throw new Error("rollback not used");
+      throw new Error('rollback not used')
     },
     getAlarm: async () => null,
     setAlarm: async (
       scheduledTime: number | Date,
       options?: globalThis.DurableObjectSetAlarmOptions,
     ) => {
-      tracker.transactionAlarms.push({ options, scheduledTime });
+      tracker.transactionAlarms.push({ options, scheduledTime })
     },
     deleteAlarm: async () => undefined,
-  };
+  }
 
   // SAFETY: The transaction shares its owning fixture's concrete string/number store; the native
   // caller-selected generic is adapted once here instead of relabeling individual Map reads.
-  return implementation as typeof implementation & globalThis.DurableObjectTransaction;
+  return implementation as typeof implementation & globalThis.DurableObjectTransaction
 }
 
 function restore(
   values: Map<string, StorageFixtureValue>,
   snapshot: Map<string, StorageFixtureValue>,
 ): void {
-  values.clear();
+  values.clear()
   for (const entry of snapshot) {
-    values.set(...entry);
+    values.set(...entry)
   }
 }

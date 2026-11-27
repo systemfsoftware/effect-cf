@@ -1,1 +1,1 @@
-export { ExampleWorker as default, ExampleDurableObject } from "../durable-object-consumer";
+export { ExampleDurableObject, ExampleWorker as default } from '../durable-object-consumer'

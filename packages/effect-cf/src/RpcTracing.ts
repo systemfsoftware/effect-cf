@@ -1,81 +1,81 @@
-import * as Cause from "effect/Cause";
-import * as Clock from "effect/Clock";
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import * as Option from "effect/Option";
-import * as References from "effect/References";
-import * as Schema from "effect/Schema";
-import * as Tracer from "effect/Tracer";
+import * as Cause from 'effect/Cause'
+import * as Clock from 'effect/Clock'
+import * as Context from 'effect/Context'
+import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
+import * as Option from 'effect/Option'
+import * as References from 'effect/References'
+import * as Schema from 'effect/Schema'
+import * as Tracer from 'effect/Tracer'
 
 /**
  * Live native RPC metadata. Opted-in receivers reserve a valid trailing value
  * with this tag for transport context; do not use it as a final domain argument.
  * Never store this in durable messages or envelopes.
  */
-export const RpcTraceContext = Schema.TaggedStruct("effect-cf/RpcTraceContext/v1", {
+export const RpcTraceContext = Schema.TaggedStruct('@systemfsoftware/effect-cf/RpcTraceContext/v1', {
   traceId: Schema.String.check(Schema.isPattern(/^(?!0{32}$)[0-9a-f]{32}$/)),
   spanId: Schema.String.check(Schema.isPattern(/^(?!0{16}$)[0-9a-f]{16}$/)),
   sampled: Schema.Boolean,
-});
+})
 
-export type RpcTraceContext = typeof RpcTraceContext.Type;
+export type RpcTraceContext = typeof RpcTraceContext.Type
 
 export interface ReceiverOptions {
   /** Stable service name, never an instance id or capability URL. */
-  readonly service: string;
+  readonly service: string
 }
 
 /** Per-invocation metadata passed to Worker and DurableObject RunSymbol overrides. */
 export interface RpcInvocationInfo {
-  readonly service: string;
-  readonly method: string;
+  readonly service: string
+  readonly method: string
   /** Native arguments with valid, opted-in trace metadata removed. Do not log them. */
-  readonly args: ReadonlyArray<unknown>;
+  readonly args: ReadonlyArray<unknown>
   /**
    * Set after a definition-backed receiver decodes its arguments, before its
    * handler runs. Absent before decoding and when decoding fails. Do not log it.
    */
-  readonly decodedArgs?: ReadonlyArray<unknown>;
-  readonly parent?: RpcTraceContext;
+  readonly decodedArgs?: ReadonlyArray<unknown>
+  readonly parent?: RpcTraceContext
 }
 
-const isRpcTraceContext = Schema.is(RpcTraceContext);
+const isRpcTraceContext = Schema.is(RpcTraceContext)
 
 /**
  * Appends the current live parent only for a receiver that has opted in.
  * Call this inside the CLIENT span, immediately before the native invocation.
  * With no valid propagating parent, the original argument array is returned.
  */
-export const withRpcTraceContext = Effect.fnUntraced(function* (
+export const withRpcTraceContext = Effect.fnUntraced(function*(
   args: ReadonlyArray<unknown>,
 ): Effect.fn.Return<ReadonlyArray<unknown>> {
   if (yield* Tracer.DisablePropagation) {
-    return args;
+    return args
   }
 
-  const parent = yield* Effect.serviceOption(Tracer.ParentSpan);
+  const parent = yield* Effect.serviceOption(Tracer.ParentSpan)
 
   if (Option.isNone(parent) || Context.get(parent.value.annotations, Tracer.DisablePropagation)) {
-    return args;
+    return args
   }
 
   const context = {
-    _tag: "effect-cf/RpcTraceContext/v1",
+    _tag: '@systemfsoftware/effect-cf/RpcTraceContext/v1',
     traceId: parent.value.traceId,
     spanId: parent.value.spanId,
     sampled: parent.value.sampled,
-  };
+  }
 
-  return isRpcTraceContext(context) ? [...args, context] : args;
-});
+  return isRpcTraceContext(context) ? [...args, context] : args
+})
 
 const attributes = (service: string, method: string) => ({
-  "sentry.op": "rpc",
-  "rpc.system.name": "cloudflare",
-  "rpc.method": `${service}/${method}`,
-  "server.address": service,
-});
+  'sentry.op': 'rpc',
+  'rpc.system.name': 'cloudflare',
+  'rpc.method': `${service}/${method}`,
+  'server.address': service,
+})
 
 const withRpcSpan = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
@@ -96,23 +96,23 @@ const withRpcSpan = <A, E, R>(
           if (
             Exit.isSuccess(exit) ||
             Cause.hasInterruptsOnly(exit.cause) ||
-            span.status._tag === "Ended"
+            span.status._tag === 'Ended'
           ) {
-            return Effect.void;
+            return Effect.void
           }
 
           // OTLP's default cause formatter includes schema inputs and native error
           // messages. End with a safe failure, while returning the original exit.
-          return Effect.gen(function* () {
-            const timing = yield* References.TracerTimingEnabled;
-            const endTime = timing ? yield* Clock.currentTimeNanos : 0n;
+          return Effect.gen(function*() {
+            const timing = yield* References.TracerTimingEnabled
+            const endTime = timing ? yield* Clock.currentTimeNanos : 0n
 
-            span.attribute("error.type", "_OTHER");
-            span.end(endTime, Exit.fail("RPC failed"));
-          });
+            span.attribute('error.type', '_OTHER')
+            span.end(endTime, Exit.fail('RPC failed'))
+          })
         }),
       ),
-  );
+  )
 
 /** Wrap the whole call, including native result resolution and success decoding. */
 export const withRpcClientSpan = <A, E, R>(
@@ -121,8 +121,8 @@ export const withRpcClientSpan = <A, E, R>(
   method: string,
 ): Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan>> =>
   withRpcSpan(effect, binding, method, {
-    kind: "client",
-  });
+    kind: 'client',
+  })
 
 /**
  * Optional application instrumentation for the entire receiver effect.
@@ -135,6 +135,6 @@ export const withRpcServerSpan = <A, E, R>(
   invocation: RpcInvocationInfo,
 ): Effect.Effect<A, E, Exclude<R, Tracer.ParentSpan>> =>
   withRpcSpan(effect, invocation.service, invocation.method, {
-    kind: "server",
+    kind: 'server',
     parent: invocation.parent === undefined ? undefined : Tracer.externalSpan(invocation.parent),
-  });
+  })

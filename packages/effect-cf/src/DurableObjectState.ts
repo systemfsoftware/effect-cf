@@ -1,22 +1,22 @@
-import * as Cause from "effect/Cause";
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
+import * as Cause from 'effect/Cause'
+import * as Context from 'effect/Context'
+import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
 
-import { fromDurableObjectStorage, type DurableObjectStorage } from "./DurableObjectStorage";
-import { fromWebSocket, type DurableWebSocket } from "./DurableObjectWebSocket";
-import type { WorkerContextWaitUntilOptions } from "./Worker";
-import { runNativeCallback } from "./internal/NativeCallback";
-import { makeWaitUntilScheduler } from "./internal/WorkerContext";
+import { type DurableObjectStorage, fromDurableObjectStorage } from './DurableObjectStorage'
+import { type DurableWebSocket, fromWebSocket } from './DurableObjectWebSocket'
+import { runNativeCallback } from './internal/NativeCallback'
+import { makeWaitUntilScheduler } from './internal/WorkerContext'
+import type { WorkerContextWaitUntilOptions } from './Worker'
 
 /**
  * Effect-friendly wrapper around Cloudflare `DurableObjectState`.
  */
 export interface DurableObjectStateService {
-  readonly raw: globalThis.DurableObjectState;
-  readonly id: globalThis.DurableObjectId;
-  readonly storage: DurableObjectStorage;
-  waitUntil(promise: Promise<unknown>): Effect.Effect<void>;
+  readonly raw: globalThis.DurableObjectState
+  readonly id: globalThis.DurableObjectId
+  readonly storage: DurableObjectStorage
+  waitUntil(promise: Promise<unknown>): Effect.Effect<void>
   /**
    * Runs a background Effect via Cloudflare's `waitUntil` with the caller's
    * Effect context, mirroring `WorkerContext.waitUntil` failure modes:
@@ -26,7 +26,7 @@ export interface DurableObjectStateService {
   waitUntil<A, E, R, R2 = never>(
     effect: Effect.Effect<A, E, R>,
     options?: WorkerContextWaitUntilOptions<E, R2>,
-  ): Effect.Effect<void, never, R | R2>;
+  ): Effect.Effect<void, never, R | R2>
   /**
    * Runs an Effect inside Cloudflare's `blockConcurrencyWhile` gate.
    *
@@ -37,7 +37,7 @@ export interface DurableObjectStateService {
    * ordinary Effect failures instead of resetting the Durable Object. Defects
    * and interruptions still reject the callback.
    */
-  blockConcurrencyWhile<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R>;
+  blockConcurrencyWhile<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R>
   /**
    * Runs an Effect inside Cloudflare's `blockConcurrencyWhile` gate and lets
    * Effect failures reject the callback.
@@ -46,15 +46,15 @@ export interface DurableObjectStateService {
    * platform also resets the Durable Object if the callback exceeds the
    * documented timeout (currently 30 seconds).
    */
-  blockConcurrencyWhileOrReset<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R>;
-  acceptWebSocket(ws: DurableWebSocket, tags?: Array<string>): Effect.Effect<void>;
-  getWebSockets(tag?: string): Effect.Effect<Array<DurableWebSocket>>;
-  setWebSocketAutoResponse(pair?: WebSocketRequestResponsePair): Effect.Effect<void>;
-  getWebSocketAutoResponse: Effect.Effect<WebSocketRequestResponsePair | null>;
-  getWebSocketAutoResponseTimestamp(ws: DurableWebSocket): Effect.Effect<Date | null>;
-  setHibernatableWebSocketEventTimeout(timeoutMs?: number): Effect.Effect<void>;
-  getHibernatableWebSocketEventTimeout: Effect.Effect<number | null>;
-  getTags(ws: DurableWebSocket): Effect.Effect<Array<string>>;
+  blockConcurrencyWhileOrReset<A, E, R>(effect: Effect.Effect<A, E, R>): Effect.Effect<A, E, R>
+  acceptWebSocket(ws: DurableWebSocket, tags?: Array<string>): Effect.Effect<void>
+  getWebSockets(tag?: string): Effect.Effect<Array<DurableWebSocket>>
+  setWebSocketAutoResponse(pair?: WebSocketRequestResponsePair): Effect.Effect<void>
+  getWebSocketAutoResponse: Effect.Effect<WebSocketRequestResponsePair | null>
+  getWebSocketAutoResponseTimestamp(ws: DurableWebSocket): Effect.Effect<Date | null>
+  setHibernatableWebSocketEventTimeout(timeoutMs?: number): Effect.Effect<void>
+  getHibernatableWebSocketEventTimeout: Effect.Effect<number | null>
+  getTags(ws: DurableWebSocket): Effect.Effect<Array<string>>
   /**
    * Forcibly resets the Durable Object. Cloudflare logs an uncaught Error using
    * the optional reason, and the method is not available in `wrangler dev` local
@@ -62,28 +62,29 @@ export interface DurableObjectStateService {
    * `retryAlarm: false` to prevent the current alarm invocation from retrying;
    * this option has no effect outside an alarm handler.
    */
-  abort(reason?: string, options?: globalThis.DurableObjectAbortOptions): Effect.Effect<void>;
+  abort(reason?: string, options?: globalThis.DurableObjectAbortOptions): Effect.Effect<void>
 }
 
 export class DurableObjectState extends Context.Service<
   DurableObjectState,
   DurableObjectStateService
->()("effect-cf/DurableObjectState") {}
+>()('@systemfsoftware/effect-cf/DurableObjectState') {}
 
 export const fromDurableObjectState = (
   state: globalThis.DurableObjectState,
 ): DurableObjectStateService => {
-  const scheduleWaitUntil = makeWaitUntilScheduler("DurableObjectState.waitUntil", (promise) =>
-    state.waitUntil(promise),
-  );
+  const scheduleWaitUntil = makeWaitUntilScheduler(
+    'DurableObjectState.waitUntil',
+    (promise) => state.waitUntil(promise),
+  )
   // SAFETY: the runtime Effect.isEffect branch implements both overloads of the service method.
   const waitUntil = (<A, E, R, R2 = never>(
     input: Promise<unknown> | Effect.Effect<A, E, R>,
     options?: WorkerContextWaitUntilOptions<E, R2>,
   ) =>
     Effect.isEffect(input)
-      ? scheduleWaitUntil(input, options, options?.mode ?? "observe")
-      : Effect.sync(() => state.waitUntil(input))) as DurableObjectStateService["waitUntil"];
+      ? scheduleWaitUntil(input, options, options?.mode ?? 'observe')
+      : Effect.sync(() => state.waitUntil(input))) as DurableObjectStateService['waitUntil']
 
   return {
     raw: state,
@@ -92,24 +93,23 @@ export const fromDurableObjectState = (
     waitUntil,
     blockConcurrencyWhile: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
       runNativeCallback<A, E, R, Exit.Exit<A, E>>((run) =>
-        state.blockConcurrencyWhile(() => runExitPreservingTypedFailures(run, effect)),
+        state.blockConcurrencyWhile(() => runExitPreservingTypedFailures(run, effect))
       ).pipe(Effect.orDie, Effect.flatten),
     blockConcurrencyWhileOrReset: <A, E, R>(effect: Effect.Effect<A, E, R>) =>
       runNativeCallback<A, E, R, A>((run) =>
         state.blockConcurrencyWhile(async () => {
-          const exit = await run(effect);
+          const exit = await run(effect)
 
           if (Exit.isFailure(exit)) {
-            throw Cause.squash(exit.cause);
+            throw Cause.squash(exit.cause)
           }
 
-          return exit.value;
-        }),
+          return exit.value
+        })
       ).pipe(Effect.orDie),
     acceptWebSocket: (ws: DurableWebSocket, tags?: Array<string>) =>
       Effect.sync(() => state.acceptWebSocket(ws.raw, tags)),
-    getWebSockets: (tag?: string) =>
-      Effect.sync(() => state.getWebSockets(tag).map((socket) => fromWebSocket(socket))),
+    getWebSockets: (tag?: string) => Effect.sync(() => state.getWebSockets(tag).map((socket) => fromWebSocket(socket))),
     setWebSocketAutoResponse: (pair?: WebSocketRequestResponsePair) =>
       Effect.sync(() => state.setWebSocketAutoResponse(pair)),
     getWebSocketAutoResponse: Effect.sync(() => state.getWebSocketAutoResponse()),
@@ -117,24 +117,22 @@ export const fromDurableObjectState = (
       Effect.sync(() => state.getWebSocketAutoResponseTimestamp(ws.raw)),
     setHibernatableWebSocketEventTimeout: (timeoutMs?: number) =>
       Effect.sync(() => state.setHibernatableWebSocketEventTimeout(timeoutMs)),
-    getHibernatableWebSocketEventTimeout: Effect.sync(() =>
-      state.getHibernatableWebSocketEventTimeout(),
-    ),
+    getHibernatableWebSocketEventTimeout: Effect.sync(() => state.getHibernatableWebSocketEventTimeout()),
     getTags: (ws: DurableWebSocket) => Effect.sync(() => state.getTags(ws.raw)),
     abort: (reason?: string, options?: globalThis.DurableObjectAbortOptions) =>
       Effect.sync(() => state.abort(reason, options)),
-  };
-};
+  }
+}
 
 const runExitPreservingTypedFailures = async <A, E, R>(
   run: (effect: Effect.Effect<A, E, R>) => Promise<Exit.Exit<A, E>>,
   effect: Effect.Effect<A, E, R>,
 ): Promise<Exit.Exit<A, E>> => {
-  const exit = await run(effect);
+  const exit = await run(effect)
 
   if (Exit.isFailure(exit) && (Cause.hasDies(exit.cause) || Cause.hasInterrupts(exit.cause))) {
-    throw Cause.squash(exit.cause);
+    throw Cause.squash(exit.cause)
   }
 
-  return exit;
-};
+  return exit
+}

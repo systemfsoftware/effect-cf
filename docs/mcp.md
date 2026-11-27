@@ -3,60 +3,60 @@
 Use Effect's `McpServer.layerHttpRequestScoped` with `Worker.make`. Effect owns tool registration, schemas, protocol handling, and progress notifications; the Worker owns the HTTP request and response lifetime. Install `effect-cf` and `effect@^4.1.0`; no separate MCP server SDK is required.
 
 ```ts
-import { Effect, Layer, Schema } from "effect";
-import { McpProtocol, McpSchema, McpServer, Tool, Toolkit } from "effect/ai";
-import { HttpRouter } from "effect/http";
-import { Worker } from "effect-cf";
+import { Worker } from '@systemfsoftware/effect-cf'
+import { Effect, Layer, Schema } from 'effect'
+import { McpProtocol, McpSchema, McpServer, Tool, Toolkit } from 'effect/ai'
+import { HttpRouter } from 'effect/http'
 
-const Wait = Tool.make("Wait", {
-  description: "Waits one second and reports progress",
+const Wait = Tool.make('Wait', {
+  description: 'Waits one second and reports progress',
   dependencies: [McpSchema.McpRequestContext],
   parameters: Tool.EmptyParams,
   success: Schema.Struct({ done: Schema.Boolean }),
-});
-const toolkit = Toolkit.make(Wait);
+})
+const toolkit = Toolkit.make(Wait)
 const handlers = toolkit.toLayer(
-  Effect.gen(function* () {
-    const server = yield* McpServer.McpServer;
+  Effect.gen(function*() {
+    const server = yield* McpServer.McpServer
 
     return {
       Wait: () =>
-        Effect.gen(function* () {
-          const { requestMetadata } = yield* McpSchema.McpRequestContext;
-          const progressToken = requestMetadata?.progressToken;
+        Effect.gen(function*() {
+          const { requestMetadata } = yield* McpSchema.McpRequestContext
+          const progressToken = requestMetadata?.progressToken
 
           if (Schema.is(McpSchema.ProgressToken)(progressToken)) {
-            yield* server.notifications["notifications/progress"]({
+            yield* server.notifications['notifications/progress']({
               progressToken,
               progress: 0,
               total: 1,
-              message: "Started",
-            });
+              message: 'Started',
+            })
           }
 
-          yield* Effect.sleep("1 second");
+          yield* Effect.sleep('1 second')
 
-          return { done: true };
+          return { done: true }
         }),
-    };
+    }
   }),
-);
+)
 
 const server = McpServer.layerHttpRequestScoped({
-  name: "progress-example",
-  version: "1.0.0",
-  path: "/mcp",
+  name: 'progress-example',
+  version: '1.0.0',
+  path: '/mcp',
   protocols: [McpProtocol.v2026_07_28],
-});
+})
 const routes = McpServer.toolkit(toolkit).pipe(
   Layer.provide(handlers),
   Layer.provideMerge(server),
   Layer.provideMerge(HttpRouter.layer),
-);
+)
 
 export default Worker.make(routes, {
   fetch: HttpRouter.HttpRouter.use((router) => router.asHttpEffect()),
-});
+})
 ```
 
 Use `Tool.EmptyParams` for tools without parameters. Other tools use an object schema such as `Schema.Struct({ query: Schema.String })`. Progress values must increase on successive updates; their units belong to the tool. Read the current call's token from `McpRequestContext` and omit notifications when the client supplies none. Toolkit preliminary results are separate from progress notifications.
@@ -70,23 +70,23 @@ Merge other Effect HTTP routes into the same router. For browser clients, set th
 With `@modelcontextprotocol/client@^2.0.0`, enable modern version negotiation and supply `onprogress` so the client sends and tracks a progress token:
 
 ```ts
-import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/client";
+import { Client, StreamableHTTPClientTransport } from '@modelcontextprotocol/client'
 
 const client = new Client(
-  { name: "example-client", version: "1.0.0" },
-  { versionNegotiation: { mode: "auto" } },
-);
-await client.connect(new StreamableHTTPClientTransport(new URL("https://example.com/mcp")));
+  { name: 'example-client', version: '1.0.0' },
+  { versionNegotiation: { mode: 'auto' } },
+)
+await client.connect(new StreamableHTTPClientTransport(new URL('https://example.com/mcp')))
 
 try {
   const result = await client.callTool(
-    { name: "Wait", arguments: {} },
+    { name: 'Wait', arguments: {} },
     { onprogress: ({ progress, total, message }) => console.log(progress, total, message) },
-  );
+  )
 
-  console.log(result.structuredContent);
+  console.log(result.structuredContent)
 } finally {
-  await client.close();
+  await client.close()
 }
 ```
 

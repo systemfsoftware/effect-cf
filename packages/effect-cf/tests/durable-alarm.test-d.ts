@@ -1,44 +1,39 @@
-import { expectTypeOf } from "vite-plus/test";
-import { Context, DateTime, Effect, Layer, Schema } from "effect";
-import type { SecureRandom } from "effect/crypto";
-import { SqlClient, type SqlError } from "effect/sql";
+import { Context, DateTime, Effect, Layer, Schema } from 'effect'
+import type { SecureRandom } from 'effect/crypto'
+import { SqlClient, type SqlError } from 'effect/sql'
+import { expectTypeOf } from 'vite-plus/test'
 
-import {
-  DurableObject,
-  DurableObjectAlarm,
-  DurableObjectState,
-  DurableObjectStorage,
-} from "../src/index";
+import { DurableObject, DurableObjectAlarm, DurableObjectState, DurableObjectStorage } from '../src/index'
 
-class Application extends Context.Service<Application, { readonly id: string }>()("Application") {}
-class ApplicationError extends Schema.TaggedError<ApplicationError>()("ApplicationError", {}) {}
+class Application extends Context.Service<Application, { readonly id: string }>()('Application') {}
+class ApplicationError extends Schema.TaggedError<ApplicationError>()('ApplicationError', {}) {}
 
-declare const alarms: DurableObjectAlarm.AlarmScheduler;
-declare const application: Effect.Effect<number, ApplicationError, Application>;
+declare const alarms: DurableObjectAlarm.AlarmScheduler
+declare const application: Effect.Effect<number, ApplicationError, Application>
 
 expectTypeOf(alarms.transaction(() => application)).toEqualTypeOf<
   Effect.Effect<number, ApplicationError | DurableObjectStorage.StorageOperationError, Application>
->();
+>()
 
 const composed = alarms.transaction((tx) =>
-  Effect.gen(function* () {
-    const app = yield* Application;
-    const sql = yield* SqlClient.SqlClient;
-    const state = yield* DurableObjectState.DurableObjectState;
+  Effect.gen(function*() {
+    const app = yield* Application
+    const sql = yield* SqlClient.SqlClient
+    const state = yield* DurableObjectState.DurableObjectState
 
-    yield* sql`INSERT INTO application_jobs (id) VALUES (${app.id})`;
-    yield* state.storage.put("last-job", app.id);
+    yield* sql`INSERT INTO application_jobs (id) VALUES (${app.id})`
+    yield* state.storage.put('last-job', app.id)
     yield* tx.scheduleAlarm({
-      tag: "job",
+      tag: 'job',
       id: app.id,
       payload: null,
       runAt: DateTime.makeUnsafe(1),
-    });
-    yield* tx.cancelAlarm({ tag: "obsolete", id: app.id });
+    })
+    yield* tx.cancelAlarm({ tag: 'obsolete', id: app.id })
 
-    return yield* application;
-  }),
-);
+    return yield* application
+  })
+)
 
 expectTypeOf(composed).toEqualTypeOf<
   Effect.Effect<
@@ -55,167 +50,167 @@ expectTypeOf(composed).toEqualTypeOf<
     | DurableObjectState.DurableObjectState
     | SecureRandom.SecureRandom
   >
->();
+>()
 
-declare const tx: DurableObjectAlarm.AlarmTransaction;
-declare const storage: DurableObjectStorage.DurableObjectStorage;
-declare const storageTx: DurableObjectStorage.DurableObjectTransaction;
+declare const tx: DurableObjectAlarm.AlarmTransaction
+declare const storage: DurableObjectStorage.DurableObjectStorage
+declare const storageTx: DurableObjectStorage.DurableObjectTransaction
 
 // @ts-expect-error Platform alarm writes are confined to the scheduler.
-storage.setAlarm(1);
+storage.setAlarm(1)
 // @ts-expect-error Relative platform alarm writes cannot bypass the scheduler either.
-storage.setAlarmAfter("1 second");
+storage.setAlarmAfter('1 second')
 // @ts-expect-error Transactions must enroll logical alarms through alarms.transaction.
-storageTx.setAlarm(1);
+storageTx.setAlarm(1)
 // @ts-expect-error Raw cancellation would erase other logical alarm deadlines.
-storageTx.deleteAlarm();
+storageTx.deleteAlarm()
 
 // @ts-expect-error The callback only exposes mutations, not another transaction boundary.
-tx.transaction(() => Effect.void);
+tx.transaction(() => Effect.void)
 // @ts-expect-error Dispatch and external handler work do not belong in the transaction.
-tx.processDueAlarms(() => Effect.void);
+tx.processDueAlarms(() => Effect.void)
 
-class DocumentAlarms extends DurableObjectAlarm.Tag<DocumentAlarms>()("DocumentAlarms", {
+class DocumentAlarms extends DurableObjectAlarm.Tag<DocumentAlarms>()('DocumentAlarms', {
   archive: Schema.Struct({ key: Schema.String, revision: Schema.FiniteFromString }),
-  cleanup: { payload: Schema.Null, failure: "retry" },
+  cleanup: { payload: Schema.Null, failure: 'retry' },
 }) {}
-class OtherAlarms extends DurableObjectAlarm.Tag<OtherAlarms>()("OtherAlarms", {
+class OtherAlarms extends DurableObjectAlarm.Tag<OtherAlarms>()('OtherAlarms', {
   archive: Schema.Struct({ key: Schema.String, revision: Schema.FiniteFromString }),
-  cleanup: { payload: Schema.Null, failure: "retry" },
+  cleanup: { payload: Schema.Null, failure: 'retry' },
 }) {}
-declare const documentAlarms: DocumentAlarms["Service"];
-const runAt = DateTime.makeUnsafe(1);
+declare const documentAlarms: DocumentAlarms['Service']
+const runAt = DateTime.makeUnsafe(1)
 const archiveInput = {
-  tag: "archive",
-  id: "a",
+  tag: 'archive',
+  id: 'a',
   runAt,
-  payload: { key: "a", revision: 1 },
-} as const;
+  payload: { key: 'a', revision: 1 },
+} as const
 
-void documentAlarms.scheduleAlarm(archiveInput);
-void documentAlarms.scheduleAlarmEarlier(archiveInput);
-void documentAlarms.getAlarmStatus({ tag: "archive", id: "a" });
+void documentAlarms.scheduleAlarm(archiveInput)
+void documentAlarms.scheduleAlarmEarlier(archiveInput)
+void documentAlarms.getAlarmStatus({ tag: 'archive', id: 'a' })
 // @ts-expect-error A schema definition alone does not provide scheduling.
-void DocumentAlarms.scheduleAlarm(archiveInput);
+void DocumentAlarms.scheduleAlarm(archiveInput)
 // @ts-expect-error The tag must belong to this definition.
-void documentAlarms.scheduleAlarm({ ...archiveInput, tag: "archvie" });
+void documentAlarms.scheduleAlarm({ ...archiveInput, tag: 'archvie' })
 // @ts-expect-error Scheduling accepts the decoded type, not its wire encoding.
-void documentAlarms.scheduleAlarm({ ...archiveInput, payload: { key: "a", revision: "1" } });
+void documentAlarms.scheduleAlarm({ ...archiveInput, payload: { key: 'a', revision: '1' } })
 // @ts-expect-error A known tag cannot be paired with another tag's payload.
-void documentAlarms.scheduleAlarm({ ...archiveInput, tag: "cleanup" });
+void documentAlarms.scheduleAlarm({ ...archiveInput, tag: 'cleanup' })
 // @ts-expect-error Cancellation uses the same defined tags.
-void documentAlarms.cancelAlarm({ tag: "archvie", id: "a" });
+void documentAlarms.cancelAlarm({ tag: 'archvie', id: 'a' })
 
 expectTypeOf(documentAlarms.transaction(() => application)).toEqualTypeOf<
   Effect.Effect<number, ApplicationError | DurableObjectStorage.StorageOperationError, Application>
->();
+>()
 
 void documentAlarms.transaction((typedTx) => {
-  void typedTx.scheduleAlarm(archiveInput);
-  void typedTx.cancelAlarm({ tag: "cleanup", id: "a" });
+  void typedTx.scheduleAlarm(archiveInput)
+  void typedTx.cancelAlarm({ tag: 'cleanup', id: 'a' })
   // @ts-expect-error Transactional scheduling is definition-bound too.
-  void typedTx.scheduleAlarm({ ...archiveInput, tag: "archvie" });
+  void typedTx.scheduleAlarm({ ...archiveInput, tag: 'archvie' })
   // @ts-expect-error Transactional scheduling keeps tag and payload correlated.
-  void typedTx.scheduleAlarm({ ...archiveInput, tag: "cleanup" });
+  void typedTx.scheduleAlarm({ ...archiveInput, tag: 'cleanup' })
   // @ts-expect-error A transaction handle cannot open nested transactions.
-  void typedTx.transaction(() => Effect.void);
+  void typedTx.transaction(() => Effect.void)
 
-  return application;
-});
+  return application
+})
 
-const schedule = Effect.fn("schedule")(function* () {
-  const alarms = yield* DocumentAlarms;
+const schedule = Effect.fn('schedule')(function*() {
+  const alarms = yield* DocumentAlarms
 
-  yield* alarms.scheduleAlarm(archiveInput);
+  yield* alarms.scheduleAlarm(archiveInput)
 
-  return "saved";
-});
+  return 'saved'
+})
 const handlers = {
-  archive: Effect.fn("archive")(function* ({ id }: { readonly id: string }) {
-    const alarms = yield* DocumentAlarms;
+  archive: Effect.fn('archive')(function*({ id }: { readonly id: string }) {
+    const alarms = yield* DocumentAlarms
 
-    yield* alarms.cancelAlarm({ tag: "archive", id });
+    yield* alarms.cancelAlarm({ tag: 'archive', id })
   }),
   cleanup: () => Effect.void,
-};
-const registration = DocumentAlarms.handlers(handlers);
+}
+const registration = DocumentAlarms.handlers(handlers)
 
 // @ts-expect-error All declared alarms need handlers.
-DocumentAlarms.handlers({ archive: handlers.archive });
+DocumentAlarms.handlers({ archive: handlers.archive })
 
-DurableObject.make(Layer.empty, { alarms: registration, rpc: { save: schedule } });
+DurableObject.make(Layer.empty, { alarms: registration, rpc: { save: schedule } })
 // @ts-expect-error Removing the registration leaves DocumentAlarms unsatisfied.
 // @effect-diagnostics-next-line missingEffectContext:off
-DurableObject.make(Layer.empty, { rpc: { save: schedule } });
+DurableObject.make(Layer.empty, { rpc: { save: schedule } })
 // @ts-expect-error A raw alarm hook cannot provide the typed scheduler.
 // @effect-diagnostics-next-line missingEffectContext:off
-DurableObject.make(Layer.empty, { alarms: Effect.void, rpc: { save: schedule } });
+DurableObject.make(Layer.empty, { alarms: Effect.void, rpc: { save: schedule } })
 // Another service with identical payloads cannot satisfy DocumentAlarms.
 DurableObject.make(Layer.empty, {
   alarms: OtherAlarms.handlers({ archive: () => Effect.void, cleanup: () => Effect.void }),
   // @ts-expect-error The registered service does not satisfy schedule's dependency.
   // @effect-diagnostics-next-line missingEffectContext:off
   rpc: { save: schedule },
-});
+})
 
-class Documents extends DurableObject.Tag<Documents>()("Documents", {
+class Documents extends DurableObject.Tag<Documents>()('Documents', {
   save: DurableObject.method({ success: Schema.String }),
 }) {}
-Documents.make(Layer.empty, { alarms: registration, rpc: { save: schedule } });
+Documents.make(Layer.empty, { alarms: registration, rpc: { save: schedule } })
 // @ts-expect-error Tagged DOs must register the service too.
-Documents.make(Layer.empty, { rpc: { save: schedule } });
+Documents.make(Layer.empty, { rpc: { save: schedule } })
 
-const scheduleRpc = { save: schedule };
-const runtimeOnly = { rpc: scheduleRpc };
-const eventOnly = { eventLayer: registration.layer, rpc: scheduleRpc };
+const scheduleRpc = { save: schedule }
+const runtimeOnly = { rpc: scheduleRpc }
+const eventOnly = { eventLayer: registration.layer, rpc: scheduleRpc }
 const otherRegistration = OtherAlarms.handlers({
   archive: () => Effect.void,
   cleanup: () => Effect.void,
-});
-const wrongRegistration = { alarms: otherRegistration, rpc: scheduleRpc };
+})
+const wrongRegistration = { alarms: otherRegistration, rpc: scheduleRpc }
 
 // @ts-expect-error Installing the service layer alone does not install its dispatcher.
-DurableObject.make(registration.layer, runtimeOnly);
+DurableObject.make(registration.layer, runtimeOnly)
 // @ts-expect-error A layer can schedule work during construction even without RPC methods.
-DurableObject.make(registration.layer);
+DurableObject.make(registration.layer)
 // @ts-expect-error An event layer cannot substitute for handler registration.
-DurableObject.make(Layer.empty, eventOnly);
+DurableObject.make(Layer.empty, eventOnly)
 // @ts-expect-error Tagged DOs cannot bypass registration through application outputs.
-Documents.make(registration.layer, runtimeOnly);
+Documents.make(registration.layer, runtimeOnly)
 // @ts-expect-error Tagged DOs cannot bypass registration through event outputs.
-Documents.make(Layer.empty, eventOnly);
+Documents.make(Layer.empty, eventOnly)
 // @ts-expect-error A different dispatcher does not cover the service in the application layer.
-DurableObject.make(registration.layer, wrongRegistration);
+DurableObject.make(registration.layer, wrongRegistration)
 
-DurableObject.make(registration.layer, { alarms: registration, rpc: scheduleRpc });
-Documents.make(Layer.empty, { ...eventOnly, alarms: registration });
+DurableObject.make(registration.layer, { alarms: registration, rpc: scheduleRpc })
+Documents.make(Layer.empty, { ...eventOnly, alarms: registration })
 
-const scheduled = Context.Service<{ readonly ready: boolean }>("test/Scheduled");
-const applicationLayer = Layer.effect(scheduled, schedule().pipe(Effect.as({ ready: true })));
+const scheduled = Context.Service<{ readonly ready: boolean }>('test/Scheduled')
+const applicationLayer = Layer.effect(scheduled, schedule().pipe(Effect.as({ ready: true })))
 
 DurableObject.make(applicationLayer, {
   alarms: registration,
   initialize: schedule().pipe(Effect.asVoid),
   eventLayer: Layer.effect(scheduled, schedule().pipe(Effect.as({ ready: true }))),
   rpc: { save: schedule },
-});
+})
 // @ts-expect-error Application layers cannot use an unregistered alarm service.
 // @effect-diagnostics-next-line missingLayerContext:off
-DurableObject.make(applicationLayer);
+DurableObject.make(applicationLayer)
 
-class Maintenance extends DurableObjectAlarm.Tag<Maintenance>()("test/Maintenance", {
-  maintenance: { payload: Schema.Null, lifecycle: "manual" },
+class Maintenance extends DurableObjectAlarm.Tag<Maintenance>()('test/Maintenance', {
+  maintenance: { payload: Schema.Null, lifecycle: 'manual' },
 }) {}
-class Lifecycle extends DurableObjectAlarm.Tag<Lifecycle>()("test/Lifecycle", {
+class Lifecycle extends DurableObjectAlarm.Tag<Lifecycle>()('test/Lifecycle', {
   lifecycle: Schema.Null,
 }) {}
-const maintenanceRef = { tag: "maintenance", id: "maintenance" } as const;
-const maintenanceInput = (runAt: DateTime.Utc) => ({ ...maintenanceRef, payload: null, runAt });
+const maintenanceRef = { tag: 'maintenance', id: 'maintenance' } as const
+const maintenanceInput = (runAt: DateTime.Utc) => ({ ...maintenanceRef, payload: null, runAt })
 
-declare const maintenance: Maintenance["Service"];
+declare const maintenance: Maintenance['Service']
 expectTypeOf(maintenance.transaction(() => application)).toEqualTypeOf<
   Effect.Effect<number, ApplicationError | DurableObjectStorage.StorageOperationError, Application>
->();
+>()
 expectTypeOf(maintenance.deferWakes(application)).toEqualTypeOf<
   Effect.Effect<
     number,
@@ -224,33 +219,33 @@ expectTypeOf(maintenance.deferWakes(application)).toEqualTypeOf<
     | DurableObjectStorage.StorageOperationError,
     Application
   >
->();
+>()
 expectTypeOf(maintenance.scheduleAlarm(maintenanceInput(runAt))).toEqualTypeOf<
-  ReturnType<DurableObjectAlarm.AlarmScheduler["scheduleAlarm"]>
->();
-void maintenance.scheduleAlarmEarlier(maintenanceInput(runAt));
-void maintenance.cancelAlarm(maintenanceRef);
-void maintenance.getAlarmStatus(maintenanceRef);
-void alarms.scheduleAlarm({ ...maintenanceInput(runAt), lifecycle: "manual" });
+  ReturnType<DurableObjectAlarm.AlarmScheduler['scheduleAlarm']>
+>()
+void maintenance.scheduleAlarmEarlier(maintenanceInput(runAt))
+void maintenance.cancelAlarm(maintenanceRef)
+void maintenance.getAlarmStatus(maintenanceRef)
+void alarms.scheduleAlarm({ ...maintenanceInput(runAt), lifecycle: 'manual' })
 // @ts-expect-error Manual alarms leave repeat scheduling to their consumer.
-void maintenance.scheduleAlarm({ ...maintenanceInput(runAt), repeatEvery: "1 minute" });
+void maintenance.scheduleAlarm({ ...maintenanceInput(runAt), repeatEvery: '1 minute' })
 // @ts-expect-error Manual alarms leave progress budgets to their consumer.
-void maintenance.scheduleAlarmEarlier({ ...maintenanceInput(runAt), progress: 1 });
-const manualFailure = { payload: Schema.Null, lifecycle: "manual", failure: "retry" } as const;
+void maintenance.scheduleAlarmEarlier({ ...maintenanceInput(runAt), progress: 1 })
+const manualFailure = { payload: Schema.Null, lifecycle: 'manual', failure: 'retry' } as const
 const manualRetry = {
   payload: Schema.Null,
-  lifecycle: "manual",
-  retry: { initialDelay: "1 second" },
-} as const;
+  lifecycle: 'manual',
+  retry: { initialDelay: '1 second' },
+} as const
 
 // @ts-expect-error Manual definitions cannot install automatic failure policies.
-void (manualFailure satisfies DurableObjectAlarm.AlarmDefinitionEntry);
+void (manualFailure satisfies DurableObjectAlarm.AlarmDefinitionEntry)
 // @ts-expect-error Manual definitions cannot install automatic retry policies.
-void (manualRetry satisfies DurableObjectAlarm.AlarmDefinitionEntry);
+void (manualRetry satisfies DurableObjectAlarm.AlarmDefinitionEntry)
 
 const maintenanceRegistration = Maintenance.handlers({
   maintenance: () => application.pipe(Effect.asVoid),
-});
+})
 
 expectTypeOf(maintenanceRegistration.run).toEqualTypeOf<
   Effect.Effect<
@@ -258,40 +253,38 @@ expectTypeOf(maintenanceRegistration.run).toEqualTypeOf<
     ApplicationError | DurableObjectAlarm.DurableObjectAlarmError,
     Application | DurableObjectAlarm.DurableObjectAlarm | SecureRandom.SecureRandom
   >
->();
-const armMaintenance = Effect.flatMap(Maintenance, (alarms) =>
-  alarms.scheduleAlarm(maintenanceInput(runAt)),
-);
+>()
+const armMaintenance = Effect.flatMap(Maintenance, (alarms) => alarms.scheduleAlarm(maintenanceInput(runAt)))
 const together = DurableObjectAlarm.mergeAll(
   registration,
   maintenanceRegistration,
   Lifecycle.handlers({ lifecycle: () => Effect.void }),
-);
-const appService = Layer.succeed(Application, { id: "app" });
+)
+const appService = Layer.succeed(Application, { id: 'app' })
 
 DurableObject.make(appService, {
   alarms: together,
   rpc: { save: schedule, armMaintenance: () => armMaintenance },
-});
-Documents.make(appService, { alarms: together, rpc: { save: schedule } });
+})
+Documents.make(appService, { alarms: together, rpc: { save: schedule } })
 // @ts-expect-error A manual alarm requires its own handler registration.
 // @effect-diagnostics-next-line missingEffectContext:off
-DurableObject.make(Layer.empty, { rpc: { armMaintenance: () => armMaintenance } });
+DurableObject.make(Layer.empty, { rpc: { armMaintenance: () => armMaintenance } })
 DurableObject.make(Layer.empty, {
   alarms: registration,
   // @ts-expect-error An unrelated alarm registration does not register maintenance.
   // @effect-diagnostics-next-line missingEffectContext:off
   rpc: { armMaintenance: () => armMaintenance },
-});
+})
 // @ts-expect-error Installing a manual alarm service layer alone cannot install its dispatcher.
-DurableObject.make(maintenanceRegistration.layer);
+DurableObject.make(maintenanceRegistration.layer)
 // Duplicate definition tags are rejected at runtime, not by composition's types.
-DurableObjectAlarm.mergeAll(registration, otherRegistration);
+DurableObjectAlarm.mergeAll(registration, otherRegistration)
 
 void maintenance.transaction((manualTx) => {
-  void manualTx.scheduleAlarm(maintenanceInput(runAt));
+  void manualTx.scheduleAlarm(maintenanceInput(runAt))
   // @ts-expect-error An alarm transaction cannot open nested transactions.
-  void manualTx.transaction(() => Effect.void);
+  void manualTx.transaction(() => Effect.void)
 
-  return manualTx.cancelAlarm(maintenanceRef);
-});
+  return manualTx.cancelAlarm(maintenanceRef)
+})

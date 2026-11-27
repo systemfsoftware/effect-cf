@@ -1,27 +1,27 @@
-import { cloudflareTest } from "@cloudflare/vitest-plugin";
-import type { OxfmtConfig } from "vite-plus/fmt";
-import type { OxlintConfig } from "vite-plus/lint";
-import { defineConfig } from "vite-plus";
+import { cloudflareTest } from '@cloudflare/vitest-plugin'
+import { defineConfig } from 'vite-plus'
+import type { OxfmtConfig } from 'vite-plus/fmt'
+import type { OxlintConfig } from 'vite-plus/lint'
 
 const toolIgnorePatterns = [
-  "pnpm-lock.yaml",
-  "repos/**",
-  ".bundle-base/**",
-  ".bundle-report/**",
-  ".runtime-bench/**",
-  ".agents/**",
-  ".claude/**",
-  ".dev-kit/**",
-  ".opencode/**",
-  ".repos/**",
-  ".vite-hooks/_/**",
-  "oxlint/plugin-anti-slop.js",
-  "packages/effect-cf/tests/fixtures/declaration-emit/worker-configuration.d.ts",
-];
+  'pnpm-lock.yaml',
+  'repos/**',
+  '.bundle-base/**',
+  '.bundle-report/**',
+  '.runtime-bench/**',
+  '.agents/**',
+  '.claude/**',
+  '.dev-kit/**',
+  '.opencode/**',
+  '.repos/**',
+  '.vite-hooks/_/**',
+  'oxlint/plugin-anti-slop.js',
+  'packages/effect-cf/tests/fixtures/declaration-emit/worker-configuration.d.ts',
+]
 
 const recommendedOxfmtConfig = {
-  arrowParens: "always",
-  endOfLine: "lf",
+  arrowParens: 'always',
+  endOfLine: 'lf',
   ignorePatterns: toolIgnorePatterns,
   printWidth: 100,
   semi: true,
@@ -29,9 +29,9 @@ const recommendedOxfmtConfig = {
   sortImports: true,
   sortPackageJson: true,
   tabWidth: 2,
-  trailingComma: "all",
+  trailingComma: 'all',
   useTabs: false,
-} satisfies OxfmtConfig;
+} satisfies OxfmtConfig
 
 const recommendedOxlintConfig = {
   ignorePatterns: toolIgnorePatterns,
@@ -42,86 +42,86 @@ const recommendedOxlintConfig = {
   },
   jsPlugins: [
     {
-      name: "anti-slop",
-      specifier: new URL("./oxlint/plugin-anti-slop.js", import.meta.url).pathname,
+      name: 'anti-slop',
+      specifier: new URL('./oxlint/plugin-anti-slop.js', import.meta.url).pathname,
     },
-    { name: "effect", specifier: new URL("./oxlint/plugin-effect.js", import.meta.url).pathname },
-    { name: "stylistic", specifier: new URL("./oxlint/plugin-style.js", import.meta.url).pathname },
+    { name: 'effect', specifier: new URL('./oxlint/plugin-effect.js', import.meta.url).pathname },
+    { name: 'stylistic', specifier: new URL('./oxlint/plugin-style.js', import.meta.url).pathname },
   ],
-  plugins: ["import", "vitest"],
+  plugins: ['import', 'vitest'],
   rules: {
-    "anti-slop/no-chained-type-assertions": "error",
-    "anti-slop/no-conditional-empty-object-spread": "error",
-    "anti-slop/no-known-value-widening": "error",
-    "anti-slop/no-module-mocking": "error",
-    "anti-slop/no-object-parameters": "error",
-    "anti-slop/no-reflect-apply": "error",
-    "anti-slop/no-reflect-get": "error",
-    "anti-slop/no-runtime-typeof": "error",
-    "anti-slop/no-shape-in-symbol-names": "error",
-    "anti-slop/no-unknown-parameters": "error",
-    "anti-slop/no-unknown-returns": "error",
-    "anti-slop/no-unknown-type-aliases": "error",
-    "anti-slop/no-unsafe-dictionary-type": "error",
-    "anti-slop/no-widen-then-assert": "error",
-    "anti-slop/require-safety-comment-for-type-assertion": "error",
-    eqeqeq: "error",
-    "import/default": "off",
-    "import/namespace": "off",
-    "import/no-cycle": "error",
-    "import/no-duplicates": ["error", { preferInline: true }],
-    "import/no-self-import": "error",
-    "stylistic/padding-line-between-statements": [
-      "error",
-      { blankLine: "always", prev: ["const", "let", "var"], next: "*" },
+    'anti-slop/no-chained-type-assertions': 'error',
+    'anti-slop/no-conditional-empty-object-spread': 'error',
+    'anti-slop/no-known-value-widening': 'error',
+    'anti-slop/no-module-mocking': 'error',
+    'anti-slop/no-object-parameters': 'error',
+    'anti-slop/no-reflect-apply': 'error',
+    'anti-slop/no-reflect-get': 'error',
+    'anti-slop/no-runtime-typeof': 'error',
+    'anti-slop/no-shape-in-symbol-names': 'error',
+    'anti-slop/no-unknown-parameters': 'error',
+    'anti-slop/no-unknown-returns': 'error',
+    'anti-slop/no-unknown-type-aliases': 'error',
+    'anti-slop/no-unsafe-dictionary-type': 'error',
+    'anti-slop/no-widen-then-assert': 'error',
+    'anti-slop/require-safety-comment-for-type-assertion': 'error',
+    eqeqeq: 'error',
+    'import/default': 'off',
+    'import/namespace': 'off',
+    'import/no-cycle': 'error',
+    'import/no-duplicates': ['error', { preferInline: true }],
+    'import/no-self-import': 'error',
+    'stylistic/padding-line-between-statements': [
+      'error',
+      { blankLine: 'always', prev: ['const', 'let', 'var'], next: '*' },
       {
-        blankLine: "any",
-        prev: ["const", "let", "var"],
-        next: ["const", "let", "var"],
+        blankLine: 'any',
+        prev: ['const', 'let', 'var'],
+        next: ['const', 'let', 'var'],
       },
-      { blankLine: "always", prev: "*", next: "return" },
+      { blankLine: 'always', prev: '*', next: 'return' },
     ],
-    "typescript/consistent-type-imports": [
-      "error",
-      { fixStyle: "inline-type-imports", prefer: "type-imports" },
+    'typescript/consistent-type-imports': [
+      'error',
+      { fixStyle: 'inline-type-imports', prefer: 'type-imports' },
     ],
-    "typescript/no-floating-promises": "off",
-    "typescript/no-explicit-any": "error",
-    "typescript/no-misused-spread": "off",
-    "typescript/no-non-null-assertion": "error",
-    "typescript/require-array-sort-compare": "off",
-    "typescript/restrict-template-expressions": "off",
-    "typescript/switch-exhaustiveness-check": "error",
-    "unicorn/prefer-node-protocol": "error",
-    "vitest/no-focused-tests": "error",
-    "vitest/no-identical-title": "error",
-    "vitest/no-standalone-expect": "off",
-    "vitest/valid-expect": "error",
+    'typescript/no-floating-promises': 'off',
+    'typescript/no-explicit-any': 'error',
+    'typescript/no-misused-spread': 'off',
+    'typescript/no-non-null-assertion': 'error',
+    'typescript/require-array-sort-compare': 'off',
+    'typescript/restrict-template-expressions': 'off',
+    'typescript/switch-exhaustiveness-check': 'error',
+    'unicorn/prefer-node-protocol': 'error',
+    'vitest/no-focused-tests': 'error',
+    'vitest/no-identical-title': 'error',
+    'vitest/no-standalone-expect': 'off',
+    'vitest/valid-expect': 'error',
   },
   overrides: [
     {
-      files: ["**/*.test.{ts,tsx}", "**/*.spec.{ts,tsx}"],
+      files: ['**/*.test.{ts,tsx}', '**/*.spec.{ts,tsx}'],
       rules: {
-        "typescript/no-non-null-assertion": "off",
+        'typescript/no-non-null-assertion': 'off',
       },
     },
   ],
-} satisfies OxlintConfig;
+} satisfies OxlintConfig
 
 const testExcludes = [
-  "**/.bundle-base/**",
-  "**/.bundle-report/**",
-  "**/.runtime-bench/**",
-  "**/node_modules/**",
-  "**/dist/**",
-  "**/.git/**",
-  ".repos/**",
-  ".worktrees/**",
-];
+  '**/.bundle-base/**',
+  '**/.bundle-report/**',
+  '**/.runtime-bench/**',
+  '**/node_modules/**',
+  '**/dist/**',
+  '**/.git/**',
+  '.repos/**',
+  '.worktrees/**',
+]
 
 const recommended = {
   staged: {
-    "*": "vp check --fix",
+    '*': 'dprint fmt --allow-no-files',
   },
   fmt: {
     ...recommendedOxfmtConfig,
@@ -131,17 +131,17 @@ const recommended = {
   },
   run: {
     tasks: {
-      check: ["vp fmt --check", "vp lint", "vp test", "vp run typecheck"],
+      check: ['dprint check', 'vp lint', 'vp test', 'vp run typecheck'],
       typecheck: {
         command: [
-          "vp exec effect-tsrs diagnostics --type-check --project scripts/tsconfig.json",
+          'vp exec effect-tsrs diagnostics --type-check --project scripts/tsconfig.json',
           "vp run --cache --filter './packages/*' --filter './examples/*' --fail-if-no-match typecheck",
         ],
         cache: false,
       },
     },
   },
-};
+}
 
 export default defineConfig({
   ...recommended,
@@ -153,36 +153,36 @@ export default defineConfig({
     projects: [
       {
         test: {
-          name: "node",
+          name: 'node',
           alias: {
-            "cloudflare:workflows": new URL(
-              "./packages/effect-cf/tests/cloudflare-workflows.ts",
+            'cloudflare:workflows': new URL(
+              './packages/effect-cf/tests/cloudflare-workflows.ts',
               import.meta.url,
             ).pathname,
-            "cloudflare:workers": new URL(
-              "./packages/effect-cf/tests/cloudflare-workers.ts",
+            'cloudflare:workers': new URL(
+              './packages/effect-cf/tests/cloudflare-workers.ts',
               import.meta.url,
             ).pathname,
           },
-          exclude: [...testExcludes, "**/*.worker.test.ts"],
-          include: ["**/*.test.ts"],
+          exclude: [...testExcludes, '**/*.worker.test.ts'],
+          include: ['**/*.test.ts'],
         },
       },
       {
         plugins: [
           cloudflareTest({
-            main: "./packages/effect-cf/tests/worker-fixture.ts",
+            main: './packages/effect-cf/tests/worker-fixture.ts',
             wrangler: {
-              configPath: "./packages/effect-cf/tests/wrangler.jsonc",
+              configPath: './packages/effect-cf/tests/wrangler.jsonc',
             },
           }),
         ],
         test: {
-          name: "workers",
+          name: 'workers',
           // Cached module replies make the Cloudflare 1.4.8 runner close its WebSocket.
           fsModuleCache: false,
           exclude: testExcludes,
-          include: ["**/*.worker.test.ts"],
+          include: ['**/*.worker.test.ts'],
         },
       },
     ],
@@ -197,11 +197,11 @@ export default defineConfig({
     rules: {
       ...recommended.lint.rules,
       // Public RPC/schema boundaries intentionally preserve generic `any` types.
-      "typescript/no-explicit-any": "off",
+      'typescript/no-explicit-any': 'off',
       // Cloudflare's optional host methods are narrowed before assertion.
-      "typescript/no-non-null-assertion": "off",
+      'typescript/no-non-null-assertion': 'off',
       // Definition and runtime modules deliberately expose paired APIs.
-      "import/no-cycle": "off",
+      'import/no-cycle': 'off',
     },
   },
   run: {
@@ -209,44 +209,43 @@ export default defineConfig({
     cache: true,
     tasks: {
       ...recommended.run.tasks,
-      "bundle:compare": {
-        command: "bun scripts/bundle-compare.ts",
+      'bundle:compare': {
+        command: 'bun scripts/bundle-compare.ts',
         cache: false,
       },
-      "bundle:pipeline": {
-        command: "bun scripts/bundle-pipelines/build.ts",
+      'bundle:pipeline': {
+        command: 'bun scripts/bundle-pipelines/build.ts',
         cache: false,
       },
-      "bundle:setup": {
-        command: "vp install --frozen-lockfile --ignore-scripts",
-        cwd: "scripts/bundle-pipelines",
+      'bundle:setup': {
+        command: 'vp install --frozen-lockfile --ignore-scripts',
+        cwd: 'scripts/bundle-pipelines',
         cache: false,
       },
-      "bundle:typecheck": {
-        command: "vp exec tsrs --noEmit -p scripts/bundle-pipelines/tsconfig.json",
+      'bundle:typecheck': {
+        command: 'vp exec tsrs --noEmit -p scripts/bundle-pipelines/tsconfig.json',
         cache: false,
       },
-      "runtime:bench": {
-        command: "bun scripts/runtime-bench.ts",
-        dependsOn: ["effect-cf#build"],
+      'runtime:bench': {
+        command: 'bun scripts/runtime-bench.ts',
+        dependsOn: ['@systemfsoftware/effect-cf#build'],
         cache: false,
       },
-      "test:containers": {
-        command:
-          "EFFECT_CF_CONTAINER_TESTS=1 vp test --project node DurableObjectContainer.integration.test.ts",
-        dependsOn: ["effect-cf#build"],
+      'test:containers': {
+        command: 'EFFECT_CF_CONTAINER_TESTS=1 vp test --project node DurableObjectContainer.integration.test.ts',
+        dependsOn: ['@systemfsoftware/effect-cf#build'],
         cache: false,
       },
       // Examples consume the publishable packages through their published
       // `dist` entrypoints.
       check: {
         command: recommended.run.tasks.check,
-        dependsOn: ["effect-cf#build", "effect-webtransport#build"],
+        dependsOn: ['@systemfsoftware/effect-cf#build', '@systemfsoftware/effect-webtransport#build'],
       },
       typecheck: {
         ...recommended.run.tasks.typecheck,
-        dependsOn: ["effect-cf#build", "effect-webtransport#build"],
+        dependsOn: ['@systemfsoftware/effect-cf#build', '@systemfsoftware/effect-webtransport#build'],
       },
     },
   },
-});
+})

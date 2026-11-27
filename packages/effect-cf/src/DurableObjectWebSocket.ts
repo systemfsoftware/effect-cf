@@ -1,76 +1,76 @@
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as Result from "effect/Result";
-import * as S from "effect/Schema";
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Result from 'effect/Result'
+import * as S from 'effect/Schema'
 
-import { DurableObjectState } from "./DurableObjectState";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import { DurableObjectState } from './DurableObjectState'
+import * as ErrorMessage from './internal/ErrorMessage'
 
-export const DEFAULT_KEEPALIVE_REQUEST = "effect-cf:ping";
-export const DEFAULT_KEEPALIVE_RESPONSE = "effect-cf:pong";
+export const DEFAULT_KEEPALIVE_REQUEST = 'effect-cf:ping'
+export const DEFAULT_KEEPALIVE_RESPONSE = 'effect-cf:pong'
 
 /**
  * Registers exact text keepalives with Cloudflare so they never invoke the object.
  * The pair applies to all hibernating sockets on this object; install in its constructor.
  * Clients send the request text and consume the response outside their application protocol.
  */
-export const installKeepalive = Effect.fn("DurableObjectWebSocket.installKeepalive")(function* (
+export const installKeepalive = Effect.fn('DurableObjectWebSocket.installKeepalive')(function*(
   request = DEFAULT_KEEPALIVE_REQUEST,
   response = DEFAULT_KEEPALIVE_RESPONSE,
 ) {
-  const state = yield* DurableObjectState;
-  const configured = yield* state.getWebSocketAutoResponse;
+  const state = yield* DurableObjectState
+  const configured = yield* state.getWebSocketAutoResponse
 
   if (configured !== null && (configured.request !== request || configured.response !== response)) {
     return yield* Effect.die(
-      new Error("Durable Object already has a different keepalive protocol"),
-    );
+      new Error('Durable Object already has a different keepalive protocol'),
+    )
   }
 
-  yield* state.setWebSocketAutoResponse(new WebSocketRequestResponsePair(request, response));
-});
+  yield* state.setWebSocketAutoResponse(new WebSocketRequestResponsePair(request, response))
+})
 
-export type DurableWebSocketSendData = string | ArrayBuffer | ArrayBufferView;
+export type DurableWebSocketSendData = string | ArrayBuffer | ArrayBufferView
 
-export class DurableWebSocketSendError extends Data.TaggedError("DurableWebSocketSendError")<{
-  readonly cause: unknown;
+export class DurableWebSocketSendError extends Data.TaggedError('DurableWebSocketSendError')<{
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Durable Object websocket send failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Durable Object websocket send failed: ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
-export class DurableWebSocketCloseError extends Data.TaggedError("DurableWebSocketCloseError")<{
-  readonly cause: unknown;
+export class DurableWebSocketCloseError extends Data.TaggedError('DurableWebSocketCloseError')<{
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Durable Object websocket close failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Durable Object websocket close failed: ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
 /** Error raised when serializing or deserializing a websocket attachment fails. */
 export class DurableWebSocketAttachmentError extends Data.TaggedError(
-  "DurableWebSocketAttachmentError",
+  'DurableWebSocketAttachmentError',
 )<{
-  readonly operation: "serialize" | "deserialize";
-  readonly cause: unknown;
+  readonly operation: 'serialize' | 'deserialize'
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Durable Object websocket attachment ${this.operation} failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Durable Object websocket attachment ${this.operation} failed: ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
 export interface DurableWebSocket<Attachment = unknown> {
-  readonly raw: WebSocket;
-  send(data: DurableWebSocketSendData): Effect.Effect<void, DurableWebSocketSendError>;
-  close(code?: number, reason?: string): Effect.Effect<void, DurableWebSocketCloseError>;
+  readonly raw: WebSocket
+  send(data: DurableWebSocketSendData): Effect.Effect<void, DurableWebSocketSendError>
+  close(code?: number, reason?: string): Effect.Effect<void, DurableWebSocketCloseError>
   /** Serializes hibernation attachment metadata onto the socket. */
   serializeAttachment<A extends Attachment = Attachment>(
     value: A,
-  ): Effect.Effect<void, DurableWebSocketAttachmentError>;
+  ): Effect.Effect<void, DurableWebSocketAttachmentError>
   /** Deserializes hibernation attachment metadata from the socket. */
-  readonly deserializeAttachment: Effect.Effect<unknown, DurableWebSocketAttachmentError>;
+  readonly deserializeAttachment: Effect.Effect<unknown, DurableWebSocketAttachmentError>
 }
 
 export const fromWebSocket = <Attachment = unknown>(
@@ -90,27 +90,27 @@ export const fromWebSocket = <Attachment = unknown>(
   serializeAttachment: <A extends Attachment = Attachment>(value: A) =>
     Effect.try({
       try: () => raw.serializeAttachment(value),
-      catch: (cause) => new DurableWebSocketAttachmentError({ operation: "serialize", cause }),
+      catch: (cause) => new DurableWebSocketAttachmentError({ operation: 'serialize', cause }),
     }),
   deserializeAttachment: Effect.try({
     try: () => raw.deserializeAttachment(),
-    catch: (cause) => new DurableWebSocketAttachmentError({ operation: "deserialize", cause }),
+    catch: (cause) => new DurableWebSocketAttachmentError({ operation: 'deserialize', cause }),
   }),
-});
+})
 
 export interface AcceptUpgradeOptions<Attachment = unknown> {
-  readonly tags?: ReadonlyArray<string> | undefined;
+  readonly tags?: ReadonlyArray<string> | undefined
   /** Optional attachment serialized onto the server socket. */
-  readonly attachment?: Attachment | undefined;
+  readonly attachment?: Attachment | undefined
 }
 
 export interface AcceptedUpgrade<Attachment = unknown> {
-  readonly client: WebSocket;
-  readonly server: DurableWebSocket<Attachment>;
-  readonly response: Response;
+  readonly client: WebSocket
+  readonly server: DurableWebSocket<Attachment>
+  readonly response: Response
 }
 
-export const acceptUpgrade = Effect.fn("DurableObjectWebSocket.acceptUpgrade")(function* <
+export const acceptUpgrade = Effect.fn('DurableObjectWebSocket.acceptUpgrade')(function*<
   Attachment = unknown,
 >(
   options: AcceptUpgradeOptions<Attachment> = {},
@@ -119,16 +119,16 @@ export const acceptUpgrade = Effect.fn("DurableObjectWebSocket.acceptUpgrade")(f
   DurableWebSocketAttachmentError,
   DurableObjectState
 > {
-  const state = yield* DurableObjectState;
-  const pair = new WebSocketPair();
-  const client = pair[0];
-  const server = fromWebSocket<Attachment>(pair[1]);
+  const state = yield* DurableObjectState
+  const pair = new WebSocketPair()
+  const client = pair[0]
+  const server = fromWebSocket<Attachment>(pair[1])
 
   if (options.attachment !== undefined) {
-    yield* server.serializeAttachment(options.attachment);
+    yield* server.serializeAttachment(options.attachment)
   }
 
-  yield* state.acceptWebSocket(server, options.tags === undefined ? undefined : [...options.tags]);
+  yield* state.acceptWebSocket(server, options.tags === undefined ? undefined : [...options.tags])
 
   return {
     client,
@@ -137,37 +137,37 @@ export const acceptUpgrade = Effect.fn("DurableObjectWebSocket.acceptUpgrade")(f
       status: 101,
       webSocket: client,
     }),
-  };
-});
+  }
+})
 
-export type AttachmentInvalidPolicy = "ignore" | "ignore-and-close" | "fail";
+export type AttachmentInvalidPolicy = 'ignore' | 'ignore-and-close' | 'fail'
 
 export interface AttachmentRehydrateOptions {
-  readonly tag?: string | undefined;
-  readonly onInvalid?: AttachmentInvalidPolicy | undefined;
+  readonly tag?: string | undefined
+  readonly onInvalid?: AttachmentInvalidPolicy | undefined
 }
 
 export interface RehydratedDurableWebSocket<Attachment> {
-  readonly socket: DurableWebSocket<Attachment>;
-  readonly attachment: Attachment;
+  readonly socket: DurableWebSocket<Attachment>
+  readonly attachment: Attachment
 }
 
 export interface DurableWebSocketAttachment<Attachment, Encoded> {
   serialize(
     socket: DurableWebSocket<unknown>,
     value: Attachment,
-  ): Effect.Effect<void, DurableWebSocketAttachmentError>;
+  ): Effect.Effect<void, DurableWebSocketAttachmentError>
   deserialize(
     socket: DurableWebSocket<unknown>,
-  ): Effect.Effect<Option.Option<Attachment>, DurableWebSocketAttachmentError>;
+  ): Effect.Effect<Option.Option<Attachment>, DurableWebSocketAttachmentError>
   rehydrate(
     options?: AttachmentRehydrateOptions,
   ): Effect.Effect<
     Array<RehydratedDurableWebSocket<Attachment>>,
     DurableWebSocketAttachmentError,
     DurableObjectState
-  >;
-  readonly schema: S.Codec<Attachment, Encoded, never, never>;
+  >
+  readonly schema: S.Codec<Attachment, Encoded, never, never>
 }
 
 export const attachment = <const AttachmentSchema extends S.Codec<any, any, never, never>>(
@@ -176,79 +176,79 @@ export const attachment = <const AttachmentSchema extends S.Codec<any, any, neve
   S.Schema.Type<AttachmentSchema>,
   S.Codec.Encoded<AttachmentSchema>
 > => {
-  type Attachment = S.Schema.Type<AttachmentSchema>;
+  type Attachment = S.Schema.Type<AttachmentSchema>
 
   const serialize = (socket: DurableWebSocket<unknown>, value: Attachment) =>
     S.encodeEffect(schema)(value).pipe(
       Effect.mapError(
-        (cause) => new DurableWebSocketAttachmentError({ operation: "serialize", cause }),
+        (cause) => new DurableWebSocketAttachmentError({ operation: 'serialize', cause }),
       ),
       Effect.flatMap((encoded) => socket.serializeAttachment(encoded)),
-    );
+    )
 
   const deserialize = (socket: DurableWebSocket<unknown>) =>
-    Effect.gen(function* () {
-      const value = yield* socket.deserializeAttachment;
+    Effect.gen(function*() {
+      const value = yield* socket.deserializeAttachment
 
       if (value === null || value === undefined) {
-        return Option.none<Attachment>();
+        return Option.none<Attachment>()
       }
 
       return Option.some(
         yield* S.decodeEffect(schema)(value).pipe(
           Effect.mapError(
-            (cause) => new DurableWebSocketAttachmentError({ operation: "deserialize", cause }),
+            (cause) => new DurableWebSocketAttachmentError({ operation: 'deserialize', cause }),
           ),
         ),
-      );
-    });
+      )
+    })
 
   const rehydrate = (options: AttachmentRehydrateOptions = {}) =>
-    Effect.gen(function* () {
-      const state = yield* DurableObjectState;
-      const sockets = yield* state.getWebSockets(options.tag);
-      const restored: Array<RehydratedDurableWebSocket<Attachment>> = [];
-      const onInvalid = options.onInvalid ?? "ignore";
+    Effect.gen(function*() {
+      const state = yield* DurableObjectState
+      const sockets = yield* state.getWebSockets(options.tag)
+      const restored: Array<RehydratedDurableWebSocket<Attachment>> = []
+      const onInvalid = options.onInvalid ?? 'ignore'
 
       for (const socket of sockets) {
-        const decoded = yield* Effect.result(deserialize(socket));
+        const decoded = yield* Effect.result(deserialize(socket))
 
         if (Result.isSuccess(decoded) && Option.isSome(decoded.success)) {
-          restored.push({ socket, attachment: decoded.success.value });
-          continue;
+          restored.push({ socket, attachment: decoded.success.value })
+          continue
         }
 
-        if (Result.isFailure(decoded) && onInvalid === "fail") {
-          return yield* decoded.failure;
+        if (Result.isFailure(decoded) && onInvalid === 'fail') {
+          return yield* decoded.failure
         }
 
-        if (Result.isFailure(decoded) && onInvalid === "ignore-and-close") {
-          yield* socket.close(1008, "invalid websocket attachment").pipe(Effect.ignore);
+        if (Result.isFailure(decoded) && onInvalid === 'ignore-and-close') {
+          yield* socket.close(1008, 'invalid websocket attachment').pipe(Effect.ignore)
         }
       }
 
-      return restored;
-    });
+      return restored
+    })
 
-  return { serialize, deserialize, rehydrate, schema };
-};
+  return { serialize, deserialize, rehydrate, schema }
+}
 
 export interface DurableWebSocketHandlers<R = never, E = unknown> {
   readonly message?: (
     socket: DurableWebSocket,
     message: string | ArrayBuffer,
-  ) => Effect.Effect<void, E, R>;
+  ) => Effect.Effect<void, E, R>
   readonly close?: (
     socket: DurableWebSocket,
     code: number,
     reason: string,
     wasClean: boolean,
-  ) => Effect.Effect<void, E, R>;
-  readonly error?: (socket: DurableWebSocket, cause: unknown) => Effect.Effect<void, E, R>;
+  ) => Effect.Effect<void, E, R>
+  readonly error?: (socket: DurableWebSocket, cause: unknown) => Effect.Effect<void, E, R>
 }
 
 export const handlers = <R = never, E = unknown>(options: DurableWebSocketHandlers<R, E>) => ({
   webSocketMessage: options.message,
   webSocketClose: options.close,
   webSocketError: options.error,
-});
+})

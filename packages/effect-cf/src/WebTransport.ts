@@ -29,12 +29,12 @@
  * {@link inboundTransport} decodes the HTTP/3-relevant request metadata that
  * the edge does provide.
  */
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import * as Result from "effect/Result";
-import * as S from "effect/Schema";
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Predicate from 'effect/Predicate'
+import * as Result from 'effect/Result'
+import * as S from 'effect/Schema'
 
 /**
  * Metadata Cloudflare's edge reports about the inbound client connection.
@@ -45,13 +45,13 @@ import * as S from "effect/Schema";
  * present in the published types, so it is decoded from the open
  * `Record<string, unknown>` side of `request.cf`.
  */
-export class InboundTransport extends S.Class<InboundTransport>("InboundTransport")({
+export class InboundTransport extends S.Class<InboundTransport>('InboundTransport')({
   httpProtocol: S.String,
   clientQuicRtt: S.optional(S.Finite),
   clientTcpRtt: S.optional(S.Finite),
 }) {}
 
-const decodeInboundTransport = S.decodeUnknownResult(InboundTransport);
+const decodeInboundTransport = S.decodeUnknownResult(InboundTransport)
 
 /**
  * Decodes the inbound transport metadata from `request.cf`.
@@ -60,11 +60,11 @@ const decodeInboundTransport = S.decodeUnknownResult(InboundTransport);
  * dev` or when a Worker invokes another Worker directly) or does not match
  * the expected shape.
  */
-export const inboundTransport = (request: Pick<Request, "cf">): Option.Option<InboundTransport> =>
-  Result.getSuccess(decodeInboundTransport(request.cf));
+export const inboundTransport = (request: Pick<Request, 'cf'>): Option.Option<InboundTransport> =>
+  Result.getSuccess(decodeInboundTransport(request.cf))
 
 export const isHttp3 = (transport: InboundTransport): boolean =>
-  transport.clientQuicRtt !== undefined || transport.httpProtocol === "HTTP/3";
+  transport.clientQuicRtt !== undefined || transport.httpProtocol === 'HTTP/3'
 
 export interface Capabilities {
   /**
@@ -73,35 +73,34 @@ export interface Capabilities {
    * so this can only change through a breaking, deliberate update when
    * Cloudflare ships one.
    */
-  readonly inboundSessions: false;
+  readonly inboundSessions: false
   /**
    * Whether the runtime exposes a client `WebTransport` constructor global.
    * Feature-detected at runtime; `false` in workerd today, which has no
    * QUIC stack.
    */
-  readonly outboundSessions: boolean;
+  readonly outboundSessions: boolean
 }
 
 export const capabilities: Effect.Effect<Capabilities> = Effect.sync(() => {
-  const runtime = globalThis;
+  const runtime = globalThis
 
   return {
     inboundSessions: false,
-    outboundSessions:
-      Predicate.hasProperty(runtime, "WebTransport") &&
-      Predicate.isFunction(runtime["WebTransport"]),
-  };
-});
+    outboundSessions: Predicate.hasProperty(runtime, 'WebTransport') &&
+      Predicate.isFunction(runtime['WebTransport']),
+  }
+})
 
-export type WebTransportCapability = "inbound-sessions" | "outbound-sessions";
+export type WebTransportCapability = 'inbound-sessions' | 'outbound-sessions'
 
-export class WebTransportUnsupportedError extends Data.TaggedError("WebTransportUnsupportedError")<{
-  readonly capability: WebTransportCapability;
+export class WebTransportUnsupportedError extends Data.TaggedError('WebTransportUnsupportedError')<{
+  readonly capability: WebTransportCapability
 }> {
   override get message(): string {
-    return this.capability === "inbound-sessions"
-      ? "Cloudflare Workers cannot accept inbound WebTransport sessions: the edge terminates QUIC and no runtime session API exists (cloudflare/workerd#6451). Use Durable Object WebSockets for bidirectional push."
-      : "This Workers runtime provides no WebTransport client: workerd has no QUIC stack and cloudflare:sockets is TCP-only.";
+    return this.capability === 'inbound-sessions'
+      ? 'Cloudflare Workers cannot accept inbound WebTransport sessions: the edge terminates QUIC and no runtime session API exists (cloudflare/workerd#6451). Use Durable Object WebSockets for bidirectional push.'
+      : 'This Workers runtime provides no WebTransport client: workerd has no QUIC stack and cloudflare:sockets is TCP-only.'
   }
 }
 
@@ -113,5 +112,6 @@ export class WebTransportUnsupportedError extends Data.TaggedError("WebTransport
  * limitation is visible in the type system and greppable when Cloudflare
  * ships a real API.
  */
-export const inboundSessionsUnsupported: Effect.Effect<never, WebTransportUnsupportedError> =
-  Effect.fail(new WebTransportUnsupportedError({ capability: "inbound-sessions" }));
+export const inboundSessionsUnsupported: Effect.Effect<never, WebTransportUnsupportedError> = Effect.fail(
+  new WebTransportUnsupportedError({ capability: 'inbound-sessions' }),
+)

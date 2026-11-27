@@ -1,135 +1,135 @@
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Duration from "effect/Duration";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Stream from "effect/Stream";
-import type { Scope } from "effect";
+import type { Scope } from 'effect'
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Duration from 'effect/Duration'
+import * as Effect from 'effect/Effect'
+import * as Layer from 'effect/Layer'
+import * as Option from 'effect/Option'
+import * as Stream from 'effect/Stream'
 
-import { DurableObjectState } from "./DurableObjectState";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import { DurableObjectState } from './DurableObjectState'
+import * as ErrorMessage from './internal/ErrorMessage'
 
-export type ContainerStartOptions = globalThis.ContainerStartupOptions;
-export type ContainerExecOptions = Omit<globalThis.ContainerExecOptions, "signal">;
-export type ContainerInfo = globalThis.ContainerInfo;
-export type ContainerSnapshot = globalThis.ContainerSnapshot;
-export type ContainerSnapshotOptions = globalThis.ContainerSnapshotOptions;
-export type ContainerExecOutput = globalThis.ExecOutput;
+export type ContainerStartOptions = globalThis.ContainerStartupOptions
+export type ContainerExecOptions = Omit<globalThis.ContainerExecOptions, 'signal'>
+export type ContainerInfo = globalThis.ContainerInfo
+export type ContainerSnapshot = globalThis.ContainerSnapshot
+export type ContainerSnapshotOptions = globalThis.ContainerSnapshotOptions
+export type ContainerExecOutput = globalThis.ExecOutput
 
 export interface ContainerExecOutputText {
-  readonly stdout: string;
-  readonly stderr: string;
-  readonly exitCode: number;
+  readonly stdout: string
+  readonly stderr: string
+  readonly exitCode: number
 }
 
 export interface ContainerProcessLog {
-  readonly stream: "stdout" | "stderr";
-  readonly data: Uint8Array;
+  readonly stream: 'stdout' | 'stderr'
+  readonly data: Uint8Array
 }
 
 export interface ContainerHttpReadinessOptions {
   /** Defaults to 30 seconds. All durations accept numbers in milliseconds. */
-  readonly timeout?: Duration.Input;
+  readonly timeout?: Duration.Input
   /** Delay between probes. Defaults to 100 milliseconds. */
-  readonly interval?: Duration.Input;
+  readonly interval?: Duration.Input
   /** Bounds each connection or HTTP probe. Defaults to 1 second. */
-  readonly attemptTimeout?: Duration.Input;
-  readonly path?: string;
+  readonly attemptTimeout?: Duration.Input
+  readonly path?: string
   /** Accepts any HTTP response unless a status range is supplied. */
-  readonly status?: { readonly min: number; readonly max: number };
+  readonly status?: { readonly min: number; readonly max: number }
 }
 
-export class ContainerNotConfiguredError extends Data.TaggedError("ContainerNotConfiguredError")<{
-  readonly durableObjectId: string;
+export class ContainerNotConfiguredError extends Data.TaggedError('ContainerNotConfiguredError')<{
+  readonly durableObjectId: string
 }> {
   override get message(): string {
-    return `No container is configured for Durable Object "${this.durableObjectId}"`;
+    return `No container is configured for Durable Object "${this.durableObjectId}"`
   }
 }
 
-export class ContainerError extends Data.TaggedError("ContainerError")<{
-  readonly operation: string;
-  readonly cause: unknown;
+export class ContainerError extends Data.TaggedError('ContainerError')<{
+  readonly operation: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Durable Object container ${this.operation} failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Durable Object container ${this.operation} failed: ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
 export class ContainerReadinessTimeoutError extends Data.TaggedError(
-  "ContainerReadinessTimeoutError",
+  'ContainerReadinessTimeoutError',
 )<{
-  readonly port: number;
-  readonly timeout: Duration.Duration;
+  readonly port: number
+  readonly timeout: Duration.Duration
   /** The last completed probe failure, when available. */
-  readonly cause: unknown;
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Container port ${this.port} was not ready within ${Duration.toMillis(this.timeout)}ms`;
+    return `Container port ${this.port} was not ready within ${Duration.toMillis(this.timeout)}ms`
   }
 }
 
 /** A native process handle owned by its creating request. Choose one output consumer. */
 export interface ContainerProcess {
-  readonly raw: globalThis.ExecProcess;
-  readonly pid: number;
-  readonly isPty: boolean;
-  readonly stdin: globalThis.ExecProcess["stdin"];
+  readonly raw: globalThis.ExecProcess
+  readonly pid: number
+  readonly isPty: boolean
+  readonly stdin: globalThis.ExecProcess['stdin']
   /** Empty when the corresponding native stream is absent. */
-  readonly stdout: Stream.Stream<Uint8Array, ContainerError>;
-  readonly stderr: Stream.Stream<Uint8Array, ContainerError>;
+  readonly stdout: Stream.Stream<Uint8Array, ContainerError>
+  readonly stderr: Stream.Stream<Uint8Array, ContainerError>
   /** Drains both channels concurrently. Single-use, without buffering or replay. */
-  readonly logs: Stream.Stream<ContainerProcessLog, ContainerError>;
+  readonly logs: Stream.Stream<ContainerProcessLog, ContainerError>
   /** Nonzero exit codes are values, not Effect failures. */
-  readonly exitCode: Effect.Effect<number, ContainerError>;
-  readonly output: Effect.Effect<ContainerExecOutput, ContainerError>;
-  readonly outputText: Effect.Effect<ContainerExecOutputText, ContainerError>;
+  readonly exitCode: Effect.Effect<number, ContainerError>
+  readonly output: Effect.Effect<ContainerExecOutput, ContainerError>
+  readonly outputText: Effect.Effect<ContainerExecOutputText, ContainerError>
   /** Signals the main process only; does nothing after its exit has been observed. */
-  readonly kill: (signal?: number) => Effect.Effect<void, ContainerError>;
-  readonly resize: (cols: number, rows: number) => Effect.Effect<void, ContainerError>;
+  readonly kill: (signal?: number) => Effect.Effect<void, ContainerError>
+  readonly resize: (cols: number, rows: number) => Effect.Effect<void, ContainerError>
 }
 
 export interface ContainerTcpPort {
-  readonly raw: globalThis.Fetcher;
+  readonly raw: globalThis.Fetcher
   readonly fetch: (
     input: RequestInfo | URL,
     init?: RequestInit,
-  ) => Effect.Effect<Response, ContainerError>;
+  ) => Effect.Effect<Response, ContainerError>
   /** Forwards an authorized preview request once, using the container's HTTP transport. */
-  readonly proxy: (request: Request) => Effect.Effect<Response, ContainerError>;
+  readonly proxy: (request: Request) => Effect.Effect<Response, ContainerError>
   /** The caller owns the returned socket and must close it. */
   readonly connect: (
-    ...args: Parameters<globalThis.Fetcher["connect"]>
-  ) => Effect.Effect<ReturnType<globalThis.Fetcher["connect"]>, ContainerError>;
+    ...args: Parameters<globalThis.Fetcher['connect']>
+  ) => Effect.Effect<ReturnType<globalThis.Fetcher['connect']>, ContainerError>
   /** Closes the socket when the scope ends, awaiting cleanup and preserving close failures as defects. */
   readonly connectScoped: (
-    ...args: Parameters<globalThis.Fetcher["connect"]>
-  ) => Effect.Effect<ReturnType<globalThis.Fetcher["connect"]>, ContainerError, Scope.Scope>;
+    ...args: Parameters<globalThis.Fetcher['connect']>
+  ) => Effect.Effect<ReturnType<globalThis.Fetcher['connect']>, ContainerError, Scope.Scope>
 }
 
 /** Direct container control inside a Durable Object; lifecycle policy belongs to the application. */
 export interface DurableObjectContainerService {
-  readonly raw: globalThis.Container;
-  readonly running: Effect.Effect<boolean, ContainerError>;
-  readonly images: Effect.Effect<Readonly<Record<string, string>>, ContainerError>;
-  readonly inspect: Effect.Effect<Option.Option<ContainerInfo>, ContainerError>;
+  readonly raw: globalThis.Container
+  readonly running: Effect.Effect<boolean, ContainerError>
+  readonly images: Effect.Effect<Readonly<Record<string, string>>, ContainerError>
+  readonly inspect: Effect.Effect<Option.Option<ContainerInfo>, ContainerError>
   /** Validates options and initiates startup. It does not wait for readiness. */
-  readonly start: (options?: ContainerStartOptions) => Effect.Effect<void, ContainerError>;
+  readonly start: (options?: ContainerStartOptions) => Effect.Effect<void, ContainerError>
   /** Waits for the container to stop; failures retain the native cause, including its exitCode. */
-  readonly monitor: Effect.Effect<void, ContainerError>;
+  readonly monitor: Effect.Effect<void, ContainerError>
   readonly destroy: (
-    reason?: Parameters<globalThis.Container["destroy"]>[0],
-  ) => Effect.Effect<void, ContainerError>;
-  readonly signal: (signal: number) => Effect.Effect<void, ContainerError>;
+    reason?: Parameters<globalThis.Container['destroy']>[0],
+  ) => Effect.Effect<void, ContainerError>
+  readonly signal: (signal: number) => Effect.Effect<void, ContainerError>
   /** Effect duration input: numbers are milliseconds; bigints are nanoseconds. */
-  readonly setInactivityTimeout: (duration: Duration.Input) => Effect.Effect<void, ContainerError>;
-  readonly getTcpPort: (port: number) => Effect.Effect<ContainerTcpPort, ContainerError>;
+  readonly setInactivityTimeout: (duration: Duration.Input) => Effect.Effect<void, ContainerError>
+  readonly getTcpPort: (port: number) => Effect.Effect<ContainerTcpPort, ContainerError>
   /** Sends HTTP GET probes to an already-started container. Never retries a caller's request. */
   readonly waitForHttp: (
     port: number,
     options?: ContainerHttpReadinessOptions,
-  ) => Effect.Effect<void, ContainerError | ContainerReadinessTimeoutError>;
+  ) => Effect.Effect<void, ContainerError | ContainerReadinessTimeoutError>
   /**
    * Runs an executable with arguments, without a shell or automatic container startup.
    * Interruption cancels acquisition. After acquisition, the caller owns the process.
@@ -138,38 +138,38 @@ export interface DurableObjectContainerService {
   readonly exec: (
     command: ReadonlyArray<string>,
     options?: ContainerExecOptions,
-  ) => Effect.Effect<ContainerProcess, ContainerError>;
+  ) => Effect.Effect<ContainerProcess, ContainerError>
   /** Sends SIGKILL to a still-running main process when the scope closes. */
   readonly execScoped: (
     command: ReadonlyArray<string>,
     options?: ContainerExecOptions,
-  ) => Effect.Effect<ContainerProcess, ContainerError, Scope.Scope>;
+  ) => Effect.Effect<ContainerProcess, ContainerError, Scope.Scope>
   readonly snapshotContainer: (
     options?: ContainerSnapshotOptions,
-  ) => Effect.Effect<ContainerSnapshot, ContainerError>;
+  ) => Effect.Effect<ContainerSnapshot, ContainerError>
   readonly interceptOutboundHttp: (
     address: string,
     binding: globalThis.Fetcher,
-  ) => Effect.Effect<void, ContainerError>;
+  ) => Effect.Effect<void, ContainerError>
   readonly interceptAllOutboundHttp: (
     binding: globalThis.Fetcher,
-  ) => Effect.Effect<void, ContainerError>;
+  ) => Effect.Effect<void, ContainerError>
   readonly interceptOutboundHttps: (
     address: string,
     binding: globalThis.Fetcher,
-  ) => Effect.Effect<void, ContainerError>;
+  ) => Effect.Effect<void, ContainerError>
 }
 
 export class DurableObjectContainer extends Context.Service<
   DurableObjectContainer,
   DurableObjectContainerService
->()("effect-cf/DurableObjectContainer") {}
+>()('@systemfsoftware/effect-cf/DurableObjectContainer') {}
 
 const attempt = <A>(operation: string, evaluate: () => A): Effect.Effect<A, ContainerError> =>
   Effect.try({
     try: evaluate,
     catch: (cause) => new ContainerError({ operation, cause }),
-  });
+  })
 
 const attemptPromise = <A>(
   operation: string,
@@ -178,18 +178,18 @@ const attemptPromise = <A>(
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => new ContainerError({ operation, cause }),
-  });
+  })
 
 const processStream = (
-  stream: globalThis.ExecProcess["stdout"] | undefined,
+  stream: globalThis.ExecProcess['stdout'] | undefined,
   operation: string,
 ): Stream.Stream<Uint8Array, ContainerError> =>
   stream === null || stream === undefined
     ? Stream.empty
     : Stream.fromReadableStream({
-        evaluate: () => stream,
-        onError: (cause) => new ContainerError({ operation, cause }),
-      });
+      evaluate: () => stream,
+      onError: (cause) => new ContainerError({ operation, cause }),
+    })
 
 const mergeProcessLogs = (
   stdout: ReadableStream<Uint8Array> | null | undefined,
@@ -198,48 +198,48 @@ const mergeProcessLogs = (
   Stream.fromReadableStream({
     evaluate: () => {
       const readers: Array<{
-        stream: "stdout" | "stderr";
-        reader: ReadableStreamDefaultReader<Uint8Array>;
-      }> = [];
+        stream: 'stdout' | 'stderr'
+        reader: ReadableStreamDefaultReader<Uint8Array>
+      }> = []
       const ready: Array<{
-        index: number;
-        result?: ReadableStreamReadResult<Uint8Array>;
-        error?: ContainerError;
-      }> = [];
-      let remaining = 0;
-      let wake: (() => void) | undefined;
-      let stopped = false;
-      let cleanup: Promise<void> | undefined;
+        index: number
+        result?: ReadableStreamReadResult<Uint8Array>
+        error?: ContainerError
+      }> = []
+      let remaining = 0
+      let wake: (() => void) | undefined
+      let stopped = false
+      let cleanup: Promise<void> | undefined
       const cancel = () => {
-        if (cleanup !== undefined) return cleanup;
-        stopped = true;
-        wake?.();
-        wake = undefined;
+        if (cleanup !== undefined) return cleanup
+        stopped = true
+        wake?.()
+        wake = undefined
 
         // Install the shared promise before native cancellation callbacks can reenter.
         return (cleanup = Promise.resolve().then(async () => {
           await Promise.all(
             readers.map(async ({ reader }) => {
               try {
-                await reader.cancel();
+                await reader.cancel()
               } catch {
               } finally {
                 try {
-                  reader.releaseLock();
+                  reader.releaseLock()
                 } catch {}
               }
             }),
-          );
-          ready.length = 0;
-        }));
-      };
+          )
+          ready.length = 0
+        }))
+      }
       const read = (index: number) => {
         const notify = (value: (typeof ready)[number]) => {
-          if (stopped) return;
-          ready.push(value);
-          wake?.();
-          wake = undefined;
-        };
+          if (stopped) return
+          ready.push(value)
+          wake?.()
+          wake = undefined
+        }
 
         readers[index].reader.read().then(
           (result) => notify({ index, result }),
@@ -248,80 +248,83 @@ const mergeProcessLogs = (
               index,
               error: new ContainerError({ operation: `exec.${readers[index].stream}`, cause }),
             }),
-        );
-      };
+        )
+      }
 
       return new ReadableStream<ContainerProcessLog>(
         {
           async start() {
             try {
-              if (stdout !== null && stdout !== undefined)
-                readers.push({ stream: "stdout", reader: stdout.getReader() });
-              if (stderr !== null && stderr !== undefined)
-                readers.push({ stream: "stderr", reader: stderr.getReader() });
-              remaining = readers.length;
-              for (let index = 0; index < readers.length; index++) read(index);
+              if (stdout !== null && stdout !== undefined) {
+                readers.push({ stream: 'stdout', reader: stdout.getReader() })
+              }
+              if (stderr !== null && stderr !== undefined) {
+                readers.push({ stream: 'stderr', reader: stderr.getReader() })
+              }
+              remaining = readers.length
+              for (let index = 0; index < readers.length; index++) read(index)
             } catch (cause) {
-              await cancel();
-              throw new ContainerError({ operation: "exec.logs", cause });
+              await cancel()
+              throw new ContainerError({ operation: 'exec.logs', cause })
             }
           },
           async pull(controller) {
             try {
               while (!stopped && remaining > 0) {
-                if (ready.length === 0)
+                if (ready.length === 0) {
                   await new Promise<void>((resolve) => {
-                    wake = resolve;
-                  });
-                if (stopped) return;
-                const next = ready.shift()!;
+                    wake = resolve
+                  })
+                }
+                if (stopped) return
+                const next = ready.shift()!
 
-                if (next.error !== undefined) throw next.error;
+                if (next.error !== undefined) throw next.error
                 if (next.result!.done) {
-                  remaining--;
-                  readers[next.index].reader.releaseLock();
+                  remaining--
+                  readers[next.index].reader.releaseLock()
                 } else {
-                  read(next.index);
+                  read(next.index)
                   controller.enqueue({
                     stream: readers[next.index].stream,
                     data: next.result!.value,
-                  });
+                  })
 
-                  return;
+                  return
                 }
               }
-              if (!stopped) controller.close();
+              if (!stopped) controller.close()
             } catch (cause) {
-              await cancel();
-              controller.error(cause);
+              await cancel()
+              controller.error(cause)
             }
           },
           cancel,
         },
         { highWaterMark: 0 },
-      );
+      )
     },
     onError: (cause) =>
       cause instanceof ContainerError
         ? cause
-        : new ContainerError({ operation: "exec.logs", cause }),
-  });
+        : new ContainerError({ operation: 'exec.logs', cause }),
+  })
 
 const fromProcess = (process: globalThis.ExecProcess): ContainerProcess => {
-  let exited = false;
+  let exited = false
   const onExit = () => {
-    exited = true;
-  };
+    exited = true
+  }
 
   // Signaling an exited native process can raise an uncaught runtime error.
   // Observe completion immediately, even if the caller never awaits exitCode.
-  process.exitCode.then(onExit, onExit);
+  process.exitCode.then(onExit, onExit)
 
-  const nativeStdout = process.stdout;
-  const nativeStderr = process.stderr;
-  const stdout = processStream(nativeStdout, "exec.stdout");
-  const stderr = processStream(nativeStderr, "exec.stderr");
-  const output = attemptPromise("exec.output", () => process.output());
+  const nativeStdout = process.stdout
+  const nativeStderr = process.stderr
+  const stdout = processStream(nativeStdout, 'exec.stdout')
+  const stderr = processStream(nativeStderr, 'exec.stderr')
+  const output = attemptPromise('exec.output', () => process.output())
 
   return {
     raw: process,
@@ -331,7 +334,7 @@ const fromProcess = (process: globalThis.ExecProcess): ContainerProcess => {
     stdout,
     stderr,
     logs: mergeProcessLogs(nativeStdout, nativeStderr),
-    exitCode: attemptPromise("exec.exitCode", () => process.exitCode),
+    exitCode: attemptPromise('exec.exitCode', () => process.exitCode),
     output,
     outputText: Effect.map(output, (result) => ({
       stdout: new TextDecoder().decode(result.stdout),
@@ -339,108 +342,104 @@ const fromProcess = (process: globalThis.ExecProcess): ContainerProcess => {
       exitCode: result.exitCode,
     })),
     kill: (signal) =>
-      attemptPromise("exec.kill", async () => {
+      attemptPromise('exec.kill', async () => {
         // Let an already-settled exitCode notify us before attempting a signal.
-        await Promise.resolve();
-        if (!exited) process.kill(signal);
+        await Promise.resolve()
+        if (!exited) process.kill(signal)
       }),
-    resize: (cols, rows) => attempt("exec.resize", () => process.resize(cols, rows)),
-  };
-};
+    resize: (cols, rows) => attempt('exec.resize', () => process.resize(cols, rows)),
+  }
+}
 
 const fromTcpPort = (port: globalThis.Fetcher): ContainerTcpPort => {
-  const fetch: ContainerTcpPort["fetch"] = (input, init) =>
-    attemptPromise("getTcpPort.fetch", (signal) => {
-      const callerSignal =
-        init?.signal !== undefined
-          ? init.signal
-          : input instanceof Request
-            ? input.signal
-            : undefined;
+  const fetch: ContainerTcpPort['fetch'] = (input, init) =>
+    attemptPromise('getTcpPort.fetch', (signal) => {
+      const callerSignal = init?.signal !== undefined
+        ? init.signal
+        : input instanceof Request
+        ? input.signal
+        : undefined
 
       return port.fetch(input, {
         ...init,
-        signal:
-          callerSignal === null || callerSignal === undefined
-            ? signal
-            : AbortSignal.any([callerSignal, signal]),
-      });
-    });
+        signal: callerSignal === null || callerSignal === undefined
+          ? signal
+          : AbortSignal.any([callerSignal, signal]),
+      })
+    })
 
-  const connect: ContainerTcpPort["connect"] = (...args) =>
-    attempt("getTcpPort.connect", () => port.connect(...args));
+  const connect: ContainerTcpPort['connect'] = (...args) => attempt('getTcpPort.connect', () => port.connect(...args))
 
   return {
     raw: port,
     fetch,
     proxy: (request) =>
-      attempt("getTcpPort.proxy", () => {
-        const url = new URL(request.url);
+      attempt('getTcpPort.proxy', () => {
+        const url = new URL(request.url)
 
-        url.protocol = "http:";
+        url.protocol = 'http:'
 
-        return new Request(url, request);
+        return new Request(url, request)
       }).pipe(Effect.flatMap((forwarded) => fetch(forwarded))),
     connect,
     connectScoped: (...args) =>
-      Effect.acquireRelease(connect(...args), (socket) =>
-        attemptPromise("getTcpPort.close", () => socket.close()).pipe(Effect.orDie),
+      Effect.acquireRelease(
+        connect(...args),
+        (socket) => attemptPromise('getTcpPort.close', () => socket.close()).pipe(Effect.orDie),
       ),
-  };
-};
+  }
+}
 
 /** Wraps `ctx.container` without starting it or taking ownership of its lifecycle. */
 export const fromContainer = (container: globalThis.Container): DurableObjectContainerService => {
   const exec = (command: ReadonlyArray<string>, options?: ContainerExecOptions) =>
-    attemptPromise("exec", (signal) => container.exec([...command], { ...options, signal })).pipe(
+    attemptPromise('exec', (signal) => container.exec([...command], { ...options, signal })).pipe(
       Effect.map(fromProcess),
-    );
-  const waitForHttp = Effect.fnUntraced(function* (
+    )
+  const waitForHttp = Effect.fnUntraced(function*(
     portNumber: number,
     options: ContainerHttpReadinessOptions = {},
   ) {
-    const timeout = yield* attempt("waitForHttp", () =>
-      Duration.fromInputUnsafe(options.timeout ?? "30 seconds"),
-    );
-    let lastFailure: unknown;
-    const probe = attemptPromise("waitForHttp", async (signal) => {
+    const timeout = yield* attempt('waitForHttp', () => Duration.fromInputUnsafe(options.timeout ?? '30 seconds'))
+    let lastFailure: unknown
+    const probe = attemptPromise('waitForHttp', async (signal) => {
       // Reacquire after a failed probe so workerd can discard a failed cached port capability.
       const response = await container
         .getTcpPort(portNumber)
-        .fetch(new URL(options.path ?? "/", "http://container"), { signal });
+        .fetch(new URL(options.path ?? '/', 'http://container'), { signal })
 
-      await response.body?.cancel();
+      await response.body?.cancel()
       if (
         options.status !== undefined &&
         (response.status < options.status.min || response.status > options.status.max)
       ) {
-        throw new Error(`HTTP readiness probe returned status ${response.status}`);
+        throw new Error(`HTTP readiness probe returned status ${response.status}`)
       }
-    });
-    const poll = Effect.gen(function* () {
+    })
+    const poll = Effect.gen(function*() {
       while (true) {
-        if (!(yield* attempt("running", () => container.running))) {
+        if (!(yield* attempt('running', () => container.running))) {
           return yield* new ContainerError({
-            operation: "waitForHttp",
-            cause: new Error("Container stopped before the port became ready"),
-          });
+            operation: 'waitForHttp',
+            cause: new Error('Container stopped before the port became ready'),
+          })
         }
         const ready = yield* probe.pipe(
-          Effect.timeout(options.attemptTimeout ?? "1 second"),
+          Effect.timeout(options.attemptTimeout ?? '1 second'),
           Effect.match({
             onSuccess: () => true,
             onFailure: (error) => {
-              lastFailure = error;
+              lastFailure = error
 
-              return false;
+              return false
             },
           }),
-        );
+        )
 
-        if (ready) return;
-        yield* Effect.sleep(options.interval ?? "100 millis");
+        if (ready) return
+        yield* Effect.sleep(options.interval ?? '100 millis')
       }
-    });
+    })
 
     return yield* poll.pipe(
       Effect.timeoutOrElse({
@@ -450,25 +449,23 @@ export const fromContainer = (container: globalThis.Container): DurableObjectCon
             new ContainerReadinessTimeoutError({ port: portNumber, timeout, cause: lastFailure }),
           ),
       }),
-    );
-  });
+    )
+  })
 
   return {
     raw: container,
-    running: attempt("running", () => container.running),
-    images: attempt("images", () => container.images),
-    inspect: attemptPromise("inspect", () => container.inspect()).pipe(
+    running: attempt('running', () => container.running),
+    images: attempt('images', () => container.images),
+    inspect: attemptPromise('inspect', () => container.inspect()).pipe(
       Effect.map(Option.fromNullishOr),
     ),
-    start: (options) => attempt("start", () => container.start(options)),
-    monitor: attemptPromise("monitor", () => container.monitor()),
-    destroy: (reason) => attemptPromise("destroy", () => container.destroy(reason)),
-    signal: (signal) => attempt("signal", () => container.signal(signal)),
+    start: (options) => attempt('start', () => container.start(options)),
+    monitor: attemptPromise('monitor', () => container.monitor()),
+    destroy: (reason) => attemptPromise('destroy', () => container.destroy(reason)),
+    signal: (signal) => attempt('signal', () => container.signal(signal)),
     setInactivityTimeout: (duration) =>
-      attemptPromise("setInactivityTimeout", () =>
-        container.setInactivityTimeout(Duration.toMillis(duration)),
-      ),
-    getTcpPort: (port) => attempt("getTcpPort", () => fromTcpPort(container.getTcpPort(port))),
+      attemptPromise('setInactivityTimeout', () => container.setInactivityTimeout(Duration.toMillis(duration))),
+    getTcpPort: (port) => attempt('getTcpPort', () => fromTcpPort(container.getTcpPort(port))),
     waitForHttp,
     exec,
     execScoped: (command, options) =>
@@ -480,19 +477,15 @@ export const fromContainer = (container: globalThis.Container): DurableObjectCon
         },
       ),
     snapshotContainer: (options = {}) =>
-      attemptPromise("snapshotContainer", () => container.snapshotContainer(options)),
+      attemptPromise('snapshotContainer', () => container.snapshotContainer(options)),
     interceptOutboundHttp: (address, binding) =>
-      attemptPromise("interceptOutboundHttp", () =>
-        container.interceptOutboundHttp(address, binding),
-      ),
+      attemptPromise('interceptOutboundHttp', () => container.interceptOutboundHttp(address, binding)),
     interceptAllOutboundHttp: (binding) =>
-      attemptPromise("interceptAllOutboundHttp", () => container.interceptAllOutboundHttp(binding)),
+      attemptPromise('interceptAllOutboundHttp', () => container.interceptAllOutboundHttp(binding)),
     interceptOutboundHttps: (address, binding) =>
-      attemptPromise("interceptOutboundHttps", () =>
-        container.interceptOutboundHttps(address, binding),
-      ),
-  };
-};
+      attemptPromise('interceptOutboundHttps', () => container.interceptOutboundHttps(address, binding)),
+  }
+}
 
 /** Supplies the container attached to the current Durable Object, without owning it. */
 export const layer: Layer.Layer<
@@ -501,14 +494,14 @@ export const layer: Layer.Layer<
   DurableObjectState
 > = Layer.effect(
   DurableObjectContainer,
-  Effect.gen(function* () {
-    const state = yield* DurableObjectState;
-    const container = state.raw.container;
+  Effect.gen(function*() {
+    const state = yield* DurableObjectState
+    const container = state.raw.container
 
     if (container === undefined) {
-      return yield* new ContainerNotConfiguredError({ durableObjectId: state.id.toString() });
+      return yield* new ContainerNotConfiguredError({ durableObjectId: state.id.toString() })
     }
 
-    return fromContainer(container);
+    return fromContainer(container)
   }),
-);
+)

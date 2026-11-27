@@ -1,75 +1,75 @@
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
-import type { Context, Layer, Scope } from "effect";
+import type { Context, Layer, Scope } from 'effect'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Predicate from 'effect/Predicate'
 
-import * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import * as CloudflareRpc from "./Rpc";
-import type * as DurableObjectDefinition from "./DurableObjectDefinition";
-import * as RpcDefinition from "./RpcDefinition";
-import * as ErrorMessage from "./internal/ErrorMessage";
-import * as RpcInvocation from "./internal/RpcInvocation";
-import * as RpcTracing from "./RpcTracing";
-import * as RpcTargets from "./RpcTargets";
+import * as Binding from './Binding'
+import type * as DurableObjectDefinition from './DurableObjectDefinition'
+import type { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
+import * as RpcInvocation from './internal/RpcInvocation'
+import * as CloudflareRpc from './Rpc'
+import * as RpcDefinition from './RpcDefinition'
+import * as RpcTargets from './RpcTargets'
+import * as RpcTracing from './RpcTracing'
 
 const expectedDurableObjectNamespace =
-  "Durable Object namespace binding with getByName(), get(), idFromName(), idFromString(), newUniqueId(), and jurisdiction()";
+  'Durable Object namespace binding with getByName(), get(), idFromName(), idFromString(), newUniqueId(), and jurisdiction()'
 
 interface DurableObjectFetcher {
-  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>;
+  fetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response>
 }
 
 type RpcClient<Api> = {
   readonly [
-    Key in keyof Api as Key extends string
-      ? Api[Key] extends (...args: Array<any>) => any
-        ? Key
-        : never
+    Key in keyof Api as Key extends string ? Api[Key] extends (...args: Array<any>) => any ? Key
       : never
-  ]: Api[Key];
-};
-
-type ReservedMethodName = DurableObjectDefinition.ReservedMethodName | "fetch";
-type DynamicMethod = (...args: Array<any>) => any;
-interface DynamicMethods {
-  [method: string]: DynamicMethod;
+      : never
+  ]: Api[Key]
 }
-type NamespaceCandidate = Parameters<typeof Predicate.isUnknown>[0];
+
+type ReservedMethodName = DurableObjectDefinition.ReservedMethodName | 'fetch'
+type DynamicMethod = (...args: Array<any>) => any
+interface DynamicMethods {
+  [method: string]: DynamicMethod
+}
+type NamespaceCandidate = Parameters<typeof Predicate.isUnknown>[0]
 
 /**
  * Cloudflare Durable Object stub, optionally enriched with RPC methods.
  */
-export type DurableObjectStubClient<Api extends object> = DurableObjectFetcher &
-  RpcClient<CloudflareRpc.Provider<Api, ReservedMethodName>> & {
-    readonly id: globalThis.DurableObjectId;
-    readonly name?: string;
-  };
+export type DurableObjectStubClient<Api extends object> =
+  & DurableObjectFetcher
+  & RpcClient<CloudflareRpc.Provider<Api, ReservedMethodName>>
+  & {
+    readonly id: globalThis.DurableObjectId
+    readonly name?: string
+  }
 
 export interface DurableObjectNamespaceClient<Api extends object> {
   newUniqueId(
     options?: globalThis.DurableObjectNamespaceNewUniqueIdOptions,
-  ): globalThis.DurableObjectId;
-  idFromName(name: string): globalThis.DurableObjectId;
-  idFromString(id: string): globalThis.DurableObjectId;
+  ): globalThis.DurableObjectId
+  idFromName(name: string): globalThis.DurableObjectId
+  idFromString(id: string): globalThis.DurableObjectId
   get(
     id: globalThis.DurableObjectId,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ): DurableObjectStubClient<Api>;
+  ): DurableObjectStubClient<Api>
   getByName(
     name: string,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ): DurableObjectStubClient<Api>;
+  ): DurableObjectStubClient<Api>
   jurisdiction(
     jurisdiction: globalThis.DurableObjectJurisdiction,
-  ): DurableObjectNamespaceClient<Api>;
+  ): DurableObjectNamespaceClient<Api>
 }
 
 /**
  * Minimal namespace binding metadata.
  */
 export interface DurableObjectNamespaceDefinition {
-  readonly binding: string;
+  readonly binding: string
 }
 
 /**
@@ -78,76 +78,80 @@ export interface DurableObjectNamespaceDefinition {
 export interface DurableObjectNamespaceBindingDefinition<
   Definition extends DurableObjectDefinition.Definition.Any | undefined = undefined,
 > {
-  readonly binding: string;
-  readonly definition?: Definition;
+  readonly binding: string
+  readonly definition?: Definition
   /** Append live trace context only when the receiver also enables rpcTracing. */
-  readonly rpcTracing?: boolean;
+  readonly rpcTracing?: boolean
 }
 
 /**
  * Failure raised when invoking an RPC method on a Durable Object stub.
  */
-export class DurableObjectRpcError extends Data.TaggedError("DurableObjectRpcError")<{
-  readonly binding: string;
-  readonly method: string;
-  readonly cause: unknown;
+export class DurableObjectRpcError extends Data.TaggedError('DurableObjectRpcError')<{
+  readonly binding: string
+  readonly method: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Durable Object RPC method "${this.method}" failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Durable Object RPC method "${this.method}" failed for binding "${this.binding}": ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
 /**
  * Failure raised when forwarding a request to a Durable Object stub.
  */
-export class DurableObjectFetchError extends Data.TaggedError("DurableObjectFetchError")<{
-  readonly binding: string;
-  readonly cause: unknown;
+export class DurableObjectFetchError extends Data.TaggedError('DurableObjectFetchError')<{
+  readonly binding: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Durable Object fetch failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Durable Object fetch failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
-type StubMethodKey<Api> = RpcInvocation.AsyncMethodKey<Api>;
-type StubMethodArgs<Api, Method extends keyof Api> = RpcInvocation.AsyncMethodArgs<Api, Method>;
+type StubMethodKey<Api> = RpcInvocation.AsyncMethodKey<Api>
+type StubMethodArgs<Api, Method extends keyof Api> = RpcInvocation.AsyncMethodArgs<Api, Method>
 type StubMethodSuccess<Api, Method extends keyof Api> = RpcInvocation.AsyncMethodSuccess<
   Api,
   Method
->;
+>
 type StubMethodCloudflareReturn<
   Api,
   Method extends keyof Api,
-> = RpcInvocation.AsyncMethodCloudflareReturn<Api, Method>;
+> = RpcInvocation.AsyncMethodCloudflareReturn<Api, Method>
 
 export type StubCall<R, Api extends object> = <Method extends StubMethodKey<Api>>(
   stub: DurableObjectStubClient<Api>,
   method: Method,
   ...args: StubMethodArgs<Api, Method>
-) => Effect.Effect<StubMethodSuccess<Api, Method>, DurableObjectRpcError, R>;
+) => Effect.Effect<StubMethodSuccess<Api, Method>, DurableObjectRpcError, R>
 
 export type StubRpc<R, Api extends object> = <Method extends StubMethodKey<Api>>(
   stub: DurableObjectStubClient<Api>,
   method: Method,
   ...args: StubMethodArgs<Api, Method>
-) => Effect.Effect<StubMethodCloudflareReturn<Api, Method>, DurableObjectRpcError, R>;
+) => Effect.Effect<StubMethodCloudflareReturn<Api, Method>, DurableObjectRpcError, R>
 
 export type StubScopedCall<R, Api extends object> = <Method extends StubMethodKey<Api>>(
   stub: DurableObjectStubClient<Api>,
   method: Method,
   ...args: StubMethodArgs<Api, Method>
-) => Effect.Effect<Awaited<StubMethodSuccess<Api, Method>>, DurableObjectRpcError, Scope.Scope | R>;
+) => Effect.Effect<Awaited<StubMethodSuccess<Api, Method>>, DurableObjectRpcError, Scope.Scope | R>
 
-type DurableObjectDirectClient<R, Api extends object> = {
-  readonly fetch: (
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ) => Effect.Effect<globalThis.Response, DurableObjectFetchError, R>;
-} & {
-  readonly [Method in StubMethodKey<Api>]: (
-    ...args: StubMethodArgs<Api, Method>
-  ) => Effect.Effect<StubMethodSuccess<Api, Method>, DurableObjectRpcError, R>;
-};
+type DurableObjectDirectClient<R, Api extends object> =
+  & {
+    readonly fetch: (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => Effect.Effect<globalThis.Response, DurableObjectFetchError, R>
+  }
+  & {
+    readonly [Method in StubMethodKey<Api>]: (
+      ...args: StubMethodArgs<Api, Method>
+    ) => Effect.Effect<StubMethodSuccess<Api, Method>, DurableObjectRpcError, R>
+  }
 
 type DefinitionNamespaceDirectMethods<
   R,
@@ -156,31 +160,33 @@ type DefinitionNamespaceDirectMethods<
 > = {
   readonly [Method in RpcDefinition.Definition.MethodNames<Definition>]: (
     stub: DurableObjectStubClient<Api>,
-    ...args: RpcDefinition.Method.Args<Definition["methods"][Method]>
+    ...args: RpcDefinition.Method.Args<Definition['methods'][Method]>
   ) => Effect.Effect<
-    RpcDefinition.Method.Success<Definition["methods"][Method]>,
+    RpcDefinition.Method.Success<Definition['methods'][Method]>,
     DurableObjectRpcError,
     R
-  >;
-};
+  >
+}
 
 type DefinitionDurableObjectDirectClient<
   R,
   Definition extends DurableObjectDefinition.Definition.Any,
-> = {
-  readonly fetch: (
-    input: RequestInfo | URL,
-    init?: RequestInit,
-  ) => Effect.Effect<globalThis.Response, DurableObjectFetchError, R>;
-} & {
-  readonly [Method in RpcDefinition.Definition.MethodNames<Definition>]: (
-    ...args: RpcDefinition.Method.Args<Definition["methods"][Method]>
-  ) => Effect.Effect<
-    RpcDefinition.Method.Success<Definition["methods"][Method]>,
-    DurableObjectRpcError,
-    R
-  >;
-};
+> =
+  & {
+    readonly fetch: (
+      input: RequestInfo | URL,
+      init?: RequestInit,
+    ) => Effect.Effect<globalThis.Response, DurableObjectFetchError, R>
+  }
+  & {
+    readonly [Method in RpcDefinition.Definition.MethodNames<Definition>]: (
+      ...args: RpcDefinition.Method.Args<Definition['methods'][Method]>
+    ) => Effect.Effect<
+      RpcDefinition.Method.Success<Definition['methods'][Method]>,
+      DurableObjectRpcError,
+      R
+    >
+  }
 
 type DefinitionNamespaceDirectClientMethods<
   R,
@@ -189,21 +195,21 @@ type DefinitionNamespaceDirectClientMethods<
   readonly byName: (
     name: string,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ) => DefinitionDurableObjectDirectClient<R, Definition>;
+  ) => DefinitionDurableObjectDirectClient<R, Definition>
   readonly byId: (
     id: globalThis.DurableObjectId,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ) => DefinitionDurableObjectDirectClient<R, Definition>;
-};
+  ) => DefinitionDurableObjectDirectClient<R, Definition>
+}
 
 type DirectMethods<
   R,
   Api extends object,
   Definition,
-> = Definition extends DurableObjectDefinition.Definition.Any
-  ? DefinitionNamespaceDirectMethods<R, Api, Definition> &
-      DefinitionNamespaceDirectClientMethods<R, Definition>
-  : {};
+> = Definition extends DurableObjectDefinition.Definition.Any ?
+    & DefinitionNamespaceDirectMethods<R, Api, Definition>
+    & DefinitionNamespaceDirectClientMethods<R, Definition>
+  : {}
 
 export type DurableObjectNamespaceEffectClient<
   Api extends object,
@@ -211,25 +217,25 @@ export type DurableObjectNamespaceEffectClient<
 > = DirectMethods<never, Api, Definition> & {
   readonly newUniqueId: (
     options?: globalThis.DurableObjectNamespaceNewUniqueIdOptions,
-  ) => Effect.Effect<globalThis.DurableObjectId>;
-  readonly idFromName: (name: string) => Effect.Effect<globalThis.DurableObjectId>;
-  readonly idFromString: (id: string) => Effect.Effect<globalThis.DurableObjectId>;
+  ) => Effect.Effect<globalThis.DurableObjectId>
+  readonly idFromName: (name: string) => Effect.Effect<globalThis.DurableObjectId>
+  readonly idFromString: (id: string) => Effect.Effect<globalThis.DurableObjectId>
   readonly get: (
     id: globalThis.DurableObjectId,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ) => Effect.Effect<DurableObjectStubClient<Api>>;
+  ) => Effect.Effect<DurableObjectStubClient<Api>>
   readonly getByName: (
     name: string,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ) => Effect.Effect<DurableObjectStubClient<Api>>;
+  ) => Effect.Effect<DurableObjectStubClient<Api>>
   readonly jurisdiction: (
     jurisdiction: globalThis.DurableObjectJurisdiction,
-  ) => Effect.Effect<DurableObjectNamespaceClient<Api>>;
+  ) => Effect.Effect<DurableObjectNamespaceClient<Api>>
   readonly fetch: (
     stub: DurableObjectStubClient<Api>,
     input: RequestInfo | URL,
     init?: RequestInit,
-  ) => Effect.Effect<globalThis.Response, DurableObjectFetchError>;
+  ) => Effect.Effect<globalThis.Response, DurableObjectFetchError>
   /**
    * Invokes a Durable Object RPC method and returns Cloudflare's raw RPC result.
    *
@@ -239,14 +245,14 @@ export type DurableObjectNamespaceEffectClient<
    *
    * Most application code should use {@link call} instead.
    */
-  readonly rpc: StubRpc<never, Api>;
+  readonly rpc: StubRpc<never, Api>
   /**
    * Invokes a Durable Object RPC method, resolves Cloudflare's RPC result, and
    * decodes the success value when the namespace was created from a definition.
    *
    * This is the normal choice when application code wants the final typed value.
    */
-  readonly call: StubCall<never, Api>;
+  readonly call: StubCall<never, Api>
   /**
    * Invokes a Durable Object RPC method in the current `Scope`, resolves
    * Cloudflare's RPC result, decodes definition-backed success values, and
@@ -256,15 +262,15 @@ export type DurableObjectNamespaceEffectClient<
    * Use this for RPC methods that return Cloudflare RPC resources or other
    * disposable objects whose lifetime should be tied to an Effect scope.
    */
-  readonly scopedCall: StubScopedCall<never, Api>;
+  readonly scopedCall: StubScopedCall<never, Api>
   /**
    * Exposes the underlying native Durable Object namespace binding.
    *
    * Prefer the typed helpers above unless Cloudflare exposes a platform feature
    * that is not wrapped by effect-cf yet.
    */
-  readonly rawUnsafe: Effect.Effect<DurableObjectNamespaceClient<Api>>;
-};
+  readonly rawUnsafe: Effect.Effect<DurableObjectNamespaceClient<Api>>
+}
 
 export type DurableObjectNamespaceStaticClient<
   R,
@@ -273,131 +279,128 @@ export type DurableObjectNamespaceStaticClient<
 > = DirectMethods<R, Api, Definition> & {
   readonly newUniqueId: (
     options?: globalThis.DurableObjectNamespaceNewUniqueIdOptions,
-  ) => Effect.Effect<globalThis.DurableObjectId, never, R>;
-  readonly idFromName: (name: string) => Effect.Effect<globalThis.DurableObjectId, never, R>;
-  readonly idFromString: (id: string) => Effect.Effect<globalThis.DurableObjectId, never, R>;
+  ) => Effect.Effect<globalThis.DurableObjectId, never, R>
+  readonly idFromName: (name: string) => Effect.Effect<globalThis.DurableObjectId, never, R>
+  readonly idFromString: (id: string) => Effect.Effect<globalThis.DurableObjectId, never, R>
   readonly get: (
     id: globalThis.DurableObjectId,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ) => Effect.Effect<DurableObjectStubClient<Api>, never, R>;
+  ) => Effect.Effect<DurableObjectStubClient<Api>, never, R>
   readonly getByName: (
     name: string,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ) => Effect.Effect<DurableObjectStubClient<Api>, never, R>;
+  ) => Effect.Effect<DurableObjectStubClient<Api>, never, R>
   readonly jurisdiction: (
     jurisdiction: globalThis.DurableObjectJurisdiction,
-  ) => Effect.Effect<DurableObjectNamespaceClient<Api>, never, R>;
+  ) => Effect.Effect<DurableObjectNamespaceClient<Api>, never, R>
   readonly fetch: (
     stub: DurableObjectStubClient<Api>,
     input: RequestInfo | URL,
     init?: RequestInit,
-  ) => Effect.Effect<globalThis.Response, DurableObjectFetchError, R>;
-  readonly rpc: StubRpc<R, Api>;
-  readonly call: StubCall<R, Api>;
-  readonly scopedCall: StubScopedCall<R, Api>;
-  readonly rawUnsafe: () => Effect.Effect<DurableObjectNamespaceClient<Api>, never, R>;
-};
+  ) => Effect.Effect<globalThis.Response, DurableObjectFetchError, R>
+  readonly rpc: StubRpc<R, Api>
+  readonly call: StubCall<R, Api>
+  readonly scopedCall: StubScopedCall<R, Api>
+  readonly rawUnsafe: () => Effect.Effect<DurableObjectNamespaceClient<Api>, never, R>
+}
 
 const hasFunction = <Candidate>(value: Candidate, key: string): boolean =>
-  Predicate.hasProperty(value, key) && Predicate.isFunction(value[key]);
+  Predicate.hasProperty(value, key) && Predicate.isFunction(value[key])
 
 export const isDurableObjectNamespaceClient = <Api extends object>(
   value: NamespaceCandidate,
 ): value is DurableObjectNamespaceClient<Api> =>
-  hasFunction(value, "getByName") &&
-  hasFunction(value, "get") &&
-  hasFunction(value, "idFromName") &&
-  hasFunction(value, "idFromString") &&
-  hasFunction(value, "newUniqueId") &&
-  hasFunction(value, "jurisdiction");
+  hasFunction(value, 'getByName') &&
+  hasFunction(value, 'get') &&
+  hasFunction(value, 'idFromName') &&
+  hasFunction(value, 'idFromString') &&
+  hasFunction(value, 'newUniqueId') &&
+  hasFunction(value, 'jurisdiction')
 
 export const makeClient = <
   Api extends object,
   const Definition extends DurableObjectDefinition.Definition.Any | undefined = undefined,
 >(
   definition: DurableObjectNamespaceBindingDefinition<Definition>,
-): ((
+): (
   namespace: DurableObjectNamespaceClient<Api>,
-) => DurableObjectNamespaceEffectClient<Api, Definition>) => {
-  type NamespaceClient = DurableObjectNamespaceClient<Api>;
-  type StubClient = DurableObjectStubClient<Api>;
+) => DurableObjectNamespaceEffectClient<Api, Definition> => {
+  type NamespaceClient = DurableObjectNamespaceClient<Api>
+  type StubClient = DurableObjectStubClient<Api>
 
   return (namespace: NamespaceClient) => {
     const newUniqueId = (options?: globalThis.DurableObjectNamespaceNewUniqueIdOptions) =>
-      Effect.sync(() => namespace.newUniqueId(options));
+      Effect.sync(() => namespace.newUniqueId(options))
 
-    const idFromName = (name: string) => Effect.sync(() => namespace.idFromName(name));
+    const idFromName = (name: string) => Effect.sync(() => namespace.idFromName(name))
 
-    const idFromString = (id: string) => Effect.sync(() => namespace.idFromString(id));
+    const idFromString = (id: string) => Effect.sync(() => namespace.idFromString(id))
 
     const get = (
       id: globalThis.DurableObjectId,
       options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
     ) =>
-      RpcTargets.get(namespace, JSON.stringify(["id", id.toString(), options]), () =>
-        namespace.get(id, options),
-      ).pipe(Effect.orDie);
+      RpcTargets.get(namespace, JSON.stringify(['id', id.toString(), options]), () => namespace.get(id, options)).pipe(
+        Effect.orDie,
+      )
 
     const getByName = (
       name: string,
       options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
     ) =>
-      RpcTargets.get(namespace, JSON.stringify(["name", name, options]), () =>
-        namespace.getByName(name, options),
-      ).pipe(Effect.orDie);
+      RpcTargets.get(namespace, JSON.stringify(['name', name, options]), () => namespace.getByName(name, options)).pipe(
+        Effect.orDie,
+      )
 
     const jurisdiction = (value: globalThis.DurableObjectJurisdiction) =>
-      Effect.sync(() => namespace.jurisdiction(value));
+      Effect.sync(() => namespace.jurisdiction(value))
 
     const fetch = (stub: StubClient, input: RequestInfo | URL, init?: RequestInit) =>
       Effect.tryPromise({
         try: (signal) => {
-          const callerSignal =
-            init?.signal !== undefined
-              ? init.signal
-              : input instanceof Request
-                ? input.signal
-                : undefined;
+          const callerSignal = init?.signal !== undefined
+            ? init.signal
+            : input instanceof Request
+            ? input.signal
+            : undefined
 
           return stub.fetch(input, {
             ...init,
-            signal:
-              callerSignal === null || callerSignal === undefined
-                ? signal
-                : AbortSignal.any([callerSignal, signal]),
-          });
+            signal: callerSignal === null || callerSignal === undefined
+              ? signal
+              : AbortSignal.any([callerSignal, signal]),
+          })
         },
         catch: (cause) => new DurableObjectFetchError({ binding: definition.binding, cause }),
-      }).pipe(Effect.tapCause(() => RpcTargets.invalidate(stub)));
+      }).pipe(Effect.tapCause(() => RpcTargets.invalidate(stub)))
 
-    const rpc = Effect.fnUntraced(function* <Method extends StubMethodKey<Api>>(
+    const rpc = Effect.fnUntraced(function*<Method extends StubMethodKey<Api>>(
       stub: StubClient,
       method: Method,
       ...args: StubMethodArgs<Api, Method>
     ): Effect.fn.Return<StubMethodCloudflareReturn<Api, Method>, DurableObjectRpcError> {
-      const methodName = String(method);
+      const methodName = String(method)
       // SAFETY: the runtime definition and method name select the same method schemas as Method.
-      const encodedArgs =
-        definition.definition === undefined
-          ? args
-          : yield* RpcDefinition.encodeArgs(
-              definition.definition,
-              methodName as RpcDefinition.Definition.MethodNames<NonNullable<Definition>>,
-              args as never,
-            ).pipe(
-              Effect.mapError(
-                (cause) =>
-                  new DurableObjectRpcError({
-                    binding: definition.binding,
-                    method: methodName,
-                    cause,
-                  }),
-              ),
-            );
+      const encodedArgs = definition.definition === undefined
+        ? args
+        : yield* RpcDefinition.encodeArgs(
+          definition.definition,
+          methodName as RpcDefinition.Definition.MethodNames<NonNullable<Definition>>,
+          args as never,
+        ).pipe(
+          Effect.mapError(
+            (cause) =>
+              new DurableObjectRpcError({
+                binding: definition.binding,
+                method: methodName,
+                cause,
+              }),
+          ),
+        )
 
       const nativeArgs = definition.rpcTracing
         ? yield* RpcTracing.withRpcTraceContext(encodedArgs)
-        : encodedArgs;
+        : encodedArgs
 
       // SAFETY: domain arguments retain their encoded order; an opted-in receiver strips only valid trace metadata.
       return yield* RpcInvocation.invokeRpcMethod(
@@ -410,16 +413,16 @@ export const makeClient = <
             method: methodName,
             cause,
           }),
-      ).pipe(Effect.tapCause(() => RpcTargets.invalidate(stub)));
-    });
+      ).pipe(Effect.tapCause(() => RpcTargets.invalidate(stub)))
+    })
 
-    const decodeSuccess = Effect.fnUntraced(function* <Method extends StubMethodKey<Api>>(
+    const decodeSuccess = Effect.fnUntraced(function*<Method extends StubMethodKey<Api>>(
       methodName: string,
       value: Awaited<StubMethodCloudflareReturn<Api, Method>>,
     ): Effect.fn.Return<StubMethodSuccess<Api, Method>, DurableObjectRpcError> {
       if (definition.definition === undefined) {
         // SAFETY: without a schema codec, the native RPC result is already the declared success type.
-        return value as StubMethodSuccess<Api, Method>;
+        return value as StubMethodSuccess<Api, Method>
       }
 
       // SAFETY: methodName identifies Method in the same definition used to decode the result.
@@ -436,19 +439,19 @@ export const makeClient = <
               cause,
             }),
         ),
-      );
+      )
 
       // SAFETY: the selected method's success schema decodes to its declared API success type.
-      return decoded as StubMethodSuccess<Api, Method>;
-    });
+      return decoded as StubMethodSuccess<Api, Method>
+    })
 
     const call = Effect.fnUntraced(
-      function* <Method extends StubMethodKey<Api>>(
+      function*<Method extends StubMethodKey<Api>>(
         stub: StubClient,
         method: Method,
         ...args: StubMethodArgs<Api, Method>
       ): Effect.fn.Return<StubMethodSuccess<Api, Method>, DurableObjectRpcError> {
-        const methodName = String(method);
+        const methodName = String(method)
         const value = yield* CloudflareRpc.resolve(yield* rpc(stub, method, ...args)).pipe(
           Effect.tapCause(() => RpcTargets.invalidate(stub)),
           Effect.mapError(
@@ -459,22 +462,21 @@ export const makeClient = <
                 cause,
               }),
           ),
-        );
+        )
 
-        return yield* decodeSuccess<Method>(methodName, value);
+        return yield* decodeSuccess<Method>(methodName, value)
       },
-      (effect, ...args) =>
-        RpcTracing.withRpcClientSpan(effect, definition.binding, String(args[1])),
-    );
+      (effect, ...args) => RpcTracing.withRpcClientSpan(effect, definition.binding, String(args[1])),
+    )
 
     const scopedCall = Effect.fnUntraced(
-      function* <Method extends StubMethodKey<Api>>(
+      function*<Method extends StubMethodKey<Api>>(
         stub: StubClient,
         method: Method,
         ...args: StubMethodArgs<Api, Method>
       ): Effect.fn.Return<StubMethodSuccess<Api, Method>, DurableObjectRpcError, Scope.Scope> {
-        const methodName = String(method);
-        const result = yield* rpc(stub, method, ...args);
+        const methodName = String(method)
+        const result = yield* rpc(stub, method, ...args)
         const value = yield* CloudflareRpc.scoped(result).pipe(
           Effect.tapCause(() => RpcTargets.invalidate(stub)),
           Effect.mapError(
@@ -485,20 +487,19 @@ export const makeClient = <
                 cause,
               }),
           ),
-        );
+        )
 
-        return yield* decodeSuccess<Method>(methodName, value);
+        return yield* decodeSuccess<Method>(methodName, value)
       },
-      (effect, ...args) =>
-        RpcTracing.withRpcClientSpan(effect, definition.binding, String(args[1])),
-    );
+      (effect, ...args) => RpcTracing.withRpcClientSpan(effect, definition.binding, String(args[1])),
+    )
 
     const directMethods = makeDirectMethods<never, Api, Definition>(definition.definition, {
       call,
       fetch,
       get,
       getByName,
-    });
+    })
 
     // SAFETY: the common namespace operations and generated direct methods implement the client contract.
     return Object.assign(directMethods, {
@@ -513,9 +514,9 @@ export const makeClient = <
       call,
       scopedCall,
       rawUnsafe: Effect.succeed(namespace),
-    }) as DurableObjectNamespaceEffectClient<Api, Definition>;
-  };
-};
+    }) as DurableObjectNamespaceEffectClient<Api, Definition>
+  }
+}
 
 export const layer = <
   Self,
@@ -532,11 +533,10 @@ export const layer = <
   Binding.layer(
     tag,
     definition.binding,
-    (value): value is DurableObjectNamespaceClient<Api> =>
-      isDurableObjectNamespaceClient<Api>(value),
+    (value): value is DurableObjectNamespaceClient<Api> => isDurableObjectNamespaceClient<Api>(value),
     makeClient<Api, Definition>(definition),
     { expected: expectedDurableObjectNamespace },
-  );
+  )
 
 export const makeDirectMethods = <
   R,
@@ -545,23 +545,23 @@ export const makeDirectMethods = <
 >(
   rpcDefinition: Definition | undefined,
   helpers: {
-    readonly call: StubCall<R, Api>;
+    readonly call: StubCall<R, Api>
     readonly fetch: (
       stub: DurableObjectStubClient<Api>,
       input: RequestInfo | URL,
       init?: RequestInit,
-    ) => Effect.Effect<globalThis.Response, DurableObjectFetchError, R>;
+    ) => Effect.Effect<globalThis.Response, DurableObjectFetchError, R>
     readonly get: (
       id: globalThis.DurableObjectId,
       options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-    ) => Effect.Effect<DurableObjectStubClient<Api>, never, R>;
+    ) => Effect.Effect<DurableObjectStubClient<Api>, never, R>
     readonly getByName: (
       name: string,
       options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-    ) => Effect.Effect<DurableObjectStubClient<Api>, never, R>;
+    ) => Effect.Effect<DurableObjectStubClient<Api>, never, R>
   },
 ): DirectMethods<R, Api, Definition> => {
-  const methods: DynamicMethods = {};
+  const methods: DynamicMethods = {}
 
   if (rpcDefinition !== undefined) {
     for (const methodName of Object.keys(rpcDefinition.methods)) {
@@ -573,7 +573,7 @@ export const makeDirectMethods = <
             method: string,
             ...args: Array<unknown>
           ) => any
-        )(stub, methodName, ...args);
+        )(stub, methodName, ...args)
     }
 
     const makeClient = (
@@ -581,18 +581,18 @@ export const makeDirectMethods = <
     ): DurableObjectDirectClient<R, Api> => {
       const client: DynamicMethods = {
         fetch: (input: RequestInfo | URL, init?: RequestInit) =>
-          Effect.gen(function* () {
-            const stub = yield* getStub();
+          Effect.gen(function*() {
+            const stub = yield* getStub()
 
-            return yield* helpers.fetch(stub, input, init);
+            return yield* helpers.fetch(stub, input, init)
           }),
-      };
+      }
 
       for (const methodName of Object.keys(rpcDefinition.methods)) {
         // SAFETY: methodName comes from rpcDefinition.methods and helpers.call dispatches that same key.
         client[methodName] = (...args: Array<unknown>) =>
-          Effect.gen(function* () {
-            const stub = yield* getStub();
+          Effect.gen(function*() {
+            const stub = yield* getStub()
 
             // SAFETY: methodName and arguments come from the same generated RPC method entry.
             return yield* (
@@ -601,25 +601,25 @@ export const makeDirectMethods = <
                 method: string,
                 ...args: Array<unknown>
               ) => Effect.Effect<any, DurableObjectRpcError, R>
-            )(stub, methodName, ...args);
-          });
+            )(stub, methodName, ...args)
+          })
       }
 
       // SAFETY: client contains fetch plus every RPC method enumerated by rpcDefinition.
-      return client as DurableObjectDirectClient<R, Api>;
-    };
+      return client as DurableObjectDirectClient<R, Api>
+    }
 
     methods.byName = (
       name: string,
       options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-    ) => makeClient(() => helpers.getByName(name, options));
+    ) => makeClient(() => helpers.getByName(name, options))
 
     methods.byId = (
       id: globalThis.DurableObjectId,
       options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-    ) => makeClient(() => helpers.get(id, options));
+    ) => makeClient(() => helpers.get(id, options))
   }
 
   // SAFETY: methods is populated from the exact rpcDefinition keys, including its by-name/id clients.
-  return methods as DirectMethods<R, Api, Definition>;
-};
+  return methods as DirectMethods<R, Api, Definition>
+}

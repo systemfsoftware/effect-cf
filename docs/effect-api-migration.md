@@ -24,17 +24,17 @@ Numeric schemas now reject `NaN`, `Infinity`, and `-Infinity` in RPC argument co
 Replace the removed `Crypto.Crypto` service with `SecureRandom.SecureRandom` for randomness and UUIDs, and `Digest.Digest` for hashing:
 
 ```ts
-import { Effect } from "effect";
-import { Digest, SecureRandom } from "effect/crypto";
+import { Effect } from 'effect'
+import { Digest, SecureRandom } from 'effect/crypto'
 
-const program = Effect.gen(function* () {
-  const random = yield* SecureRandom.SecureRandom;
-  const digest = yield* Digest.Digest;
-  const id = yield* random.uuidV4();
-  const hash = yield* digest.digestHex(Digest.sha256, new TextEncoder().encode(id));
+const program = Effect.gen(function*() {
+  const random = yield* SecureRandom.SecureRandom
+  const digest = yield* Digest.Digest
+  const id = yield* random.uuidV4()
+  const hash = yield* digest.digestHex(Digest.sha256, new TextEncoder().encode(id))
 
-  return { id, hash };
-});
+  return { id, hash }
+})
 ```
 
 Worker, Durable Object, and Workflow runtimes supply `SecureRandom` and `Digest` through `BrowserCrypto.layerSecureRandom` and `BrowserCrypto.layerDigest`, backed by Workers Web Crypto. Application and event layers can override these services. The `effect-cf/vitest` layer supplies them too. Other crypto families, such as `Aead` or `Signature`, require an explicit application layer.

@@ -1,49 +1,50 @@
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
-import * as S from "effect/Schema";
-import type { Context } from "effect";
+import type { Context } from 'effect'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Predicate from 'effect/Predicate'
+import * as S from 'effect/Schema'
 
-import * as Binding from "./Binding";
-import type * as RpcDefinition from "./RpcDefinition";
+import * as Binding from './Binding'
+import type * as RpcDefinition from './RpcDefinition'
 
-export type MessageSendRequest<Body> = globalThis.MessageSendRequest<Body>;
-export type QueueMetrics = globalThis.QueueMetrics;
-export type QueueSendBatchOptions = globalThis.QueueSendBatchOptions;
-export type QueueSendBatchResponse = globalThis.QueueSendBatchResponse;
-export type QueueSendOptions = globalThis.QueueSendOptions;
-export type QueueSendResponse = globalThis.QueueSendResponse;
+export type MessageSendRequest<Body> = globalThis.MessageSendRequest<Body>
+export type QueueMetrics = globalThis.QueueMetrics
+export type QueueSendBatchOptions = globalThis.QueueSendBatchOptions
+export type QueueSendBatchResponse = globalThis.QueueSendBatchResponse
+export type QueueSendOptions = globalThis.QueueSendOptions
+export type QueueSendResponse = globalThis.QueueSendResponse
 
-export type QueueProducer<Body> = Pick<Queue<Body>, "send"> &
-  Partial<Pick<Queue<Body>, "sendBatch" | "metrics">>;
+export type QueueProducer<Body> =
+  & Pick<Queue<Body>, 'send'>
+  & Partial<Pick<Queue<Body>, 'sendBatch' | 'metrics'>>
 
-const expectedQueueProducer = "Queue producer binding with send(); optional sendBatch()/metrics()";
+const expectedQueueProducer = 'Queue producer binding with send(); optional sendBatch()/metrics()'
 
-type QueueCandidate = Parameters<typeof Predicate.isUnknown>[0];
+type QueueCandidate = Parameters<typeof Predicate.isUnknown>[0]
 
 export interface QueueBindingDefinition<Message extends RpcDefinition.ServiceFreeSchema> {
-  readonly binding: string;
-  readonly message: Message;
+  readonly binding: string
+  readonly message: Message
 }
 
 export interface QueueBindingClient<Message extends RpcDefinition.ServiceFreeSchema> {
   readonly send: (
     message: S.Schema.Type<Message>,
     options?: QueueSendOptions,
-  ) => Effect.Effect<void, QueueOperationError | S.SchemaError>;
+  ) => Effect.Effect<void, QueueOperationError | S.SchemaError>
   readonly sendBatch: (
     messages: Iterable<MessageSendRequest<S.Schema.Type<Message>>>,
     options?: QueueSendBatchOptions,
-  ) => Effect.Effect<void, QueueOperationError | S.SchemaError>;
-  readonly metrics: Effect.Effect<QueueMetrics, QueueOperationError>;
-  readonly rawUnsafe: Effect.Effect<QueueProducer<S.Codec.Encoded<Message>>>;
+  ) => Effect.Effect<void, QueueOperationError | S.SchemaError>
+  readonly metrics: Effect.Effect<QueueMetrics, QueueOperationError>
+  readonly rawUnsafe: Effect.Effect<QueueProducer<S.Codec.Encoded<Message>>>
 }
 
-export class QueueOperationError extends Data.TaggedError("QueueOperationError")<{
-  readonly binding: string;
-  readonly operation: string;
-  readonly cause: unknown;
-  readonly message: string;
+export class QueueOperationError extends Data.TaggedError('QueueOperationError')<{
+  readonly binding: string
+  readonly operation: string
+  readonly cause: unknown
+  readonly message: string
 }> {}
 
 const tryQueuePromise = <A>(
@@ -60,73 +61,71 @@ const tryQueuePromise = <A>(
         cause,
         message: `Cloudflare queue binding "${binding}" operation "${operation}" failed`,
       }),
-  });
+  })
 
 export const isQueue = <Body>(value: QueueCandidate): value is QueueProducer<Body> =>
-  Predicate.hasProperty(value, "send") && Predicate.isFunction(value.send);
+  Predicate.hasProperty(value, 'send') && Predicate.isFunction(value.send)
 
 export const makeClient = <Message extends RpcDefinition.ServiceFreeSchema>(
   definition: QueueBindingDefinition<Message>,
-): ((queue: QueueProducer<S.Codec.Encoded<Message>>) => QueueBindingClient<Message>) => {
-  type Body = S.Schema.Type<Message>;
-  type EncodedBody = S.Codec.Encoded<Message>;
+): (queue: QueueProducer<S.Codec.Encoded<Message>>) => QueueBindingClient<Message> => {
+  type Body = S.Schema.Type<Message>
+  type EncodedBody = S.Codec.Encoded<Message>
 
-  const encodeMessage = S.encodeEffect(definition.message);
+  const encodeMessage = S.encodeEffect(definition.message)
 
   return (queue) => ({
-    send: Effect.fn("QueueBinding.send", {
-      attributes: { binding: definition.binding, operation: "send" },
-    })(function* (message: Body, options?: QueueSendOptions) {
-      const encoded = yield* encodeMessage(message);
+    send: Effect.fn('QueueBinding.send', {
+      attributes: { binding: definition.binding, operation: 'send' },
+    })(function*(message: Body, options?: QueueSendOptions) {
+      const encoded = yield* encodeMessage(message)
 
-      yield* tryQueuePromise(definition.binding, "send", () => queue.send(encoded, options));
+      yield* tryQueuePromise(definition.binding, 'send', () => queue.send(encoded, options))
     }),
-    sendBatch: Effect.fn("QueueBinding.sendBatch", {
-      attributes: { binding: definition.binding, operation: "sendBatch" },
-    })(function* (messages: Iterable<MessageSendRequest<Body>>, options?: QueueSendBatchOptions) {
-      const encodedMessages: Array<MessageSendRequest<EncodedBody>> = [];
+    sendBatch: Effect.fn('QueueBinding.sendBatch', {
+      attributes: { binding: definition.binding, operation: 'sendBatch' },
+    })(function*(messages: Iterable<MessageSendRequest<Body>>, options?: QueueSendBatchOptions) {
+      const encodedMessages: Array<MessageSendRequest<EncodedBody>> = []
 
       for (const message of messages) {
         encodedMessages.push({
           ...message,
           body: yield* encodeMessage(message.body),
-        });
+        })
       }
 
-      const sendBatch = queue.sendBatch;
+      const sendBatch = queue.sendBatch
 
       if (sendBatch === undefined) {
         return yield* new QueueOperationError({
           binding: definition.binding,
-          operation: "sendBatch",
+          operation: 'sendBatch',
           cause: new Error(`Queue binding "${definition.binding}" does not provide sendBatch()`),
           message: `Cloudflare queue binding "${definition.binding}" does not provide sendBatch()`,
-        });
+        })
       }
 
-      yield* tryQueuePromise(definition.binding, "sendBatch", () =>
-        sendBatch.call(queue, encodedMessages, options),
-      );
+      yield* tryQueuePromise(definition.binding, 'sendBatch', () => sendBatch.call(queue, encodedMessages, options))
     }),
     metrics: Effect.suspend(() => {
-      const metrics = queue.metrics;
+      const metrics = queue.metrics
 
       if (metrics === undefined) {
         return Effect.fail(
           new QueueOperationError({
             binding: definition.binding,
-            operation: "metrics",
+            operation: 'metrics',
             cause: new Error(`Queue binding "${definition.binding}" does not provide metrics()`),
             message: `Cloudflare queue binding "${definition.binding}" does not provide metrics()`,
           }),
-        );
+        )
       }
 
-      return tryQueuePromise(definition.binding, "metrics", () => metrics.call(queue));
+      return tryQueuePromise(definition.binding, 'metrics', () => metrics.call(queue))
     }),
     rawUnsafe: Effect.succeed(queue),
-  });
-};
+  })
+}
 
 export const layer = <Self, Message extends RpcDefinition.ServiceFreeSchema>(
   tag: Context.Service<Self, QueueBindingClient<Message>>,
@@ -135,8 +134,7 @@ export const layer = <Self, Message extends RpcDefinition.ServiceFreeSchema>(
   Binding.layer(
     tag,
     definition.binding,
-    (value): value is QueueProducer<S.Codec.Encoded<Message>> =>
-      isQueue<S.Codec.Encoded<Message>>(value),
+    (value): value is QueueProducer<S.Codec.Encoded<Message>> => isQueue<S.Codec.Encoded<Message>>(value),
     makeClient(definition),
     { expected: expectedQueueProducer },
-  );
+  )

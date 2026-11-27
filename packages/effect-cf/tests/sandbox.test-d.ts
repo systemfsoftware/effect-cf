@@ -1,39 +1,39 @@
-import type { ISandbox } from "@cloudflare/sandbox";
-import { expectTypeOf } from "vite-plus/test";
-import { Effect, type Option, type Stream } from "effect";
+import type { ISandbox } from '@cloudflare/sandbox'
+import { Effect, type Option, type Stream } from 'effect'
+import { expectTypeOf } from 'vite-plus/test'
 
-import * as Sandbox from "effect-cf/sandbox";
+import * as Sandbox from '@systemfsoftware/effect-cf/sandbox'
 
-type MissingClientMethods = Exclude<keyof ISandbox, keyof Sandbox.SandboxInstanceClient>;
+type MissingClientMethods = Exclude<keyof ISandbox, keyof Sandbox.SandboxInstanceClient>
 
-expectTypeOf<MissingClientMethods>().toEqualTypeOf<never>();
+expectTypeOf<MissingClientMethods>().toEqualTypeOf<never>()
 
-class TestSandboxes extends Sandbox.Tag<TestSandboxes>()("TestSandboxes") {}
+class TestSandboxes extends Sandbox.Tag<TestSandboxes>()('TestSandboxes') {}
 
-const program = Effect.gen(function* () {
-  const sandbox = yield* TestSandboxes.get("my-sandbox");
+const program = Effect.gen(function*() {
+  const sandbox = yield* TestSandboxes.get('my-sandbox')
 
-  expectTypeOf(sandbox.exec(["echo", "hi"])).toEqualTypeOf<
+  expectTypeOf(sandbox.exec(['echo', 'hi'])).toEqualTypeOf<
     Effect.Effect<Sandbox.SandboxProcessHandle, Sandbox.SandboxOperationError>
-  >();
-  expectTypeOf(sandbox.getProcess("proc-1")).toEqualTypeOf<
+  >()
+  expectTypeOf(sandbox.getProcess('proc-1')).toEqualTypeOf<
     Effect.Effect<Option.Option<Sandbox.SandboxProcessHandle>, Sandbox.SandboxOperationError>
-  >();
-  expectTypeOf(sandbox.readFileStream("/workspace/a.bin")).toEqualTypeOf<
+  >()
+  expectTypeOf(sandbox.readFileStream('/workspace/a.bin')).toEqualTypeOf<
     Stream.Stream<Uint8Array, Sandbox.SandboxOperationError>
-  >();
-  expectTypeOf(sandbox.watch("/workspace")).toEqualTypeOf<
+  >()
+  expectTypeOf(sandbox.watch('/workspace')).toEqualTypeOf<
     Stream.Stream<Sandbox.FileWatchSSEEvent, Sandbox.SandboxOperationError>
-  >();
+  >()
 
-  const handle = yield* sandbox.exec(["sleep", "1"]);
+  const handle = yield* sandbox.exec(['sleep', '1'])
 
   expectTypeOf(handle.logs()).toEqualTypeOf<
     Stream.Stream<Sandbox.ProcessLogEvent, Sandbox.SandboxOperationError>
-  >();
+  >()
   expectTypeOf(handle.waitForExit()).toEqualTypeOf<
     Effect.Effect<Sandbox.ProcessExit, Sandbox.SandboxOperationError>
-  >();
-});
+  >()
+})
 
-void program;
+void program

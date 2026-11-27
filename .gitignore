@@ -57,3 +57,7 @@ Session.vim
 .bundle-report/
 .runtime-bench/
 .vitest/
+
+# Nix build output
+/result
+/result-*

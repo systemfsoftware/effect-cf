@@ -17,7 +17,7 @@ Add a changeset only when the PR changes the published package (`packages/effect
 
 ```md
 ---
-"effect-cf": minor
+"@systemfsoftware/effect-cf": minor
 ---
 
 Add Effect-native Durable Object WebSocket helpers for typed hibernation attachments.

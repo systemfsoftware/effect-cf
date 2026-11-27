@@ -1,24 +1,24 @@
-import { defineConfig } from "vite-plus";
+import { defineConfig } from 'vite-plus'
 
-const testExcludes = ["**/node_modules/**", "**/dist/**", "**/.git/**"];
+const testExcludes = ['**/node_modules/**', '**/dist/**', '**/.git/**']
 
 export default defineConfig({
   test: {
     projects: [
       {
         test: {
-          name: "node",
+          name: 'node',
           exclude: testExcludes,
-          include: ["**/*.test.ts"],
+          include: ['**/*.test.ts'],
         },
       },
     ],
   },
   pack: {
-    entry: ["src/index.ts"],
+    entry: ['src/index.ts'],
     dts: {
-      generator: "tsgo",
+      generator: 'tsgo',
     },
   },
   fmt: {},
-});
+})

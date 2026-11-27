@@ -30,36 +30,36 @@ Register a typed alarm service with `DurableObject.make` and enroll work from
 an incoming event. SQLite-backed Durable Objects are required.
 
 ```ts
-import { DateTime, Effect, Layer, Schema } from "effect";
-import { DurableObject, DurableObjectAlarm, DurableObjectState } from "effect-cf";
+import { DurableObject, DurableObjectAlarm, DurableObjectState } from '@systemfsoftware/effect-cf'
+import { DateTime, Effect, Layer, Schema } from 'effect'
 
-class Expirations extends DurableObjectAlarm.Tag<Expirations>()("Expirations", {
+class Expirations extends DurableObjectAlarm.Tag<Expirations>()('Expirations', {
   expire: Schema.Null,
 }) {}
 
 export const SessionObject = DurableObject.make(Layer.empty, {
   alarms: Expirations.handlers({
-    expire: ({ id }) => Effect.log("Session deadline reached", id),
+    expire: ({ id }) => Effect.log('Session deadline reached', id),
   }),
   rpc: {
-    arm: Effect.fn("SessionObject.arm")(function* (id: string, deadline: number) {
-      const alarms = yield* Expirations;
-      const state = yield* DurableObjectState.DurableObjectState;
+    arm: Effect.fn('SessionObject.arm')(function*(id: string, deadline: number) {
+      const alarms = yield* Expirations
+      const state = yield* DurableObjectState.DurableObjectState
 
       yield* alarms.transaction((tx) =>
-        Effect.gen(function* () {
-          yield* state.storage.put(`session:${id}`, { deadline });
+        Effect.gen(function*() {
+          yield* state.storage.put(`session:${id}`, { deadline })
           yield* tx.scheduleAlarm({
-            tag: "expire",
+            tag: 'expire',
             id,
             payload: null,
             runAt: DateTime.makeUnsafe(deadline),
-          });
-        }),
-      );
+          })
+        })
+      )
     }),
   },
-});
+})
 ```
 
 `scheduleAlarm` arms or replaces one `{tag, id}`. `scheduleAlarmEarlier` atomically
@@ -131,14 +131,14 @@ identity as an automatic alarm. Its handler explicitly reschedules or cancels
 that alarm after consulting the authoritative queue.
 
 ```ts
-class Maintenance extends DurableObjectAlarm.Tag<Maintenance>()("library/maintenance", {
-  maintenance: { payload: Schema.Null, lifecycle: "manual" },
+class Maintenance extends DurableObjectAlarm.Tag<Maintenance>()('library/maintenance', {
+  maintenance: { payload: Schema.Null, lifecycle: 'manual' },
 }) {}
 
 const alarms = DurableObjectAlarm.mergeAll(
-  Expirations.handlers({ expire: ({ id }) => Effect.log("Expired", id) }),
+  Expirations.handlers({ expire: ({ id }) => Effect.log('Expired', id) }),
   Maintenance.handlers({ maintenance: () => maintenancePass }),
-);
+)
 
 // Pass this registration as DurableObject.make(applicationLayer, { alarms, ... }).
 ```
@@ -159,22 +159,22 @@ Enroll source work and its deadline in the same transaction, before the first
 source mutation:
 
 ```ts
-const enroll = Effect.gen(function* () {
-  const state = yield* DurableObjectState.DurableObjectState;
-  const maintenance = yield* Maintenance;
+const enroll = Effect.gen(function*() {
+  const state = yield* DurableObjectState.DurableObjectState
+  const maintenance = yield* Maintenance
 
   yield* maintenance.transaction((tx) =>
-    Effect.gen(function* () {
+    Effect.gen(function*() {
       yield* tx.scheduleAlarmEarlier({
-        tag: "maintenance",
-        id: "queue",
+        tag: 'maintenance',
+        id: 'queue',
         payload: null,
         runAt: DateTime.makeUnsafe(deadline),
-      });
-      yield* state.storage.put("pending-job", job);
-    }),
-  );
-});
+      })
+      yield* state.storage.put('pending-job', job)
+    })
+  )
+})
 ```
 
 Use `scheduleAlarm` to replace the deadline, `scheduleAlarmEarlier` to min-merge
@@ -241,7 +241,7 @@ Opt in through the existing scheduler policy:
 ```ts
 const schedulingPolicy = Layer.succeed(DurableObjectAlarm.ScheduleConfiguration, {
   dispatchAfterEvent: true,
-});
+})
 ```
 
 After an RPC or fetch response and its event scope finish, effect-cf yields to a
@@ -276,12 +276,12 @@ Provide the optional `DurableObjectAlarm.ScheduleConfiguration` reference with
 
 ```ts
 const schedulingPolicy = Layer.succeed(DurableObjectAlarm.ScheduleConfiguration, {
-  inFlightRecovery: "1 second",
-  minimumRetryDelay: "2 seconds",
+  inFlightRecovery: '1 second',
+  minimumRetryDelay: '2 seconds',
   unchangedAttemptBudget: 4,
-  parkedRetryDelay: "2 hours",
-  minimumRepeatInterval: "20 seconds",
-});
+  parkedRetryDelay: '2 hours',
+  minimumRepeatInterval: '20 seconds',
+})
 ```
 
 Pass `schedulingPolicy` as the application layer to `DurableObject.make`. With
@@ -335,11 +335,10 @@ event to its own telemetry:
 
 ```ts
 const reporting = Layer.succeed(DurableObjectAlarm.AlarmReporter, (event) =>
-  Effect.logWarning("AlarmParked", {
+  Effect.logWarning('AlarmParked', {
     attempts: event.attempts,
     retryAt: DateTime.formatIso(event.retryAt),
-  }),
-);
+  }))
 ```
 
 Provide this layer to the object's application layer. The event contains only
@@ -391,11 +390,11 @@ exact text request is `effect-cf:ping`; the exact text response is `effect-cf:po
 Clients consume these responses outside their application message decoder:
 
 ```ts
-socket.send("effect-cf:ping");
-socket.addEventListener("message", ({ data }) => {
-  if (data === "effect-cf:pong") return;
-  handleApplicationMessage(data);
-});
+socket.send('effect-cf:ping')
+socket.addEventListener('message', ({ data }) => {
+  if (data === 'effect-cf:pong') return
+  handleApplicationMessage(data)
+})
 ```
 
 The helper accepts a custom request/response text pair and refuses to replace a
