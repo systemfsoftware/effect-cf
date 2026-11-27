@@ -1,65 +1,119 @@
 name: CI
-
 on:
-  pull_request:
+  push:
     branches: [main]
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
+  pull_request:
+    types: [opened, synchronize, reopened]
+  workflow_dispatch:
 permissions:
   contents: read
-
+env:
+  CI: "true"
+  VP_GIT_HOOKS: "0"
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' && !startsWith(github.head_ref, 'mergify/merge-queue/') }}
 jobs:
-  pr-policy:
-    name: PR Policy
-    if: github.event_name == 'pull_request'
+  lint:
+    name: lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/workspace
+        with:
+          node-version: 24
+          save-store: "true"
+      - run: pnpm run patch:tsgo
+      - run: pnpm run format:check
+      - run: pnpm run lint
+  build-and-pack:
+    name: build and pack
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/workspace
+        with:
+          node-version: 24
+      - run: pnpm run patch:tsgo
+      - run: pnpm run check:types
+      - run: pnpm run build
+  changeset:
+    name: change intent
+    if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
+    uses: systemfsoftware/pnpm-release-management/.github/workflows/changeset-check.yml@a7c8ca88d2ace4fb62bfeff20f594d11cffe3780
+    permissions:
+      contents: read
+      pull-requests: read
+  test:
+    name: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/workspace
+        with:
+          node-version: 24
+      - run: pnpm run patch:tsgo
+      - name: Configure Docker Hub mirror
+        run: |
+          sudo python3 - <<'PYTHON'
+          import json
+          from pathlib import Path
+          config_path = Path("/etc/docker/daemon.json")
+          config = json.loads(config_path.read_text()) if config_path.exists() else {}
+          mirrors = config.get("registry-mirrors", [])
+          config["registry-mirrors"] = list(dict.fromkeys(["https://mirror.gcr.io", *mirrors]))
+          config_path.parent.mkdir(parents=True, exist_ok=True)
+          config_path.write_text(json.dumps(config))
+          PYTHON
+          sudo systemctl restart docker
+          docker info --format '{{json .RegistryConfig.Mirrors}}'
+      - name: Test native containers with Docker
+        run: |
+          container_proxy_image=mirror.gcr.io/cloudflare/proxy-everything:3cb1195@sha256:0ef6716c52430096900b150d84a3302057d6cd2319dae7987128c85d0733e3c8
+          if docker pull "$container_proxy_image"; then
+            export MINIFLARE_CONTAINER_EGRESS_IMAGE="$container_proxy_image"
+          fi
+          pnpm run check:containers
+      - name: Run tests
+        run: pnpm run test
+  check:
+    name: checks / check
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    needs: [lint, build-and-pack, changeset, test]
+    if: ${{ always() }}
     steps:
-      - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-      - name: Check PR title
+      - name: Require every job to succeed
         env:
-          PR_TITLE: ${{ github.event.pull_request.title }}
+          LINT: ${{ needs.lint.result }}
+          BUILD_AND_PACK: ${{ needs.build-and-pack.result }}
+          TEST: ${{ needs.test.result }}
+          CHANGESET: ${{ needs.changeset.result }}
+          EVENT: ${{ github.event_name }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
-          if [[ "$HEAD_REF" == changeset-release/* ]]; then
-            exit 0
-          fi
-
-          if ! grep -Eq '^(feat|fix|docs|style|refactor|perf|test|build|ci|chore|revert)(\([^)]+\))?!?: .+' <<<"$PR_TITLE"; then
-            echo "PR title must follow Conventional Commit format, for example: feat: add websocket attachments"
-            exit 1
-          fi
-      - name: Check changeset
-        env:
-          BASE_REF: ${{ github.base_ref }}
-          HEAD_REF: ${{ github.head_ref }}
-        run: |
-          if [[ "$HEAD_REF" == changeset-release/* ]]; then
-            exit 0
-          fi
-
-          git fetch origin "$BASE_REF" --depth=1
-          changed_files="$(git diff --name-only "origin/$BASE_REF"...HEAD)"
-
-          needs_changeset=false
-          has_changeset=false
-          while IFS= read -r file; do
-            if [[ "$file" == packages/effect-cf/src/* || "$file" == packages/effect-cf/package.json ||
-                  "$file" == packages/effect-webtransport/src/* || "$file" == packages/effect-webtransport/package.json ]]; then
-              needs_changeset=true
+          status=0
+          for pair in "lint:$LINT" "build-and-pack:$BUILD_AND_PACK" "test:$TEST"; do
+            case "$pair" in
+              *:success) ;;
+              *) echo "A required job finished as: $pair"; status=1 ;;
+            esac
+          done
+          if [ "$CHANGESET" != success ]; then
+            if [ "$CHANGESET" = skipped ] && { [ "$EVENT" != pull_request ] || [ "$HEAD_REF" = changeset-release/main ]; }; then
+              :
+            else
+              echo "A required job finished as: changeset:$CHANGESET"
+              status=1
             fi
-            if [[ "$file" == .changeset/*.md && "$file" != ".changeset/README.md" ]]; then
-              has_changeset=true
-            fi
-          done <<<"$changed_files"
-
-          if [[ "$needs_changeset" == true && "$has_changeset" != true ]]; then
-            echo "PRs that change a publishable package's src or package.json must include a changeset under .changeset/."
-            echo "Internal-only PRs need no changeset. Never add an empty changeset: a pending changeset on main silently blocks the next release publish."
-            exit 1
           fi
+          exit "$status"

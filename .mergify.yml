@@ -1,0 +1,28 @@
+# Mergify: the policy lives in systemfsoftware/.github (.mergify.yml). This file only names this repository's checks.
+extends: .github
+
+queue_rules:
+  - name: subtree
+    merge_method: merge
+    queue_conditions:
+      # Org convention (systemfsoftware/.github README, "Subtree PRs"): one commit
+      # carries both trailers, and the PR history is not linear.
+      - 'commits[*].commit_message ~= (?ms)\A(?=.*^git-subtree-dir: \S+$)(?=.*^git-subtree-split: [0-9a-f]{40}$)'
+      - -linear-history
+      - check-success = checks / check
+      # The squash message is the pull request's title and body; `squash-message.yml` lints it on the pull request.
+      - check-success = squash message
+    merge_conditions:
+      - check-success = checks / check
+
+  - name: default
+    queue_conditions:
+      # Subtree PRs merge via the subtree queue above; a subtree
+      # claim without trailers matches no queue and cannot merge at all.
+      - "-commits[*].commit_message ~= (?m)^git-subtree-dir: \\S+$"
+      - "-title ~= (?i)\\b(add|pull|update|sync|vendor|refresh|import)\\b[^.]*\\bsubtrees?\\b|\\bsubtrees?\\b[^.]*(\\badd\\b|\\bpull\\b|\\bupdate\\b|\\bsync\\b|\\bvendor\\b|\\brefresh\\b|\\bimport\\b)"
+      - check-success = checks / check
+      # The squash message is the pull request's title and body; `squash-message.yml` lints it on the pull request.
+      - check-success = squash message
+    merge_conditions:
+      - check-success = checks / check

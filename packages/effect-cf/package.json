@@ -5,7 +5,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/danieljvdm/effect-cf.git",
+    "url": "git+https://github.com/systemfsoftware/effect-cf.git",
     "directory": "packages/effect-cf"
   },
   "files": [
@@ -70,7 +70,7 @@
     "typecheck": "vp exec effect-tsrs diagnostics --type-check --project tsconfig.json"
   },
   "dependencies": {
-    "@effect/platform-browser": "^4.1.0"
+    "@effect/platform-browser": "catalog:"
   },
   "devDependencies": {
     "@cloudflare/computer": "0.8.0",
@@ -84,10 +84,10 @@
     "@effect/sql-pg": "catalog:",
     "@effect/sql-sqlite-do": "catalog:",
     "@effect/vitest": "catalog:",
-    "@modelcontextprotocol/client": "^2.0.0",
-    "@platformatic/vfs": "^0.4.0",
+    "@modelcontextprotocol/client": "2.0.0",
+    "@platformatic/vfs": "0.4.0",
     "effect": "catalog:",
-    "esbuild": "^0.28.2",
+    "esbuild": "0.28.2",
     "just-bash": "3.6.0",
     "miniflare": "catalog:",
     "vite": "catalog:",

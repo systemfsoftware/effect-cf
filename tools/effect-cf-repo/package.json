@@ -6,7 +6,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/danieljvdm/effect-cf.git",
+    "url": "git+https://github.com/systemfsoftware/effect-cf.git",
     "directory": "tools/effect-cf-repo"
   },
   "files": [

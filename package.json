@@ -2,32 +2,37 @@
   "name": "effect-cf-monorepo",
   "version": "0.0.0",
   "private": true,
-  "workspaces": [
-    "packages/*",
-    "examples/*",
-    "tools/*"
-  ],
   "type": "module",
   "scripts": {
-    "prepare": "vp config --no-agent --hooks-dir .vite-hooks",
-    "patch:tsgo": "bun scripts/patch-effect-tsgo.ts",
-    "ready": "vp run check && vp run -r build",
+    "prepare": "node scripts/patch-effect-tsgo.ts && vp config --no-agent --hooks-dir .vite-hooks",
+    "patch:tsgo": "node scripts/patch-effect-tsgo.ts",
+    "build": "pnpm run patch:tsgo && pnpm -r --filter './packages/*' run build",
+    "check:types": "vp run typecheck",
+    "test": "vp test",
+    "check:containers": "vp run test:containers",
+    "lint": "vp lint",
+    "format": "vp fmt",
+    "format:check": "vp fmt --check",
+    "ready": "vp run check && pnpm run build",
     "changeset": "vp exec changeset",
     "changeset:version": "vp exec changeset version",
     "changeset:publish": "vp exec changeset publish",
     "dev": "vp run effect-cf#build && vp run outbox-example#dev"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.7.0",
-    "@changesets/cli": "^2.31.0",
+    "@changesets/changelog-github": "0.7.0",
+    "@changesets/cli": "2.31.0",
     "@cloudflare/vitest-plugin": "catalog:",
+    "@commitlint/cli": "^21.2.4",
+    "@commitlint/config-conventional": "^21.2.4",
+    "@commitlint/types": "^21.2.3",
     "@effect-cf/repo": "workspace:*",
     "@effect/platform-node": "catalog:",
     "@effect/tsgo": "0.36.4",
     "@effect/vitest": "catalog:",
     "@stylistic/eslint-plugin": "5.10.0",
-    "@types/bun": "^1.4.0",
-    "@types/node": "^25.6.0",
+    "@types/bun": "1.4.0",
+    "@types/node": "25.9.3",
     "@yielded/effect-tsrs": "0.2.3",
     "effect": "catalog:",
     "esbuild": "0.28.2",
@@ -39,36 +44,8 @@
     "workerd": "catalog:",
     "wrangler": "catalog:"
   },
-  "overrides": {
-    "@cloudflare/workers-types": "catalog:",
-    "@effect/platform-node-shared": "^4.1.0",
-    "miniflare": "catalog:",
-    "typescript": "7.0.2",
-    "vite": "catalog:",
-    "vitest": "catalog:",
-    "workerd": "catalog:",
-    "wrangler": "catalog:"
-  },
   "engines": {
-    "bun": ">=1.4.0",
     "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
   },
-  "packageManager": "bun@1.4.0",
-  "catalog": {
-    "@cloudflare/containers": "0.3.7",
-    "@cloudflare/workers-types": "5.20261026.1",
-    "@cloudflare/vitest-plugin": "1.4.8",
-    "@effect/platform-node": "^4.1.0",
-    "@effect/sql-d1": "^4.1.0",
-    "@effect/sql-pg": "^4.1.0",
-    "@effect/sql-sqlite-do": "^4.1.0",
-    "@effect/vitest": "^4.1.0",
-    "effect": "^4.1.0",
-    "miniflare": "5.20261023.0-beta",
-    "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0",
-    "vitest": "5.0.5",
-    "vite-plus": "1.4.0",
-    "wrangler": "4.153.0",
-    "workerd": "1.20261026.1"
-  }
+  "packageManager": "pnpm@12.21.0"
 }

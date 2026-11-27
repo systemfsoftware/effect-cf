@@ -1,0 +1,128 @@
+name: Release checks
+
+# The shared release workflow dispatches `ci-workflow` on the release PR branch. That branch changes only the
+# version surfaces, and its tree is proved by the merge-queue draft, which runs the full CI on the merged tree: that
+# is the binding gate. So this run does not rebuild the matrix for a version bump. It reuses the verdict main's own
+# CI reported for the commit the release branch is based on, and it lints the squash message the release PR carries.
+# Both jobs always run: a verdict that never reported, is still running past the wait, or did not conclude `success`
+# fails the first, and a missing pull request fails the second, so neither can pass by being skipped.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+  pull-requests: read
+
+jobs:
+  check:
+    name: checks / check
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - id: base
+        name: The release branch changes only version surfaces
+        run: |
+          set -euo pipefail
+          git fetch --no-tags origin main
+          base=$(git merge-base HEAD origin/main)
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+          unexpected=$(git diff --name-status "$base" HEAD | grep -Ev '^(M[[:space:]]+packages/[^/]+/(package\.json|CHANGELOG\.md)|D[[:space:]]+\.changeset/[^/]+\.md)$' || true)
+          if [ -n "$unexpected" ]; then
+            echo "::error::the release branch changes files beyond the version surfaces, so main's verdict does not apply:"
+            printf '%s\n' "$unexpected"
+            exit 1
+          fi
+          # A manifest may change its version value and nothing else, compared structurally so formatting and key
+          # order cannot hide a second change.
+          while IFS= read -r -d '' manifest; do
+            before=$(git show "$base:$manifest" | jq -S 'del(.version)')
+            after=$(jq -S 'del(.version)' "$manifest")
+            if [ "$before" != "$after" ]; then
+              echo "::error::$manifest changes more than its version"
+              exit 1
+            fi
+            if [ "$(git show "$base:$manifest" | jq -r .version)" = "$(jq -r .version "$manifest")" ]; then
+              echo "::error::$manifest keeps its version"
+              exit 1
+            fi
+          done < <(git diff -z --name-only "$base" HEAD -- 'packages/*/package.json')
+      - name: Main's CI on the base commit passed
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          deadline=$((SECONDS + 1200))
+          missing=0
+          while :; do
+            if ! run=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/workflows/ci.yml/runs" \
+              -f head_sha="$BASE" -f event=push -f per_page=1 --jq '.workflow_runs[0] // empty' 2>/dev/null); then
+              status=unreachable
+            elif [ -z "$run" ]; then
+              status=missing
+              missing=$((missing + 1))
+            else
+              status=$(jq -r .status <<< "$run")
+            fi
+            [ "$status" = completed ] && break
+            if [ "$missing" -ge 6 ] || [ "$SECONDS" -ge "$deadline" ]; then
+              echo "::error::main's CI for $BASE is ${status}; the release reuses that verdict and cannot proceed without a completed one"
+              exit 1
+            fi
+            sleep 20
+          done
+          id=$(jq -r .id <<< "$run")
+          conclusion=$(jq -r .conclusion <<< "$run")
+          aggregate=unreachable
+          for _ in 1 2 3; do
+            if out=$(gh api --method GET "repos/$GITHUB_REPOSITORY/actions/runs/$id/jobs" \
+              -f filter=latest -f per_page=100 \
+              --jq '[.jobs[] | select(.name == "checks / check")][0].conclusion // "missing"' 2>/dev/null); then
+              aggregate=$out
+              break
+            fi
+            sleep 5
+          done
+          if [ "$conclusion" != success ] || [ "$aggregate" != success ]; then
+            echo "::error::main's CI run $id concluded ${conclusion} with checks / check ${aggregate}; the release reuses only a success"
+            exit 1
+          fi
+
+  squash-message:
+    name: squash message
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - run: pnpm install --frozen-lockfile --filter .
+      - name: Read the release pull request's message
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          pr=$(gh api --method GET "repos/$GITHUB_REPOSITORY/pulls" -f state=open -f head="$GITHUB_REPOSITORY_OWNER:$GITHUB_REF_NAME" --jq '.[0] // empty')
+          if [ -z "$pr" ]; then
+            echo "::error::no open pull request for $GITHUB_REF_NAME, so there is no squash message to lint"
+            exit 1
+          fi
+          jq -r .title <<< "$pr" > "$RUNNER_TEMP/pr-title"
+          jq -r '.body // ""' <<< "$pr" > "$RUNNER_TEMP/pr-body"
+      - name: Lint the squash message
+        run: |
+          set -euo pipefail
+          title=$(<"$RUNNER_TEMP/pr-title")
+          body=$(<"$RUNNER_TEMP/pr-body")
+          title=${title//$'\r'/}
+          body=${body//$'\r'/}
+          printf '%s\n\n%s' "$title" "$body" | pnpm exec commitlint --verbose

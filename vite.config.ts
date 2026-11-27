@@ -4,6 +4,8 @@ import type { OxlintConfig } from "vite-plus/lint";
 import { defineConfig } from "vite-plus";
 
 const toolIgnorePatterns = [
+  "pnpm-lock.yaml",
+  "repos/**",
   ".bundle-base/**",
   ".bundle-report/**",
   ".runtime-bench/**",

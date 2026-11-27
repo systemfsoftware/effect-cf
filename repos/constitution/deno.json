@@ -1,0 +1,19 @@
+{
+  "version": "1.0.0",
+  "nodeModulesDir": "auto",
+  "tasks": {
+    "check": "deno fmt --check",
+    "prepare": "git config core.hooksPath .husky"
+  },
+  "imports": {
+    "@commitlint/config-conventional": "npm:@commitlint/config-conventional@^21.2.0"
+  },
+  "fmt": {
+    "include": [
+      "**/*.md"
+    ],
+    "exclude": [
+      "docs/plans/"
+    ]
+  }
+}
