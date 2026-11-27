@@ -4,21 +4,21 @@
  */
 export const causeMessage = (cause: unknown): string => {
   if (
-    Predicate.hasProperty(cause, "message") &&
+    Predicate.hasProperty(cause, 'message') &&
     Predicate.isString(cause.message) &&
     cause.message.length > 0
   ) {
-    return cause.message;
+    return cause.message
   }
 
   try {
-    return String(cause);
+    return String(cause)
   } catch {
-    return "unknown cause";
+    return 'unknown cause'
   }
-};
+}
 
 export const violationsMessage = (
   violations: ReadonlyArray<{ readonly path: string; readonly message: string }>,
-): string => violations.map((violation) => `${violation.path}: ${violation.message}`).join("; ");
-import * as Predicate from "effect/Predicate";
+): string => violations.map((violation) => `${violation.path}: ${violation.message}`).join('; ')
+import * as Predicate from 'effect/Predicate'

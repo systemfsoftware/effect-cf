@@ -5,12 +5,10 @@
  * its boundary instead of relying on a partial implementation.
  */
 type PartialTestDouble<Service> = {
-  readonly [Key in keyof Service]?: Service[Key] extends CallableFunction
-    ? Service[Key]
-    : Service[Key] extends object
-      ? PartialTestDouble<Service[Key]>
-      : Service[Key];
-};
+  readonly [Key in keyof Service]?: Service[Key] extends CallableFunction ? Service[Key]
+    : Service[Key] extends object ? PartialTestDouble<Service[Key]>
+    : Service[Key]
+}
 
 export const makePartialTestDouble = <
   Service extends object,
@@ -20,5 +18,5 @@ export const makePartialTestDouble = <
 ): Service => {
   // SAFETY: Test fixtures deliberately implement only the host methods exercised by each test;
   // callers supply that controlled object and choose the host interface completed by the double.
-  return implementation as Service & Implementation;
-};
+  return implementation as Service & Implementation
+}

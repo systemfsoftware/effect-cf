@@ -1,13 +1,13 @@
-import * as Effect from "effect/Effect";
-import * as Data from "effect/Data";
-import type * as Scope from "effect/Scope";
-import * as Option from "effect/Option";
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import type * as Scope from 'effect/Scope'
 
-import { CurrentTargets, type Targets } from "./internal/RpcTargets";
+import { CurrentTargets, type Targets } from './internal/RpcTargets'
 
 /** A native RPC target could not be constructed. */
-export class RpcTargetError extends Data.TaggedError("RpcTargetError")<{
-  readonly cause: unknown;
+export class RpcTargetError extends Data.TaggedError('RpcTargetError')<{
+  readonly cause: unknown
 }> {}
 
 /**
@@ -28,14 +28,13 @@ export const get = <A extends object, Owner extends object>(
     Effect.try({
       try: () => (Option.isSome(targets) ? targets.value.get(owner, address, create) : create()),
       catch: (cause) => new RpcTargetError({ cause }),
-    }),
-  );
+    }))
 
 /** Discard a failed native target so a subsequent call can acquire a fresh channel. */
 export const invalidate = <Target extends object>(target: Target): Effect.Effect<void> =>
   Effect.map(Effect.serviceOption(CurrentTargets), (targets) => {
-    if (Option.isSome(targets)) targets.value.invalidate(target);
-  });
+    if (Option.isSome(targets)) targets.value.invalidate(target)
+  })
 
 /**
  * Own RPC targets in the current Scope, including a transferred response stream,
@@ -44,51 +43,51 @@ export const invalidate = <Target extends object>(target: Target): Effect.Effect
 export const withScope = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, R | Scope.Scope> =>
-  Effect.gen(function* () {
-    let active = true;
-    let owners = new WeakMap<object, Map<string, object>>();
-    let addresses = new WeakMap<object, { entries: Map<string, object>; address: string }>();
+  Effect.gen(function*() {
+    let active = true
+    let owners = new WeakMap<object, Map<string, object>>()
+    let addresses = new WeakMap<object, { entries: Map<string, object>; address: string }>()
     const targets: Targets = {
       get: <T extends object, Owner extends object>(
         owner: Owner,
         address: string,
         create: () => T,
       ): T => {
-        if (!active) return create();
-        let entries = owners.get(owner);
+        if (!active) return create()
+        let entries = owners.get(owner)
 
         if (entries === undefined) {
-          entries = new Map();
-          owners.set(owner, entries);
+          entries = new Map()
+          owners.set(owner, entries)
         }
-        const existing = entries.get(address);
+        const existing = entries.get(address)
 
         if (existing !== undefined) {
           // SAFETY: the caller's owner/address identifies the same native target type.
-          return existing as T;
+          return existing as T
         }
-        const target = create();
+        const target = create()
 
-        entries.set(address, target);
-        addresses.set(target, { entries, address });
+        entries.set(address, target)
+        addresses.set(target, { entries, address })
 
-        return target;
+        return target
       },
       invalidate: (target) => {
-        const entry = addresses.get(target);
+        const entry = addresses.get(target)
 
-        if (entry?.entries.get(entry.address) === target) entry.entries.delete(entry.address);
-        addresses.delete(target);
+        if (entry?.entries.get(entry.address) === target) entry.entries.delete(entry.address)
+        addresses.delete(target)
       },
-    };
+    }
 
     yield* Effect.addFinalizer(() =>
       Effect.sync(() => {
-        active = false;
-        owners = new WeakMap();
-        addresses = new WeakMap();
-      }),
-    );
+        active = false
+        owners = new WeakMap()
+        addresses = new WeakMap()
+      })
+    )
 
-    return yield* effect.pipe(Effect.provideService(CurrentTargets, targets));
-  });
+    return yield* effect.pipe(Effect.provideService(CurrentTargets, targets))
+  })

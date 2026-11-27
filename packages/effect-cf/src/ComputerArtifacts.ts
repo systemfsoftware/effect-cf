@@ -3,45 +3,45 @@ import type {
   ArtifactImportOptions as CloudflareComputerArtifactImportOptions,
   ArtifactImportSource as CloudflareComputerArtifactImportSource,
   ArtifactRepoSummary as CloudflareComputerArtifactRepoSummary,
-  ArtifactScope as CloudflareComputerArtifactScope,
   ArtifactsCLIInput as CloudflareComputerArtifactsCliInput,
   ArtifactsCLIResult as CloudflareComputerArtifactsCliResult,
+  ArtifactScope as CloudflareComputerArtifactScope,
   RemoteAddFn as CloudflareComputerRemoteAdd,
-} from "@cloudflare/computer/artifacts";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
+} from '@cloudflare/computer/artifacts'
+import * as Effect from 'effect/Effect'
+import * as Predicate from 'effect/Predicate'
 
-import * as Artifacts from "./Artifacts";
+import * as Artifacts from './Artifacts'
 
 /** External Git source accepted by a repository import. */
-export type ComputerArtifactImportSource = Readonly<CloudflareComputerArtifactImportSource>;
+export type ComputerArtifactImportSource = Readonly<CloudflareComputerArtifactImportSource>
 
 /** Target options accepted by a repository import. */
-export type ComputerArtifactImportOptions = Readonly<CloudflareComputerArtifactImportOptions>;
+export type ComputerArtifactImportOptions = Readonly<CloudflareComputerArtifactImportOptions>
 
 /** Repository metadata returned by a list operation. */
-export type ComputerArtifactRepoSummary = Readonly<CloudflareComputerArtifactRepoSummary>;
+export type ComputerArtifactRepoSummary = Readonly<CloudflareComputerArtifactRepoSummary>
 
 /** Token scope accepted by the upstream Artifacts facade. */
-export type ComputerArtifactScope = CloudflareComputerArtifactScope;
+export type ComputerArtifactScope = CloudflareComputerArtifactScope
 
 /** Optional Git remote-registration seam accepted by the argv API. */
-export type ComputerArtifactsRemoteAdd = CloudflareComputerRemoteAdd;
+export type ComputerArtifactsRemoteAdd = CloudflareComputerRemoteAdd
 
 /** Input to the `artifacts` argv API. */
-export type ComputerArtifactsCliInput = CloudflareComputerArtifactsCliInput;
+export type ComputerArtifactsCliInput = CloudflareComputerArtifactsCliInput
 
 /** Result from the `artifacts` argv API. */
-export type ComputerArtifactsCliResult = Readonly<CloudflareComputerArtifactsCliResult>;
+export type ComputerArtifactsCliResult = Readonly<CloudflareComputerArtifactsCliResult>
 
 /** Options used when wrapping an Artifacts client. */
 export interface ComputerArtifactsClientOptions {
-  readonly binding?: string;
+  readonly binding?: string
 }
 
 interface MutableArtifactsErrorDetails {
-  code?: Artifacts.ArtifactsOperationError["code"];
-  numericCode?: number;
+  code?: Artifacts.ArtifactsOperationError['code']
+  numericCode?: number
 }
 
 /**
@@ -53,64 +53,64 @@ interface MutableArtifactsErrorDetails {
  * the worker-shell `artifacts` command use the same namespace convention.
  */
 export interface ComputerArtifactsClient {
-  readonly sessionId: string | undefined;
+  readonly sessionId: string | undefined
   readonly create: (
     name: Artifacts.RepoName,
     options?: Artifacts.ArtifactsCreateOptions,
-  ) => Effect.Effect<Artifacts.ArtifactsCreateRepoResult, Artifacts.ArtifactsOperationError>;
+  ) => Effect.Effect<Artifacts.ArtifactsCreateRepoResult, Artifacts.ArtifactsOperationError>
   readonly get: (
     name: Artifacts.RepoName,
-  ) => Effect.Effect<Artifacts.ArtifactsRepoInfo, Artifacts.ArtifactsOperationError>;
+  ) => Effect.Effect<Artifacts.ArtifactsRepoInfo, Artifacts.ArtifactsOperationError>
   readonly list: Effect.Effect<
     ReadonlyArray<ComputerArtifactRepoSummary>,
     Artifacts.ArtifactsOperationError
-  >;
+  >
   readonly import: (
     name: Artifacts.RepoName,
     source: ComputerArtifactImportSource,
     options?: ComputerArtifactImportOptions,
-  ) => Effect.Effect<Artifacts.ArtifactsCreateRepoResult, Artifacts.ArtifactsOperationError>;
+  ) => Effect.Effect<Artifacts.ArtifactsCreateRepoResult, Artifacts.ArtifactsOperationError>
   readonly delete: (
     name: Artifacts.RepoName,
-  ) => Effect.Effect<boolean, Artifacts.ArtifactsOperationError>;
+  ) => Effect.Effect<boolean, Artifacts.ArtifactsOperationError>
   readonly createToken: (
     name: Artifacts.RepoName,
     scope?: ComputerArtifactScope,
     ttl?: number,
-  ) => Effect.Effect<Artifacts.ArtifactsCreateTokenResult, Artifacts.ArtifactsOperationError>;
+  ) => Effect.Effect<Artifacts.ArtifactsCreateTokenResult, Artifacts.ArtifactsOperationError>
   readonly listTokens: (
     name: Artifacts.RepoName,
-  ) => Effect.Effect<Artifacts.ArtifactsTokenListResult, Artifacts.ArtifactsOperationError>;
+  ) => Effect.Effect<Artifacts.ArtifactsTokenListResult, Artifacts.ArtifactsOperationError>
   readonly getToken: (
     name: Artifacts.RepoName,
     id: string,
-  ) => Effect.Effect<Artifacts.ArtifactsTokenInfo, Artifacts.ArtifactsOperationError>;
+  ) => Effect.Effect<Artifacts.ArtifactsTokenInfo, Artifacts.ArtifactsOperationError>
   readonly revokeToken: (
     name: Artifacts.RepoName,
     tokenOrId: string,
-  ) => Effect.Effect<boolean, Artifacts.ArtifactsOperationError>;
+  ) => Effect.Effect<boolean, Artifacts.ArtifactsOperationError>
   readonly cli: (
     input: ComputerArtifactsCliInput,
-  ) => Effect.Effect<ComputerArtifactsCliResult, Artifacts.ArtifactsOperationError>;
-  readonly rawUnsafe: Effect.Effect<CloudflareComputerArtifactClient>;
+  ) => Effect.Effect<ComputerArtifactsCliResult, Artifacts.ArtifactsOperationError>
+  readonly rawUnsafe: Effect.Effect<CloudflareComputerArtifactClient>
 }
 
 const artifactsErrorDetails = (
   cause: unknown,
-): Pick<Artifacts.ArtifactsOperationError, "code" | "numericCode"> => {
+): Pick<Artifacts.ArtifactsOperationError, 'code' | 'numericCode'> => {
   if (!Predicate.isObject(cause)) {
-    return {};
+    return {}
   }
 
-  const code = Predicate.hasProperty(cause, "code") ? cause.code : undefined;
-  const numericCode = Predicate.hasProperty(cause, "numericCode") ? cause.numericCode : undefined;
-  const details: MutableArtifactsErrorDetails = {};
+  const code = Predicate.hasProperty(cause, 'code') ? cause.code : undefined
+  const numericCode = Predicate.hasProperty(cause, 'numericCode') ? cause.numericCode : undefined
+  const details: MutableArtifactsErrorDetails = {}
 
-  if (Predicate.isString(code)) details.code = code;
-  if (Predicate.isNumber(numericCode)) details.numericCode = numericCode;
+  if (Predicate.isString(code)) details.code = code
+  if (Predicate.isNumber(numericCode)) details.numericCode = numericCode
 
-  return details;
-};
+  return details
+}
 
 const operationError = (binding: string, operation: Artifacts.ArtifactsOperation, cause: unknown) =>
   new Artifacts.ArtifactsOperationError({
@@ -118,7 +118,7 @@ const operationError = (binding: string, operation: Artifacts.ArtifactsOperation
     operation,
     cause,
     ...artifactsErrorDetails(cause),
-  });
+  })
 
 const tryOperation = <A>(
   binding: string,
@@ -128,109 +128,105 @@ const tryOperation = <A>(
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => operationError(binding, operation, cause),
-  });
+  })
 
 const spanOptions = (
   binding: string,
   sessionId: string | undefined,
   operation: Artifacts.ArtifactsOperation,
-) => ({ attributes: { binding, sessionId, operation } });
+) => ({ attributes: { binding, sessionId, operation } })
 
 export const fromClient = (
   client: CloudflareComputerArtifactClient,
   options: ComputerArtifactsClientOptions = {},
 ): ComputerArtifactsClient => {
-  const binding = options.binding ?? "ARTIFACTS";
-  const { sessionId } = client;
+  const binding = options.binding ?? 'ARTIFACTS'
+  const { sessionId } = client
 
   return {
     sessionId,
     create: Effect.fn(
-      "ComputerArtifacts.create",
-      spanOptions(binding, sessionId, "create"),
-    )(function* (name: Artifacts.RepoName, createOptions?: Artifacts.ArtifactsCreateOptions) {
-      yield* Effect.annotateCurrentSpan("repo", name);
+      'ComputerArtifacts.create',
+      spanOptions(binding, sessionId, 'create'),
+    )(function*(name: Artifacts.RepoName, createOptions?: Artifacts.ArtifactsCreateOptions) {
+      yield* Effect.annotateCurrentSpan('repo', name)
 
-      return yield* tryOperation(binding, "create", () => client.create(name, createOptions));
+      return yield* tryOperation(binding, 'create', () => client.create(name, createOptions))
     }),
     get: Effect.fn(
-      "ComputerArtifacts.get",
-      spanOptions(binding, sessionId, "get"),
-    )(function* (name: Artifacts.RepoName) {
-      yield* Effect.annotateCurrentSpan("repo", name);
+      'ComputerArtifacts.get',
+      spanOptions(binding, sessionId, 'get'),
+    )(function*(name: Artifacts.RepoName) {
+      yield* Effect.annotateCurrentSpan('repo', name)
 
-      return yield* tryOperation(binding, "get", () => client.get(name));
+      return yield* tryOperation(binding, 'get', () => client.get(name))
     }),
-    list: tryOperation(binding, "list", () => client.list()).pipe(
-      Effect.withSpan("ComputerArtifacts.list", spanOptions(binding, sessionId, "list")),
+    list: tryOperation(binding, 'list', () => client.list()).pipe(
+      Effect.withSpan('ComputerArtifacts.list', spanOptions(binding, sessionId, 'list')),
     ),
     import: Effect.fn(
-      "ComputerArtifacts.import",
-      spanOptions(binding, sessionId, "import"),
-    )(function* (
+      'ComputerArtifacts.import',
+      spanOptions(binding, sessionId, 'import'),
+    )(function*(
       name: Artifacts.RepoName,
       source: ComputerArtifactImportSource,
       importOptions?: ComputerArtifactImportOptions,
     ) {
-      yield* Effect.annotateCurrentSpan("repo", name);
+      yield* Effect.annotateCurrentSpan('repo', name)
 
-      return yield* tryOperation(binding, "import", () =>
-        client.import(name, source, importOptions),
-      );
+      return yield* tryOperation(binding, 'import', () => client.import(name, source, importOptions))
     }),
     delete: Effect.fn(
-      "ComputerArtifacts.delete",
-      spanOptions(binding, sessionId, "delete"),
-    )(function* (name: Artifacts.RepoName) {
-      yield* Effect.annotateCurrentSpan("repo", name);
+      'ComputerArtifacts.delete',
+      spanOptions(binding, sessionId, 'delete'),
+    )(function*(name: Artifacts.RepoName) {
+      yield* Effect.annotateCurrentSpan('repo', name)
 
-      return yield* tryOperation(binding, "delete", () => client.delete(name));
+      return yield* tryOperation(binding, 'delete', () => client.delete(name))
     }),
     createToken: Effect.fn(
-      "ComputerArtifacts.createToken",
-      spanOptions(binding, sessionId, "createToken"),
-    )(function* (name: Artifacts.RepoName, scope?: ComputerArtifactScope, ttl?: number) {
-      yield* Effect.annotateCurrentSpan("repo", name);
+      'ComputerArtifacts.createToken',
+      spanOptions(binding, sessionId, 'createToken'),
+    )(function*(name: Artifacts.RepoName, scope?: ComputerArtifactScope, ttl?: number) {
+      yield* Effect.annotateCurrentSpan('repo', name)
 
-      return yield* tryOperation(binding, "createToken", () =>
-        client.createToken(name, scope, ttl),
-      );
+      return yield* tryOperation(binding, 'createToken', () => client.createToken(name, scope, ttl))
     }),
     listTokens: Effect.fn(
-      "ComputerArtifacts.listTokens",
-      spanOptions(binding, sessionId, "listTokens"),
-    )(function* (name: Artifacts.RepoName) {
-      yield* Effect.annotateCurrentSpan("repo", name);
+      'ComputerArtifacts.listTokens',
+      spanOptions(binding, sessionId, 'listTokens'),
+    )(function*(name: Artifacts.RepoName) {
+      yield* Effect.annotateCurrentSpan('repo', name)
 
-      return yield* tryOperation(binding, "listTokens", () => client.listTokens(name));
+      return yield* tryOperation(binding, 'listTokens', () => client.listTokens(name))
     }),
     getToken: Effect.fn(
-      "ComputerArtifacts.getToken",
-      spanOptions(binding, sessionId, "getToken"),
-    )(function* (name: Artifacts.RepoName, id: string) {
-      yield* Effect.annotateCurrentSpan({ repo: name, tokenId: id });
+      'ComputerArtifacts.getToken',
+      spanOptions(binding, sessionId, 'getToken'),
+    )(function*(name: Artifacts.RepoName, id: string) {
+      yield* Effect.annotateCurrentSpan({ repo: name, tokenId: id })
 
-      return yield* tryOperation(binding, "getToken", () => client.getToken(name, id));
+      return yield* tryOperation(binding, 'getToken', () => client.getToken(name, id))
     }),
     revokeToken: Effect.fn(
-      "ComputerArtifacts.revokeToken",
-      spanOptions(binding, sessionId, "revokeToken"),
-    )(function* (name: Artifacts.RepoName, tokenOrId: string) {
-      yield* Effect.annotateCurrentSpan("repo", name);
+      'ComputerArtifacts.revokeToken',
+      spanOptions(binding, sessionId, 'revokeToken'),
+    )(function*(name: Artifacts.RepoName, tokenOrId: string) {
+      yield* Effect.annotateCurrentSpan('repo', name)
 
-      return yield* tryOperation(binding, "revokeToken", () => client.revokeToken(name, tokenOrId));
+      return yield* tryOperation(binding, 'revokeToken', () => client.revokeToken(name, tokenOrId))
     }),
     cli: Effect.fn(
-      "ComputerArtifacts.cli",
-      spanOptions(binding, sessionId, "cli"),
-    )(function* (input: ComputerArtifactsCliInput) {
-      yield* Effect.annotateCurrentSpan("argv", input.argv.join(" "));
+      'ComputerArtifacts.cli',
+      spanOptions(binding, sessionId, 'cli'),
+    )(function*(input: ComputerArtifactsCliInput) {
+      yield* Effect.annotateCurrentSpan('argv', input.argv.join(' '))
 
-      return yield* tryOperation(binding, "cli", () => client.cli(input));
+      return yield* tryOperation(binding, 'cli', () => client.cli(input))
     }),
     rawUnsafe: Effect.succeed(client),
-  };
-};
+  }
+}
 
 /**
  * Creates an Effect-native client directly from a Worker Artifacts binding.
@@ -238,26 +234,27 @@ export const fromClient = (
  * the whole namespace. `@cloudflare/computer` is loaded only when this Effect
  * runs, keeping the optional peer out of applications without this integration.
  */
-export const makeClient = Effect.fn("ComputerArtifacts.makeClient")(function* (
+export const makeClient = Effect.fn('ComputerArtifacts.makeClient')(function*(
   bindingValue: Artifacts.ArtifactsBinding,
   sessionId?: string | null,
   options: ComputerArtifactsClientOptions = {},
 ) {
-  const binding = options.binding ?? "ARTIFACTS";
+  const binding = options.binding ?? 'ARTIFACTS'
   const computerArtifacts = yield* Effect.tryPromise({
-    try: () => import("@cloudflare/computer/artifacts"),
-    catch: (cause) => operationError(binding, "createClient", cause),
-  });
+    try: () => import('@cloudflare/computer/artifacts'),
+    catch: (cause) => operationError(binding, 'createClient', cause),
+  })
   const client = yield* Effect.try({
     try: () =>
       // SAFETY: both packages describe the same Cloudflare Artifacts binding runtime object.
       computerArtifacts.createArtifact(
-        bindingValue as Artifacts.ArtifactsBinding &
-          Parameters<typeof computerArtifacts.createArtifact>[0],
+        bindingValue as
+          & Artifacts.ArtifactsBinding
+          & Parameters<typeof computerArtifacts.createArtifact>[0],
         sessionId,
       ),
-    catch: (cause) => operationError(binding, "createClient", cause),
-  });
+    catch: (cause) => operationError(binding, 'createClient', cause),
+  })
 
-  return fromClient(client, { binding });
-});
+  return fromClient(client, { binding })
+})

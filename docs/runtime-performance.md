@@ -11,34 +11,34 @@ Use the existing `alarms.transaction` API when a group of alarm changes should c
 For a typed alarm service registered on the Durable Object:
 
 ```ts
-import { DateTime, Effect, Schema } from "effect";
-import { DurableObjectAlarm } from "effect-cf";
+import { DurableObjectAlarm } from '@systemfsoftware/effect-cf'
+import { DateTime, Effect, Schema } from 'effect'
 
-class Followups extends DurableObjectAlarm.Tag<Followups>()("Followups", {
+class Followups extends DurableObjectAlarm.Tag<Followups>()('Followups', {
   followup: Schema.Struct({ orderId: Schema.String }),
 }) {}
 
 // Register Followups.handlers({ followup: ... }) on the owning Durable Object.
-export const scheduleFollowups = Effect.fn("scheduleFollowups")(function* (
+export const scheduleFollowups = Effect.fn('scheduleFollowups')(function*(
   orderIds: ReadonlyArray<string>,
   runAt: DateTime.Utc,
 ) {
-  const alarms = yield* Followups;
+  const alarms = yield* Followups
 
   yield* alarms.transaction((tx) =>
     Effect.forEach(
       orderIds,
       (orderId) =>
         tx.scheduleAlarm({
-          tag: "followup",
+          tag: 'followup',
           id: orderId,
           runAt,
           payload: { orderId },
         }),
       { discard: true },
-    ),
-  );
-});
+    )
+  )
+})
 ```
 
 Use the transaction callback's `tx` handle sequentially. Keep external RPC, network calls, and unrelated work outside the storage transaction. A failed group rolls back together; independent calls can leave earlier mutations committed. The [outbox example](../examples/outbox/README.md) also combines application storage writes with alarm changes.
@@ -48,11 +48,11 @@ Use the transaction callback's `tx` handle sequentially. Keep external RPC, netw
 `CloudflareOtlp` defaults to logs, traces, and metrics. If the application does not use metrics, select logs and traces explicitly:
 
 ```ts
-import { CloudflareOtlp } from "effect-cf";
+import { CloudflareOtlp } from '@systemfsoftware/effect-cf'
 
 export const TelemetryLive = CloudflareOtlp.layerWorker({
-  signals: ["logs", "traces"],
-});
+  signals: ['logs', 'traces'],
+})
 ```
 
 Provide the layer at the appropriate Worker runtime or event scope. Selected signals still use standard OTEL configuration, including the exporter endpoint and `OTEL_LOGS_EXPORTER` / `OTEL_TRACES_EXPORTER`. Keep `metrics` selected when its delivery is required. Omitting it avoids constructing its exporter, timer, and finalizer; it does not merely filter metric names.

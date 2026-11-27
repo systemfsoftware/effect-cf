@@ -11,13 +11,13 @@
     "test": "vp test",
     "check:containers": "vp run test:containers",
     "lint": "vp lint",
-    "format": "vp fmt",
-    "format:check": "vp fmt --check",
+    "format": "dprint fmt",
+    "format:check": "dprint check",
     "ready": "vp run check && pnpm run build",
     "changeset": "vp exec changeset",
     "changeset:version": "vp exec changeset version",
     "changeset:publish": "vp exec changeset publish",
-    "dev": "vp run effect-cf#build && vp run outbox-example#dev"
+    "dev": "vp run @systemfsoftware/effect-cf#build && vp run outbox-example#dev"
   },
   "devDependencies": {
     "@changesets/changelog-github": "0.7.0",
@@ -42,10 +42,11 @@
     "vite-plus": "catalog:",
     "vitest": "catalog:",
     "workerd": "catalog:",
-    "wrangler": "catalog:"
+    "wrangler": "catalog:",
+    "dprint": "0.65.0"
   },
   "engines": {
     "node": "^22.18.0 || ^24.11.0 || >=26.0.0"
   },
-  "packageManager": "pnpm@12.21.0"
+  "packageManager": "pnpm@12.9.0"
 }

@@ -13,21 +13,21 @@ Use a SQLite Durable Object migration and `nodejs_compat`. The shell backend add
 Computer keeps the last 2,000 lines or 64 KiB of each command output stream by default. Longer output is saved to workspace files. Both `run.result` and the stream's `Exit` event retain the SDK's `truncated` metadata, including whether each full stream was saved and its path.
 
 ```ts
-import { Effect } from "effect";
-import { ComputerWorkspace } from "effect-cf/computer-workspace";
+import { ComputerWorkspace } from '@systemfsoftware/effect-cf/computer-workspace'
+import { Effect } from 'effect'
 
-const readLog = Effect.gen(function* () {
-  const workspace = yield* ComputerWorkspace;
-  const result = yield* workspace.execCollect("cat /logs/build.log");
-  const output = result.truncated?.stdout;
+const readLog = Effect.gen(function*() {
+  const workspace = yield* ComputerWorkspace
+  const result = yield* workspace.execCollect('cat /logs/build.log')
+  const output = result.truncated?.stdout
 
-  if (output?.status === "saved") {
-    const body = yield* workspace.readFile(output.path, { encoding: "stream" });
-    return new Response(body);
+  if (output?.status === 'saved') {
+    const body = yield* workspace.readFile(output.path, { encoding: 'stream' })
+    return new Response(body)
   }
 
-  return new Response(result.stdout);
-});
+  return new Response(result.stdout)
+})
 ```
 
 Provide `ComputerWorkspace.layer` in the Durable Object's application layer. Configure defaults with the host's `output` option, or pass `output: { maxLines, maxBytes }` to `exec`, `execCollect`, or `getExec`. `output: false` disables truncation. Saved files have a retention limit; consume them while available. A `truncated` entry whose status is `not-saved` means the full stream could not be saved.

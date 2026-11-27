@@ -1,581 +1,581 @@
-import { expectTypeOf } from "vite-plus/test";
-import { Config, Effect, Layer, Option, Redacted, Schema } from "effect";
-import type { PgClient } from "@effect/sql-pg";
-import type { HttpClient } from "effect/http";
-import type { SqlClient, SqlError } from "effect/sql";
+import type { PgClient } from '@effect/sql-pg'
+import { Config, Effect, Layer, Option, Redacted, Schema } from 'effect'
+import type { HttpClient } from 'effect/http'
+import type { SqlClient, SqlError } from 'effect/sql'
+import { expectTypeOf } from 'vite-plus/test'
 
+import * as HyperdrivePg from '../src/HyperdrivePg'
 import {
-  type Binding,
-  type DurableObjectNamespace,
-  type QueueBinding,
-  type Rpc,
-  type WorkflowBinding,
   AiGateway,
   AnalyticsEngine,
   Artifacts,
+  type Binding,
   BrowserRendering,
   DurableObject,
+  type DurableObjectNamespace,
   Email,
   Hyperdrive,
   Images,
   Kv,
   Queue,
+  type QueueBinding,
   R2,
+  type Rpc,
   ServiceBinding,
   Vectorize,
   Worker,
   WorkerEnvironment,
   WorkersAi,
   Workflow,
-} from "../src/index";
-import * as EffectCf from "../src/index";
-import * as HyperdrivePg from "../src/HyperdrivePg";
+  type WorkflowBinding,
+} from '../src/index'
+import * as EffectCf from '../src/index'
 
 export const AvatarQueueMessagePayload = Schema.Struct({
   requestId: Schema.String,
   userId: Schema.String,
-});
+})
 
-export class AvatarQueue extends Queue.Tag<AvatarQueue>()("AvatarQueue", {
+export class AvatarQueue extends Queue.Tag<AvatarQueue>()('AvatarQueue', {
   message: AvatarQueueMessagePayload,
 }) {}
 
-export const AvatarQueueLayer = AvatarQueue.layer({ binding: "AVATAR_QUEUE" });
+export const AvatarQueueLayer = AvatarQueue.layer({ binding: 'AVATAR_QUEUE' })
 
-const queueProgram = Effect.gen(function* () {
-  const queue = yield* AvatarQueue;
+const queueProgram = Effect.gen(function*() {
+  const queue = yield* AvatarQueue
 
-  expectTypeOf(queue.send({ requestId: "r1", userId: "u1" })).toEqualTypeOf<
+  expectTypeOf(queue.send({ requestId: 'r1', userId: 'u1' })).toEqualTypeOf<
     Effect.Effect<void, QueueBinding.QueueOperationError | Schema.SchemaError>
-  >();
+  >()
 
-  yield* queue.send({ requestId: "r1", userId: "u1" });
-  yield* queue.sendBatch([{ body: { requestId: "r2", userId: "u2" } }]);
-  yield* queue.metrics;
+  yield* queue.send({ requestId: 'r1', userId: 'u1' })
+  yield* queue.sendBatch([{ body: { requestId: 'r2', userId: 'u2' } }])
+  yield* queue.metrics
 
   // @ts-expect-error queue messages use the decoded schema shape.
-  yield* queue.send({ requestId: "r1" });
-});
+  yield* queue.send({ requestId: 'r1' })
+})
 
 // @ts-expect-error AvatarQueue.layer must be provided before the program can run.
 // @effect-diagnostics-next-line missingEffectContext:off
-const missingQueueLayer: Effect.Effect<void, unknown, never> = queueProgram;
+const missingQueueLayer: Effect.Effect<void, unknown, never> = queueProgram
 
-declare const env: Cloudflare.Env;
+declare const env: Cloudflare.Env
 const providedQueueProgram: Effect.Effect<void, unknown, never> = queueProgram.pipe(
   Effect.provide(
-    AvatarQueue.layer({ binding: "AVATAR_QUEUE" }).pipe(
+    AvatarQueue.layer({ binding: 'AVATAR_QUEUE' }).pipe(
       Layer.provide(Layer.succeed(WorkerEnvironment, env)),
     ),
   ),
-);
+)
 
-expectTypeOf(AvatarQueue.send({ requestId: "r1", userId: "u1" })).toEqualTypeOf<
+expectTypeOf(AvatarQueue.send({ requestId: 'r1', userId: 'u1' })).toEqualTypeOf<
   Effect.Effect<void, QueueBinding.QueueOperationError | Schema.SchemaError, AvatarQueue>
->();
+>()
 
-void missingQueueLayer;
-void providedQueueProgram;
+void missingQueueLayer
+void providedQueueProgram
 
 export class ArtifactRepositories extends Artifacts.Tag<ArtifactRepositories>()(
-  "ArtifactRepositories",
+  'ArtifactRepositories',
 ) {}
 
 export const ArtifactRepositoriesLayer = ArtifactRepositories.layer({
-  binding: "ARTIFACTS",
-});
+  binding: 'ARTIFACTS',
+})
 
-const artifactsProgram = Effect.gen(function* () {
-  const artifacts = yield* ArtifactRepositories;
+const artifactsProgram = Effect.gen(function*() {
+  const artifacts = yield* ArtifactRepositories
 
   expectTypeOf(
-    artifacts.create("agent-workspace", {
-      description: "Agent workspace",
+    artifacts.create('agent-workspace', {
+      description: 'Agent workspace',
       readOnly: false,
-      setDefaultBranch: "main",
+      setDefaultBranch: 'main',
     }),
   ).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsCreateRepoResult, Artifacts.ArtifactsOperationError>
-  >();
+  >()
 
   expectTypeOf(
     artifacts.import({
       source: {
-        url: "https://github.com/cloudflare/workers-sdk",
-        branch: "main",
+        url: 'https://github.com/cloudflare/workers-sdk',
+        branch: 'main',
         depth: 1,
       },
       target: {
-        name: "workers-sdk",
-        opts: { description: "Workers SDK", readOnly: true },
+        name: 'workers-sdk',
+        opts: { description: 'Workers SDK', readOnly: true },
       },
     }),
   ).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsCreateRepoResult, Artifacts.ArtifactsOperationError>
-  >();
+  >()
 
-  expectTypeOf(artifacts.list({ limit: 20, cursor: "next" })).toEqualTypeOf<
+  expectTypeOf(artifacts.list({ limit: 20, cursor: 'next' })).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsRepoListResult, Artifacts.ArtifactsOperationError>
-  >();
+  >()
 
-  expectTypeOf(artifacts.delete("agent-workspace")).toEqualTypeOf<
+  expectTypeOf(artifacts.delete('agent-workspace')).toEqualTypeOf<
     Effect.Effect<boolean, Artifacts.ArtifactsOperationError>
-  >();
+  >()
 
-  const repo = yield* artifacts.get("agent-workspace");
+  const repo = yield* artifacts.get('agent-workspace')
 
-  expectTypeOf(repo).toEqualTypeOf<Artifacts.ArtifactsRepoClient>();
-  expectTypeOf(repo.dispose).toEqualTypeOf<Effect.Effect<void>>();
+  expectTypeOf(repo).toEqualTypeOf<Artifacts.ArtifactsRepoClient>()
+  expectTypeOf(repo.dispose).toEqualTypeOf<Effect.Effect<void>>()
   expectTypeOf(repo.info).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsRepoInfo, Artifacts.ArtifactsOperationError>
-  >();
-  expectTypeOf(repo.createToken("read", 3600)).toEqualTypeOf<
+  >()
+  expectTypeOf(repo.createToken('read', 3600)).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsCreateTokenResult, Artifacts.ArtifactsOperationError>
-  >();
+  >()
   expectTypeOf(repo.listTokens).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsTokenListResult, Artifacts.ArtifactsOperationError>
-  >();
-  expectTypeOf(repo.revokeToken("token-id")).toEqualTypeOf<
+  >()
+  expectTypeOf(repo.revokeToken('token-id')).toEqualTypeOf<
     Effect.Effect<boolean, Artifacts.ArtifactsOperationError>
-  >();
+  >()
   expectTypeOf(
-    repo.fork("agent-workspace-copy", {
-      description: "Review copy",
+    repo.fork('agent-workspace-copy', {
+      description: 'Review copy',
       readOnly: true,
       defaultBranchOnly: true,
     }),
   ).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsCreateRepoResult, Artifacts.ArtifactsOperationError>
-  >();
-  expectTypeOf(repo.log({ ref: "main", limit: 10, offset: 0 })).toEqualTypeOf<
+  >()
+  expectTypeOf(repo.log({ ref: 'main', limit: 10, offset: 0 })).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsLogResult, Artifacts.ArtifactsOperationError>
-  >();
-  expectTypeOf(repo.readCommit("commit-sha")).toEqualTypeOf<
+  >()
+  expectTypeOf(repo.readCommit('commit-sha')).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsCommit, Artifacts.ArtifactsOperationError>
-  >();
-  expectTypeOf(repo.readTree("tree-sha")).toEqualTypeOf<
+  >()
+  expectTypeOf(repo.readTree('tree-sha')).toEqualTypeOf<
     Effect.Effect<Artifacts.ArtifactsTree, Artifacts.ArtifactsOperationError>
-  >();
-  expectTypeOf(repo.readBlob("blob-sha")).toEqualTypeOf<
+  >()
+  expectTypeOf(repo.readBlob('blob-sha')).toEqualTypeOf<
     Effect.Effect<Blob, Artifacts.ArtifactsOperationError>
-  >();
-  expectTypeOf(artifacts.rawUnsafe).toEqualTypeOf<Effect.Effect<Artifacts.ArtifactsBinding>>();
+  >()
+  expectTypeOf(artifacts.rawUnsafe).toEqualTypeOf<Effect.Effect<Artifacts.ArtifactsBinding>>()
 
   // @ts-expect-error token scopes are read or write.
-  yield* repo.createToken("admin", 3600);
-});
+  yield* repo.createToken('admin', 3600)
+})
 
-expectTypeOf(Artifacts.artifactsErrorNumericCodes.INVALID_TTL).toEqualTypeOf<10103>();
-expectTypeOf(EffectCf.Artifacts).toEqualTypeOf<typeof Artifacts>();
+expectTypeOf(Artifacts.artifactsErrorNumericCodes.INVALID_TTL).toEqualTypeOf<10103>()
+expectTypeOf(EffectCf.Artifacts).toEqualTypeOf<typeof Artifacts>()
 
-void artifactsProgram;
+void artifactsProgram
 
 export const ReportWorkflowPayload = Schema.Struct({
   reportId: Schema.String,
-});
+})
 
 export const ReportWorkflowResult = Schema.Struct({
   objectKey: Schema.String,
-});
+})
 
-export class ReportWorkflow extends Workflow.Tag<ReportWorkflow>()("ReportWorkflow", {
+export class ReportWorkflow extends Workflow.Tag<ReportWorkflow>()('ReportWorkflow', {
   payload: ReportWorkflowPayload,
   result: ReportWorkflowResult,
 }) {}
 
-export const ReportWorkflowLayer = ReportWorkflow.layer({ binding: "REPORT_WORKFLOW" });
+export const ReportWorkflowLayer = ReportWorkflow.layer({ binding: 'REPORT_WORKFLOW' })
 
-const workflowProgram = Effect.gen(function* () {
-  const workflow = yield* ReportWorkflow;
+const workflowProgram = Effect.gen(function*() {
+  const workflow = yield* ReportWorkflow
 
-  expectTypeOf(workflow.create({ reportId: "r1" })).toEqualTypeOf<
+  expectTypeOf(workflow.create({ reportId: 'r1' })).toEqualTypeOf<
     Effect.Effect<
       WorkflowBinding.WorkflowInstance<{ readonly objectKey: string }>,
       WorkflowBinding.WorkflowOperationError | Schema.SchemaError
     >
-  >();
+  >()
 
-  yield* workflow.create({ reportId: "r1" });
-  yield* workflow.createBatch([{ id: "batch-1", payload: { reportId: "r2" } }]);
+  yield* workflow.create({ reportId: 'r1' })
+  yield* workflow.createBatch([{ id: 'batch-1', payload: { reportId: 'r2' } }])
 
   // @ts-expect-error workflow payloads use the decoded schema shape.
-  yield* workflow.create({});
-});
+  yield* workflow.create({})
+})
 
-expectTypeOf(ReportWorkflow.create({ reportId: "r1" })).toEqualTypeOf<
+expectTypeOf(ReportWorkflow.create({ reportId: 'r1' })).toEqualTypeOf<
   Effect.Effect<
     WorkflowBinding.WorkflowInstance<{ readonly objectKey: string }>,
     WorkflowBinding.WorkflowOperationError | Schema.SchemaError,
     ReportWorkflow
   >
->();
+>()
 
-void workflowProgram;
+void workflowProgram
 
-export class ArtifactBucket extends R2.Tag<ArtifactBucket>()("ArtifactBucket") {}
+export class ArtifactBucket extends R2.Tag<ArtifactBucket>()('ArtifactBucket') {}
 
 export const ArtifactBucketLayer = ArtifactBucket.layer({
-  binding: "ARTIFACT_BUCKET",
-});
+  binding: 'ARTIFACT_BUCKET',
+})
 
-const r2Program = Effect.gen(function* () {
-  const bucket = yield* ArtifactBucket;
+const r2Program = Effect.gen(function*() {
+  const bucket = yield* ArtifactBucket
 
-  expectTypeOf(bucket.get("avatars/u1.png")).toEqualTypeOf<
+  expectTypeOf(bucket.get('avatars/u1.png')).toEqualTypeOf<
     Effect.Effect<Option.Option<R2.R2ObjectBodyClient>, R2.R2OperationError>
-  >();
+  >()
 
-  const object = yield* bucket.get("avatars/u1.png").pipe(Effect.map(Option.getOrThrow));
+  const object = yield* bucket.get('avatars/u1.png').pipe(Effect.map(Option.getOrThrow))
 
   expectTypeOf(object.json<{ readonly ok: true }>()).toEqualTypeOf<
     Effect.Effect<{ readonly ok: true }, R2.R2OperationError>
-  >();
+  >()
 
-  yield* bucket.put("avatars/u1.png", "image-bytes");
-  yield* bucket.delete(["avatars/u1.png"]);
+  yield* bucket.put('avatars/u1.png', 'image-bytes')
+  yield* bucket.delete(['avatars/u1.png'])
 
-  expectTypeOf(bucket.head("avatars/u1.png")).toEqualTypeOf<
+  expectTypeOf(bucket.head('avatars/u1.png')).toEqualTypeOf<
     Effect.Effect<Option.Option<R2Object>, R2.R2OperationError>
-  >();
-});
+  >()
+})
 
-export class AppHyperdrive extends Hyperdrive.Tag<AppHyperdrive>()("AppHyperdrive") {}
+export class AppHyperdrive extends Hyperdrive.Tag<AppHyperdrive>()('AppHyperdrive') {}
 
 export const AppHyperdriveLayer = AppHyperdrive.layer({
-  binding: "HYPERDRIVE",
-});
+  binding: 'HYPERDRIVE',
+})
 
-const hyperdriveProgram = Effect.gen(function* () {
-  const hyperdrive = yield* AppHyperdrive;
+const hyperdriveProgram = Effect.gen(function*() {
+  const hyperdrive = yield* AppHyperdrive
 
-  expectTypeOf(hyperdrive.connectionString).toEqualTypeOf<string>();
-  expectTypeOf(hyperdrive.rawUnsafe).toEqualTypeOf<Effect.Effect<globalThis.Hyperdrive>>();
-});
+  expectTypeOf(hyperdrive.connectionString).toEqualTypeOf<string>()
+  expectTypeOf(hyperdrive.rawUnsafe).toEqualTypeOf<Effect.Effect<globalThis.Hyperdrive>>()
+})
 
-expectTypeOf(HyperdrivePg.layer(AppHyperdrive, { binding: "HYPERDRIVE" })).toEqualTypeOf<
+expectTypeOf(HyperdrivePg.layer(AppHyperdrive, { binding: 'HYPERDRIVE' })).toEqualTypeOf<
   Layer.Layer<
     PgClient.PgClient | SqlClient.SqlClient,
     Binding.BindingNotFoundError | Binding.BindingValidationError | SqlError.SqlError,
     WorkerEnvironment
   >
->();
+>()
 
-HyperdrivePg.layer(AppHyperdrive, { binding: "HYPERDRIVE" }, { applicationName: "effect-cf" });
+HyperdrivePg.layer(AppHyperdrive, { binding: 'HYPERDRIVE' }, { applicationName: '@systemfsoftware/effect-cf' })
 
 // @ts-expect-error Hyperdrive owns database pooling, so app-side pool options are not exposed.
-HyperdrivePg.layer(AppHyperdrive, { binding: "HYPERDRIVE" }, { maxConnections: 4 });
+HyperdrivePg.layer(AppHyperdrive, { binding: 'HYPERDRIVE' }, { maxConnections: 4 })
 
-export class AvatarImages extends Images.Tag<AvatarImages>()("AvatarImages") {}
+export class AvatarImages extends Images.Tag<AvatarImages>()('AvatarImages') {}
 
 export const AvatarImagesLayer = AvatarImages.layer({
-  binding: "IMAGES",
-});
+  binding: 'IMAGES',
+})
 
-const imagesProgram = Effect.gen(function* () {
-  const images = yield* AvatarImages;
+const imagesProgram = Effect.gen(function*() {
+  const images = yield* AvatarImages
 
   expectTypeOf(images.info(new ReadableStream<Uint8Array>())).toEqualTypeOf<
     Effect.Effect<Images.ImageInfoResponse, Images.ImagesOperationError>
-  >();
+  >()
   expectTypeOf(images.info(new ArrayBuffer(0))).toEqualTypeOf<
     Effect.Effect<Images.ImageInfoResponse, Images.ImagesOperationError>
-  >();
+  >()
 
   expectTypeOf(
     images.process(Images.transform(Images.empty, { width: 128 }), {
       stream: new ArrayBuffer(0),
-      outputOptions: { format: "image/webp" },
+      outputOptions: { format: 'image/webp' },
     }),
   ).toEqualTypeOf<
     Effect.Effect<Images.ImagesTransformationResultClient, Images.ImagesOperationError>
-  >();
+  >()
 
-  expectTypeOf(images.hosted).toEqualTypeOf<Option.Option<Images.HostedImagesClient>>();
+  expectTypeOf(images.hosted).toEqualTypeOf<Option.Option<Images.HostedImagesClient>>()
   Option.map(images.hosted, (hosted) => {
-    expectTypeOf(hosted.upload(new ArrayBuffer(0), { id: "avatar-1" })).toEqualTypeOf<
+    expectTypeOf(hosted.upload(new ArrayBuffer(0), { id: 'avatar-1' })).toEqualTypeOf<
       Effect.Effect<Images.ImageMetadata, Images.ImagesOperationError>
-    >();
-  });
-});
+    >()
+  })
+})
 
-export class TransactionalEmail extends Email.Tag<TransactionalEmail>()("TransactionalEmail") {}
+export class TransactionalEmail extends Email.Tag<TransactionalEmail>()('TransactionalEmail') {}
 
-export const TransactionalEmailLayer = TransactionalEmail.layer({ binding: "EMAIL" });
+export const TransactionalEmailLayer = TransactionalEmail.layer({ binding: 'EMAIL' })
 
 export const UnvalidatedTransactionalEmailLayer = TransactionalEmail.layer({
-  binding: "EMAIL",
+  binding: 'EMAIL',
   send: { validate: false },
-});
+})
 
-expectTypeOf(UnvalidatedTransactionalEmailLayer).toEqualTypeOf(TransactionalEmailLayer);
+expectTypeOf(UnvalidatedTransactionalEmailLayer).toEqualTypeOf(TransactionalEmailLayer)
 
 expectTypeOf<Email.EmailSendError>().toEqualTypeOf<
   Email.EmailOperationError | Email.EmailValidationError
->();
+>()
 
-expectTypeOf<Email.EmailOperationError["code"]>().toEqualTypeOf<
+expectTypeOf<Email.EmailOperationError['code']>().toEqualTypeOf<
   Email.EmailErrorCode | (string & {}) | undefined
->();
+>()
 
-expectTypeOf(Email.validateMessage).returns.toEqualTypeOf<ReadonlyArray<Email.EmailViolation>>();
+expectTypeOf(Email.validateMessage).returns.toEqualTypeOf<ReadonlyArray<Email.EmailViolation>>()
 
-const emailProgram = Effect.gen(function* () {
-  const email = yield* TransactionalEmail;
+const emailProgram = Effect.gen(function*() {
+  const email = yield* TransactionalEmail
 
   expectTypeOf(
     email.send({
-      from: { name: "Example", email: "team@example.com" },
-      to: "user@example.com",
-      subject: "Welcome",
-      text: "Welcome to Example",
+      from: { name: 'Example', email: 'team@example.com' },
+      to: 'user@example.com',
+      subject: 'Welcome',
+      text: 'Welcome to Example',
     }),
-  ).toEqualTypeOf<Effect.Effect<Email.EmailSendResult, Email.EmailSendError>>();
+  ).toEqualTypeOf<Effect.Effect<Email.EmailSendResult, Email.EmailSendError>>()
 
   yield* email.send({
-    from: "team@example.com",
-    to: "user@example.com",
-    subject: "Welcome",
-    html: "<p>Welcome to Example</p>",
+    from: 'team@example.com',
+    to: 'user@example.com',
+    subject: 'Welcome',
+    html: '<p>Welcome to Example</p>',
     attachments: [
       {
-        disposition: "attachment",
-        filename: "welcome.txt",
-        type: "text/plain",
-        content: "Welcome",
+        disposition: 'attachment',
+        filename: 'welcome.txt',
+        type: 'text/plain',
+        content: 'Welcome',
       },
     ],
-  });
+  })
 
   // @ts-expect-error builder messages require a subject.
   yield* email.send({
-    from: "team@example.com",
-    to: "user@example.com",
-    text: "Welcome to Example",
-  });
-});
+    from: 'team@example.com',
+    to: 'user@example.com',
+    text: 'Welcome to Example',
+  })
+})
 
-export class Ai extends WorkersAi.Tag<Ai>()("Ai") {}
+export class Ai extends WorkersAi.Tag<Ai>()('Ai') {}
 
-export const AiLayer = Ai.layer({ binding: "AI" });
+export const AiLayer = Ai.layer({ binding: 'AI' })
 
-const workersAiProgram = Effect.gen(function* () {
-  const ai = yield* Ai;
+const workersAiProgram = Effect.gen(function*() {
+  const ai = yield* Ai
 
   expectTypeOf(
-    ai.run("@cf/qwen/qwen3-embedding-0.6b", {
-      text: "tomato soup",
+    ai.run('@cf/qwen/qwen3-embedding-0.6b', {
+      text: 'tomato soup',
     }),
   ).toEqualTypeOf<
     Effect.Effect<Ai_Cf_Qwen_Qwen3_Embedding_0_6B_Output, WorkersAi.WorkersAiOperationError>
-  >();
+  >()
 
   expectTypeOf(
-    ai.runEmbedding("@cf/qwen/qwen3-embedding-0.6b", {
-      text: "tomato soup",
+    ai.runEmbedding('@cf/qwen/qwen3-embedding-0.6b', {
+      text: 'tomato soup',
     }),
   ).toEqualTypeOf<
     Effect.Effect<WorkersAi.WorkersAiEmbeddingResponse, WorkersAi.WorkersAiOperationError>
-  >();
+  >()
 
-  expectTypeOf(ai.rawUnsafe).toEqualTypeOf<Effect.Effect<WorkersAi.WorkersAiBinding<AiModels>>>();
-});
+  expectTypeOf(ai.rawUnsafe).toEqualTypeOf<Effect.Effect<WorkersAi.WorkersAiBinding<AiModels>>>()
+})
 
-export class RecipeVectors extends Vectorize.Tag<RecipeVectors>()("RecipeVectors") {}
+export class RecipeVectors extends Vectorize.Tag<RecipeVectors>()('RecipeVectors') {}
 
-export const RecipeVectorsLayer = RecipeVectors.layer({ binding: "RECIPE_VECTORS" });
+export const RecipeVectorsLayer = RecipeVectors.layer({ binding: 'RECIPE_VECTORS' })
 
-const vectorizeProgram = Effect.gen(function* () {
-  const vectors = yield* RecipeVectors;
+const vectorizeProgram = Effect.gen(function*() {
+  const vectors = yield* RecipeVectors
 
   expectTypeOf(
     vectors.upsert([
       {
-        id: "recipe-1",
+        id: 'recipe-1',
         values: [0.1, 0.2],
-        namespace: "recipes",
-        metadata: { kind: "soup" },
+        namespace: 'recipes',
+        metadata: { kind: 'soup' },
       },
     ]),
-  ).toEqualTypeOf<Effect.Effect<Vectorize.VectorizeMutation, Vectorize.VectorizeOperationError>>();
+  ).toEqualTypeOf<Effect.Effect<Vectorize.VectorizeMutation, Vectorize.VectorizeOperationError>>()
 
   expectTypeOf(
     vectors.query([0.1, 0.2], {
       topK: 5,
-      namespace: "recipes",
-      returnMetadata: "all",
+      namespace: 'recipes',
+      returnMetadata: 'all',
       returnValues: true,
-      filter: { kind: "soup" },
+      filter: { kind: 'soup' },
     }),
-  ).toEqualTypeOf<Effect.Effect<Vectorize.VectorizeMatches, Vectorize.VectorizeOperationError>>();
-});
+  ).toEqualTypeOf<Effect.Effect<Vectorize.VectorizeMatches, Vectorize.VectorizeOperationError>>()
+})
 
-export class RequestAnalytics extends AnalyticsEngine.Tag<RequestAnalytics>()("RequestAnalytics") {}
+export class RequestAnalytics extends AnalyticsEngine.Tag<RequestAnalytics>()('RequestAnalytics') {}
 
 export const RequestAnalyticsLayer = RequestAnalytics.layer({
-  binding: "REQUEST_ANALYTICS",
-  write: { onInvalid: "drop" },
-});
+  binding: 'REQUEST_ANALYTICS',
+  write: { onInvalid: 'drop' },
+})
 
 export class RequestAnalyticsQuery extends AnalyticsEngine.QueryTag<RequestAnalyticsQuery>()(
-  "RequestAnalyticsQuery",
+  'RequestAnalyticsQuery',
 ) {}
 
 export const RequestAnalyticsQueryLayer = RequestAnalyticsQuery.layer({
-  accountId: "account-1",
-  apiToken: Redacted.make("secret-token"),
-});
+  accountId: 'account-1',
+  apiToken: Redacted.make('secret-token'),
+})
 
 export const RequestAnalyticsQueryFetchLayer = RequestAnalyticsQuery.layerFetch({
-  accountId: "account-1",
-  apiToken: Redacted.make("secret-token"),
-});
+  accountId: 'account-1',
+  apiToken: Redacted.make('secret-token'),
+})
 
 export const RequestAnalyticsQueryConfigLayer = RequestAnalyticsQuery.layerConfig(
   AnalyticsEngine.queryConfig({
-    accountId: Config.String("ACCOUNT_ID"),
-    apiToken: Config.Redacted("API_TOKEN"),
+    accountId: Config.String('ACCOUNT_ID'),
+    apiToken: Config.Redacted('API_TOKEN'),
   }),
-);
+)
 
 export const RequestAnalyticsQueryFetchConfigLayer = RequestAnalyticsQuery.layerFetchConfig(
   AnalyticsEngine.queryConfig({
-    accountId: Config.String("ACCOUNT_ID"),
-    apiToken: Config.Redacted("API_TOKEN"),
+    accountId: Config.String('ACCOUNT_ID'),
+    apiToken: Config.Redacted('API_TOKEN'),
   }),
-);
+)
 
-const analyticsEngineProgram = Effect.gen(function* () {
-  const analytics = yield* RequestAnalytics;
+const analyticsEngineProgram = Effect.gen(function*() {
+  const analytics = yield* RequestAnalytics
 
   expectTypeOf(
     analytics.writeDataPoint({
-      indexes: ["example.com"],
-      blobs: ["/home", "US", null],
+      indexes: ['example.com'],
+      blobs: ['/home', 'US', null],
       doubles: [1, 42],
     }),
-  ).toEqualTypeOf<Effect.Effect<void, AnalyticsEngine.AnalyticsEngineWriteError>>();
+  ).toEqualTypeOf<Effect.Effect<void, AnalyticsEngine.AnalyticsEngineWriteError>>()
 
   expectTypeOf(
-    analytics.writeDataPoint({ indexes: ["example.com"], blobs: ["/pricing"], doubles: [1] }),
-  ).toEqualTypeOf<Effect.Effect<void, AnalyticsEngine.AnalyticsEngineWriteError>>();
+    analytics.writeDataPoint({ indexes: ['example.com'], blobs: ['/pricing'], doubles: [1] }),
+  ).toEqualTypeOf<Effect.Effect<void, AnalyticsEngine.AnalyticsEngineWriteError>>()
 
   expectTypeOf(
     analytics.writeDataPoints(
       [
-        { indexes: ["example.com"], blobs: ["/pricing"], doubles: [1] },
-        { indexes: ["example.com"], blobs: ["/home"], doubles: [1] },
+        { indexes: ['example.com'], blobs: ['/pricing'], doubles: [1] },
+        { indexes: ['example.com'], blobs: ['/home'], doubles: [1] },
       ],
-      { onInvalid: "error" },
+      { onInvalid: 'error' },
     ),
-  ).toEqualTypeOf<Effect.Effect<void, AnalyticsEngine.AnalyticsEngineWriteError>>();
+  ).toEqualTypeOf<Effect.Effect<void, AnalyticsEngine.AnalyticsEngineWriteError>>()
 
   expectTypeOf(
-    analytics.writeDataPoints([{ indexes: ["example.com"], blobs: ["/pricing"], doubles: [1] }]),
-  ).toEqualTypeOf<Effect.Effect<void, AnalyticsEngine.AnalyticsEngineWriteError>>();
+    analytics.writeDataPoints([{ indexes: ['example.com'], blobs: ['/pricing'], doubles: [1] }]),
+  ).toEqualTypeOf<Effect.Effect<void, AnalyticsEngine.AnalyticsEngineWriteError>>()
 
   expectTypeOf(analytics.rawUnsafe).toEqualTypeOf<
     Effect.Effect<AnalyticsEngine.AnalyticsEngineBinding>
-  >();
+  >()
 
   // @ts-expect-error doubles only accept numbers.
-  yield* analytics.writeDataPoint({ doubles: ["1"] });
+  yield* analytics.writeDataPoint({ doubles: ['1'] })
 
   // @ts-expect-error only known invalid-write policies are accepted.
-  yield* analytics.writeDataPoint({ doubles: [1] }, { onInvalid: "ignore" });
-});
+  yield* analytics.writeDataPoint({ doubles: [1] }, { onInvalid: 'ignore' })
+})
 
-const analyticsEngineQueryProgram = Effect.gen(function* () {
-  const query = yield* RequestAnalyticsQuery;
+const analyticsEngineQueryProgram = Effect.gen(function*() {
+  const query = yield* RequestAnalyticsQuery
   const row = Schema.Struct({
     path: Schema.String,
     views: Schema.Finite,
-  });
+  })
 
-  expectTypeOf(query.query("SHOW TABLES")).toEqualTypeOf<
+  expectTypeOf(query.query('SHOW TABLES')).toEqualTypeOf<
     Effect.Effect<
       AnalyticsEngine.AnalyticsEngineQueryResult,
       AnalyticsEngine.AnalyticsEngineQueryError | Schema.SchemaError
     >
-  >();
+  >()
 
   expectTypeOf(
-    query.queryRows(row, "SELECT blob1 AS path, double1 AS views FROM requests"),
+    query.queryRows(row, 'SELECT blob1 AS path, double1 AS views FROM requests'),
   ).toEqualTypeOf<
     Effect.Effect<
       ReadonlyArray<{ readonly path: string; readonly views: number }>,
       AnalyticsEngine.AnalyticsEngineQueryError | Schema.SchemaError
     >
-  >();
+  >()
 
   expectTypeOf(
-    query.queryOne(row, "SELECT blob1 AS path, double1 AS views FROM requests LIMIT 1"),
+    query.queryOne(row, 'SELECT blob1 AS path, double1 AS views FROM requests LIMIT 1'),
   ).toEqualTypeOf<
     Effect.Effect<
       Option.Option<{ readonly path: string; readonly views: number }>,
       AnalyticsEngine.AnalyticsEngineQueryError | Schema.SchemaError
     >
-  >();
+  >()
 
-  expectTypeOf(query.queryText("SHOW TABLES FORMAT TabSeparated")).toEqualTypeOf<
+  expectTypeOf(query.queryText('SHOW TABLES FORMAT TabSeparated')).toEqualTypeOf<
     Effect.Effect<string, AnalyticsEngine.AnalyticsEngineQueryError>
-  >();
-});
+  >()
+})
 
 expectTypeOf(
   AnalyticsEngine.makeQueryClient({
-    accountId: "account-1",
-    apiToken: Redacted.make("secret-token"),
+    accountId: 'account-1',
+    apiToken: Redacted.make('secret-token'),
   }),
 ).toEqualTypeOf<
   Effect.Effect<AnalyticsEngine.AnalyticsEngineQueryClient, never, HttpClient.HttpClient>
->();
+>()
 
 expectTypeOf(RequestAnalyticsQueryLayer).toEqualTypeOf<
   Layer.Layer<RequestAnalyticsQuery, never, HttpClient.HttpClient>
->();
+>()
 
-expectTypeOf(RequestAnalyticsQueryFetchLayer).toEqualTypeOf<Layer.Layer<RequestAnalyticsQuery>>();
+expectTypeOf(RequestAnalyticsQueryFetchLayer).toEqualTypeOf<Layer.Layer<RequestAnalyticsQuery>>()
 
 expectTypeOf(RequestAnalyticsQueryConfigLayer).toEqualTypeOf<
   Layer.Layer<RequestAnalyticsQuery, Config.ConfigError, HttpClient.HttpClient>
->();
+>()
 
 expectTypeOf(RequestAnalyticsQueryFetchConfigLayer).toEqualTypeOf<
   Layer.Layer<RequestAnalyticsQuery, Config.ConfigError>
->();
+>()
 
-export class Gateway extends AiGateway.Tag<Gateway>()("Gateway") {}
+export class Gateway extends AiGateway.Tag<Gateway>()('Gateway') {}
 
-export const GatewayLayer = Gateway.layer({ binding: "AI", gatewayId: "default" });
+export const GatewayLayer = Gateway.layer({ binding: 'AI', gatewayId: 'default' })
 
-const aiGatewayProgram = Effect.gen(function* () {
-  const gateway = yield* Gateway;
+const aiGatewayProgram = Effect.gen(function*() {
+  const gateway = yield* Gateway
 
   expectTypeOf(
     gateway.run({
-      provider: "workers-ai",
-      endpoint: "@cf/meta/llama-3.1-8b-instruct",
+      provider: 'workers-ai',
+      endpoint: '@cf/meta/llama-3.1-8b-instruct',
       headers: {},
-      query: { prompt: "hello" },
+      query: { prompt: 'hello' },
     }),
-  ).toEqualTypeOf<Effect.Effect<Response, AiGateway.AiGatewayOperationError>>();
+  ).toEqualTypeOf<Effect.Effect<Response, AiGateway.AiGatewayOperationError>>()
 
-  expectTypeOf(gateway.getUrl("openai")).toEqualTypeOf<
+  expectTypeOf(gateway.getUrl('openai')).toEqualTypeOf<
     Effect.Effect<string, AiGateway.AiGatewayOperationError>
-  >();
-});
+  >()
+})
 
-export class Browser extends BrowserRendering.Tag<Browser>()("Browser") {}
+export class Browser extends BrowserRendering.Tag<Browser>()('Browser') {}
 
-export const BrowserLayer = Browser.layer({ binding: "MYBROWSER" });
+export const BrowserLayer = Browser.layer({ binding: 'MYBROWSER' })
 
 declare const launch: BrowserRendering.BrowserRenderingLaunch<
   BrowserRendering.BrowserRenderingBinding,
   BrowserRendering.BrowserRenderingBrowserLike
->;
+>
 
-const browserRenderingProgram = Effect.gen(function* () {
-  const rendering = yield* Browser;
+const browserRenderingProgram = Effect.gen(function*() {
+  const rendering = yield* Browser
 
   expectTypeOf(rendering.launchWith(launch)).toEqualTypeOf<
     Effect.Effect<
@@ -585,42 +585,42 @@ const browserRenderingProgram = Effect.gen(function* () {
       >,
       BrowserRendering.BrowserRenderingOperationError
     >
-  >();
-});
+  >()
+})
 
 // @ts-expect-error optional driver integrations stay behind subpath exports.
-expectTypeOf(EffectCf.HyperdrivePg).toBeNever();
+expectTypeOf(EffectCf.HyperdrivePg).toBeNever()
 
-export class SessionKv extends Kv.Tag<SessionKv>()("SessionKv", {
+export class SessionKv extends Kv.Tag<SessionKv>()('SessionKv', {
   key: Schema.String,
   value: Schema.Struct({ count: Schema.Finite }),
 }) {}
 
 export const SessionKvLayer = SessionKv.layer({
-  binding: "SESSION_KV",
-});
+  binding: 'SESSION_KV',
+})
 
-const kvProgram = Effect.gen(function* () {
-  const kv = yield* SessionKv;
+const kvProgram = Effect.gen(function*() {
+  const kv = yield* SessionKv
 
-  expectTypeOf(kv.get("session-1")).toEqualTypeOf<
+  expectTypeOf(kv.get('session-1')).toEqualTypeOf<
     Effect.Effect<
       Option.Option<{ readonly count: number }>,
       Kv.KvOperationError | Schema.SchemaError
     >
-  >();
+  >()
 
-  yield* kv.put("session-1", { count: 1 });
+  yield* kv.put('session-1', { count: 1 })
 
   // @ts-expect-error KV values use the decoded schema shape.
-  yield* kv.put("session-1", { count: "1" });
-});
+  yield* kv.put('session-1', { count: '1' })
+})
 
 const RpcReadableStream = Schema.declare(
   (value): value is ReadableStream<Uint8Array> => value instanceof ReadableStream,
-);
+)
 
-export class ApiWorker extends Worker.Tag<ApiWorker>()("ApiWorker", {
+export class ApiWorker extends Worker.Tag<ApiWorker>()('ApiWorker', {
   ping: Worker.method({
     args: [Schema.String] as const,
     success: Schema.String,
@@ -632,43 +632,43 @@ export class ApiWorker extends Worker.Tag<ApiWorker>()("ApiWorker", {
 }) {}
 
 export const ApiWorkerLayer = ApiWorker.layer({
-  binding: "API_WORKER",
-});
+  binding: 'API_WORKER',
+})
 
 export class FetchOnlyWorker extends ServiceBinding.Service<FetchOnlyWorker, {}>()(
-  "FetchOnlyWorker",
+  'FetchOnlyWorker',
   {
-    binding: "FETCH_ONLY_WORKER",
+    binding: 'FETCH_ONLY_WORKER',
   },
 ) {}
 
-export const FetchOnlyWorkerLayer = FetchOnlyWorker.layer;
+export const FetchOnlyWorkerLayer = FetchOnlyWorker.layer
 
-expectTypeOf(FetchOnlyWorker.fetch(new Request("https://example.com"))).toEqualTypeOf<
+expectTypeOf(FetchOnlyWorker.fetch(new Request('https://example.com'))).toEqualTypeOf<
   Effect.Effect<Response, ServiceBinding.ServiceBindingFetchError, FetchOnlyWorker>
->();
+>()
 
-const workerProgram = Effect.gen(function* () {
-  const worker = yield* ApiWorker;
+const workerProgram = Effect.gen(function*() {
+  const worker = yield* ApiWorker
 
-  expectTypeOf(ServiceBinding.httpClient(worker)).toEqualTypeOf<HttpClient.HttpClient>();
+  expectTypeOf(ServiceBinding.httpClient(worker)).toEqualTypeOf<HttpClient.HttpClient>()
 
-  expectTypeOf(worker.ping("hello")).toEqualTypeOf<
+  expectTypeOf(worker.ping('hello')).toEqualTypeOf<
     Effect.Effect<string, ServiceBinding.ServiceBindingRpcError>
-  >();
+  >()
 
-  yield* worker.ping("hello");
+  yield* worker.ping('hello')
 
   expectTypeOf(worker.upload(new ReadableStream())).toEqualTypeOf<
     Effect.Effect<Response, ServiceBinding.ServiceBindingRpcError>
-  >();
+  >()
 
   // @ts-expect-error Worker RPC arguments use the decoded schema shape.
-  yield* worker.ping(123);
-});
+  yield* worker.ping(123)
+})
 
 export class CounterDurableObject extends DurableObject.Tag<CounterDurableObject>()(
-  "CounterDurableObject",
+  'CounterDurableObject',
   {
     get: DurableObject.method({ success: Schema.Finite }),
     increment: DurableObject.method({
@@ -679,55 +679,57 @@ export class CounterDurableObject extends DurableObject.Tag<CounterDurableObject
 ) {}
 
 export const CounterDurableObjectLayer = CounterDurableObject.layer({
-  binding: "COUNTER_DURABLE_OBJECTS",
-});
+  binding: 'COUNTER_DURABLE_OBJECTS',
+})
 
-const durableObjectProgram = Effect.gen(function* () {
-  const namespace = yield* CounterDurableObject;
-  const counter = namespace.byName("counter-1");
-  const stub = yield* namespace.getByName("counter-1");
+const durableObjectProgram = Effect.gen(function*() {
+  const namespace = yield* CounterDurableObject
+  const counter = namespace.byName('counter-1')
+  const stub = yield* namespace.getByName('counter-1')
 
   expectTypeOf(counter.get()).toEqualTypeOf<
     Effect.Effect<number, DurableObjectNamespace.DurableObjectRpcError>
-  >();
+  >()
 
   const counterRpcResult: Effect.Effect<
     Rpc.Result<number>,
     DurableObjectNamespace.DurableObjectRpcError,
     CounterDurableObject
-  > = CounterDurableObject.rpc(stub, "get");
+  > = CounterDurableObject.rpc(stub, 'get')
 
-  yield* counter.get();
+  yield* counter.get()
 
   // @ts-expect-error Durable Object RPC method names come from the definition.
-  yield* counter.missing();
+  yield* counter.missing()
 
-  void counterRpcResult;
-});
+  void counterRpcResult
+})
 
 // @ts-expect-error CounterDurableObject.layer must be provided before the program can run.
 // @effect-diagnostics-next-line missingEffectContext:off
-const missingDurableObjectLayer: Effect.Effect<void, unknown, never> = durableObjectProgram;
+const missingDurableObjectLayer: Effect.Effect<void, unknown, never> = durableObjectProgram
 
-declare const counterStub: Effect.Success<ReturnType<typeof CounterDurableObject.getByName>>;
+declare const counterStub: Effect.Success<ReturnType<typeof CounterDurableObject.getByName>>
 
 // @ts-expect-error Static direct methods require the namespace layer.
 // @effect-diagnostics-next-line missingEffectContext:off
-const staticDirectMethodWithoutLayer: Effect.Effect<number, unknown, never> =
-  CounterDurableObject.increment(counterStub, 1);
+const staticDirectMethodWithoutLayer: Effect.Effect<number, unknown, never> = CounterDurableObject.increment(
+  counterStub,
+  1,
+)
 
-void kvProgram;
-void r2Program;
-void hyperdriveProgram;
-void imagesProgram;
-void emailProgram;
-void workersAiProgram;
-void vectorizeProgram;
-void analyticsEngineProgram;
-void analyticsEngineQueryProgram;
-void aiGatewayProgram;
-void browserRenderingProgram;
-void workerProgram;
-void durableObjectProgram;
-void missingDurableObjectLayer;
-void staticDirectMethodWithoutLayer;
+void kvProgram
+void r2Program
+void hyperdriveProgram
+void imagesProgram
+void emailProgram
+void workersAiProgram
+void vectorizeProgram
+void analyticsEngineProgram
+void analyticsEngineQueryProgram
+void aiGatewayProgram
+void browserRenderingProgram
+void workerProgram
+void durableObjectProgram
+void missingDurableObjectLayer
+void staticDirectMethodWithoutLayer

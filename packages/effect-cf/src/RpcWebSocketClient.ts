@@ -1,18 +1,18 @@
-import type * as Context from "effect/Context";
-import * as Layer from "effect/Layer";
-import type * as Rpc from "effect/rpc/Rpc";
-import * as RpcClient from "effect/rpc/RpcClient";
-import type { RpcClientError } from "effect/rpc/RpcClientError";
-import type * as RpcGroup from "effect/rpc/RpcGroup";
-import * as RpcSerialization from "effect/rpc/RpcSerialization";
-import * as Socket from "effect/socket/Socket";
+import type * as Context from 'effect/Context'
+import * as Layer from 'effect/Layer'
+import type * as Rpc from 'effect/rpc/Rpc'
+import * as RpcClient from 'effect/rpc/RpcClient'
+import type { RpcClientError } from 'effect/rpc/RpcClientError'
+import type * as RpcGroup from 'effect/rpc/RpcGroup'
+import * as RpcSerialization from 'effect/rpc/RpcSerialization'
+import * as Socket from 'effect/socket/Socket'
 
 export interface LayerOptions {
-  readonly socket?: Parameters<typeof Socket.layerWebSocket>[1];
-  readonly protocol?: Parameters<typeof RpcClient.layerProtocolSocket>[0];
-  readonly client?: Omit<NonNullable<Parameters<typeof RpcClient.make>[1]>, "flatten">;
+  readonly socket?: Parameters<typeof Socket.layerWebSocket>[1]
+  readonly protocol?: Parameters<typeof RpcClient.layerProtocolSocket>[0]
+  readonly client?: Omit<NonNullable<Parameters<typeof RpcClient.make>[1]>, 'flatten'>
   /** Must match the server's serialization. Defaults to Effect RPC JSON. */
-  readonly serialization?: RpcSerialization.RpcSerialization["Service"] | undefined;
+  readonly serialization?: RpcSerialization.RpcSerialization['Service'] | undefined
 }
 
 /**
@@ -42,4 +42,4 @@ export const layer = <I, Rpcs extends Rpc.Any>(
         ),
       ),
     ),
-  );
+  )

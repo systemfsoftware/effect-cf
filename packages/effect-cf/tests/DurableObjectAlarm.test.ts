@@ -1,240 +1,232 @@
-import { DatabaseSync } from "node:sqlite";
-import * as NodeCrypto from "@effect/platform-node/NodeCrypto";
-import { assert, expect, it, test } from "@effect/vitest";
-import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Schema } from "effect";
-import { TestClock } from "effect/testing";
+import * as NodeCrypto from '@effect/platform-node/NodeCrypto'
+import { assert, expect, it, test } from '@effect/vitest'
+import { Cause, Context, DateTime, Deferred, Effect, Exit, Fiber, Layer, Schema } from 'effect'
+import { TestClock } from 'effect/testing'
+import { DatabaseSync } from 'node:sqlite'
 
-import {
-  DurableObject,
-  DurableObjectAlarm,
-  DurableObjectState,
-  DurableObjectStorage,
-} from "../src/index";
-import { makePartialTestDouble } from "./TestDoubles";
+import { DurableObject, DurableObjectAlarm, DurableObjectState, DurableObjectStorage } from '../src/index'
+import { makePartialTestDouble } from './TestDoubles'
 
-const Application = Context.Service<{ readonly result: number }>("test/AlarmApplication");
-const maintenanceRef = { tag: "maintenance", id: "maintenance" } as const;
-const maintenanceInput = (runAt: DateTime.Utc) => ({ ...maintenanceRef, payload: null, runAt });
+const Application = Context.Service<{ readonly result: number }>('test/AlarmApplication')
+const maintenanceRef = { tag: 'maintenance', id: 'maintenance' } as const
+const maintenanceInput = (runAt: DateTime.Utc) => ({ ...maintenanceRef, payload: null, runAt })
 
-class Maintenance extends DurableObjectAlarm.Tag<Maintenance>()("test/Maintenance", {
-  maintenance: { payload: Schema.Null, lifecycle: "manual" },
+class Maintenance extends DurableObjectAlarm.Tag<Maintenance>()('test/Maintenance', {
+  maintenance: { payload: Schema.Null, lifecycle: 'manual' },
 }) {}
 const writeJob = (storage: DurableObjectStorage.DurableObjectStorage, status: string) =>
   storage.sql.exec(
-    "INSERT OR REPLACE INTO application_jobs (id, status) VALUES (?, ?)",
-    "job",
+    'INSERT OR REPLACE INTO application_jobs (id, status) VALUES (?, ?)',
+    'job',
     status,
-  );
+  )
 
-test("DurableObject.make supplies application-layer configuration to its shared scheduler", async () => {
-  const fixture = makeAlarmFixture();
+test('DurableObject.make supplies application-layer configuration to its shared scheduler', async () => {
+  const fixture = makeAlarmFixture()
   const ObjectWithPolicy = DurableObject.make(
     Layer.succeed(DurableObjectAlarm.ScheduleConfiguration, {
       unchangedAttemptBudget: 1,
-      minimumRepeatInterval: "10 seconds",
+      minimumRepeatInterval: '10 seconds',
     }),
     {
       rpc: {
-        run: Effect.fnUntraced(function* () {
-          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+        run: Effect.fnUntraced(function*() {
+          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
           yield* alarms.scheduleAlarm({
-            tag: "job",
-            id: "a",
+            tag: 'job',
+            id: 'a',
             payload: null,
             runAt: atMillis(0),
-            repeatEvery: "10 seconds",
-          });
-          yield* alarms.processDueAlarms(() => Effect.fail("failed"));
+            repeatEvery: '10 seconds',
+          })
+          yield* alarms.processDueAlarms(() => Effect.fail('failed'))
 
-          return yield* alarms.getAlarmStatus({ tag: "job", id: "a" });
+          return yield* alarms.getAlarmStatus({ tag: 'job', id: 'a' })
         }),
       },
     },
-  );
-  const instance = new ObjectWithPolicy(fixture.state, {});
-  const status = await instance.run();
+  )
+  const instance = new ObjectWithPolicy(fixture.state, {})
+  const status = await instance.run()
 
-  expect(status).toMatchObject({ attempts: 1, parked: true });
-});
+  expect(status).toMatchObject({ attempts: 1, parked: true })
+})
 
-it.effect.each(["schedule", "defer"] as const)(
-  "rejects %s from a detached handler fiber after the pass completes",
+it.effect.each(['schedule', 'defer'] as const)(
+  'rejects %s from a detached handler fiber after the pass completes',
   (operation) =>
-    Effect.gen(function* () {
-      const fixture = makeAlarmFixture();
+    Effect.gen(function*() {
+      const fixture = makeAlarmFixture()
 
       yield* fixture.run(
-        Effect.gen(function* () {
-          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
-          const release = yield* Deferred.make<void>();
-          const input = { tag: "job", id: "a", payload: null, runAt: atMillis(0) };
-          const fibers: Fiber.Fiber<void, DurableObjectAlarm.DurableObjectAlarmError>[] = [];
+        Effect.gen(function*() {
+          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
+          const release = yield* Deferred.make<void>()
+          const input = { tag: 'job', id: 'a', payload: null, runAt: atMillis(0) }
+          const fibers: Fiber.Fiber<void, DurableObjectAlarm.DurableObjectAlarmError>[] = []
 
-          yield* alarms.scheduleAlarm(input);
+          yield* alarms.scheduleAlarm(input)
           yield* alarms.processDueAlarms(() =>
-            Effect.gen(function* () {
+            Effect.gen(function*() {
               fibers.push(
                 yield* Effect.forkChild(
                   Deferred.await(release).pipe(
                     Effect.andThen(
-                      operation === "schedule"
+                      operation === 'schedule'
                         ? alarms.scheduleAlarm(input)
                         : alarms.deferWakes(Effect.void),
                     ),
                   ),
                 ),
-              );
-            }),
-          );
-          yield* Deferred.succeed(release, undefined);
-          const error = yield* Fiber.join(fibers[0]!).pipe(Effect.flip);
+              )
+            })
+          )
+          yield* Deferred.succeed(release, undefined)
+          const error = yield* Fiber.join(fibers[0]!).pipe(Effect.flip)
 
-          assert.strictEqual(error._tag, "StorageOperationError");
-          assert.isUndefined(yield* alarms.getAlarmStatus(input));
-          assert.isNull(fixture.currentAlarm());
+          assert.strictEqual(error._tag, 'StorageOperationError')
+          assert.isUndefined(yield* alarms.getAlarmStatus(input))
+          assert.isNull(fixture.currentAlarm())
         }),
-      );
+      )
     }),
-);
+)
 
-it.effect.each(["scheduleAlarm", "scheduleAlarmEarlier", "cancelAlarm"] as const)(
-  "rejects %s from an expired handler in an admitted transaction",
+it.effect.each(['scheduleAlarm', 'scheduleAlarmEarlier', 'cancelAlarm'] as const)(
+  'rejects %s from an expired handler in an admitted transaction',
   (mutation) =>
-    Effect.gen(function* () {
-      const acknowledged = Promise.withResolvers<void>();
-      let acknowledgementCall = Number.POSITIVE_INFINITY;
+    Effect.gen(function*() {
+      const acknowledged = Promise.withResolvers<void>()
+      let acknowledgementCall = Number.POSITIVE_INFINITY
       const fixture = makeAlarmFixture({
         onTransaction: (calls) => {
-          if (calls === acknowledgementCall) acknowledged.resolve();
+          if (calls === acknowledgementCall) acknowledged.resolve()
         },
-      });
+      })
 
       yield* fixture.run(
-        Effect.gen(function* () {
-          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
-          const entered = yield* Deferred.make<void>();
-          const release = yield* Deferred.make<void>();
-          const input = { tag: "job", id: "a", payload: null, runAt: atMillis(0) };
-          const future = { ...input, id: "future", runAt: atMillis(1_000) };
-          const fibers: Fiber.Fiber<void, DurableObjectAlarm.DurableObjectAlarmError>[] = [];
+        Effect.gen(function*() {
+          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
+          const entered = yield* Deferred.make<void>()
+          const release = yield* Deferred.make<void>()
+          const input = { tag: 'job', id: 'a', payload: null, runAt: atMillis(0) }
+          const future = { ...input, id: 'future', runAt: atMillis(1_000) }
+          const fibers: Fiber.Fiber<void, DurableObjectAlarm.DurableObjectAlarmError>[] = []
 
-          yield* alarms.transaction((tx) =>
-            tx.scheduleAlarm(input).pipe(Effect.andThen(tx.scheduleAlarm(future))),
-          );
+          yield* alarms.transaction((tx) => tx.scheduleAlarm(input).pipe(Effect.andThen(tx.scheduleAlarm(future))))
           // The child owns the next transaction; acknowledgement queues behind it only
           // after the handler lifetime has ended. This is the release barrier.
-          acknowledgementCall = fixture.tracker.transactionCalls + 2;
+          acknowledgementCall = fixture.tracker.transactionCalls + 2
           const processing = yield* alarms
             .processDueAlarms(() =>
-              Effect.gen(function* () {
+              Effect.gen(function*() {
                 fibers.push(
                   yield* alarms
                     .transaction((tx) =>
-                      Effect.gen(function* () {
-                        yield* Deferred.succeed(entered, undefined);
-                        yield* Deferred.await(release);
-                        yield* tx[mutation](mutation === "cancelAlarm" ? future : input);
-                      }),
+                      Effect.gen(function*() {
+                        yield* Deferred.succeed(entered, undefined)
+                        yield* Deferred.await(release)
+                        yield* tx[mutation](mutation === 'cancelAlarm' ? future : input)
+                      })
                     )
                     .pipe(Effect.forkChild),
-                );
-                yield* Deferred.await(entered);
-              }),
+                )
+                yield* Deferred.await(entered)
+              })
             )
-            .pipe(Effect.forkChild);
+            .pipe(Effect.forkChild)
 
-          yield* Effect.gen(function* () {
-            yield* Effect.promise(() => acknowledged.promise);
-            yield* Deferred.succeed(release, undefined);
-            const result = yield* Fiber.join(fibers[0]!).pipe(Effect.exit);
+          yield* Effect.gen(function*() {
+            yield* Effect.promise(() => acknowledged.promise)
+            yield* Deferred.succeed(release, undefined)
+            const result = yield* Fiber.join(fibers[0]!).pipe(Effect.exit)
 
-            assert.isTrue(Exit.isFailure(result));
+            assert.isTrue(Exit.isFailure(result))
             if (Exit.isFailure(result)) {
               assert.instanceOf(
                 Cause.squash(result.cause),
                 DurableObjectStorage.StorageOperationError,
-              );
+              )
             }
-            yield* Fiber.join(processing);
-            assert.isUndefined(yield* alarms.getAlarmStatus(input));
+            yield* Fiber.join(processing)
+            assert.isUndefined(yield* alarms.getAlarmStatus(input))
             assert.strictEqual(
               DateTime.toEpochMillis((yield* alarms.getAlarmStatus(future))!.runAt),
               1_000,
-            );
-            assert.strictEqual(fixture.currentAlarm(), 1_000);
-            assert.strictEqual(fixture.tracker.transactionRollbacks, 1);
-          }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)));
+            )
+            assert.strictEqual(fixture.currentAlarm(), 1_000)
+            assert.strictEqual(fixture.tracker.transactionRollbacks, 1)
+          }).pipe(Effect.ensuring(Deferred.succeed(release, undefined)))
         }),
-      );
+      )
     }),
-);
+)
 
 it.effect("rolls back a failure's retry budget when native reconciliation fails", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
-        const input = { tag: "job", id: "a", payload: null, runAt: atMillis(0) };
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
+        const input = { tag: 'job', id: 'a', payload: null, runAt: atMillis(0) }
 
-        yield* alarms.scheduleAlarm(input);
-        fixture.failNextSetAlarm();
-        const exit = yield* alarms.processDueAlarms(() => Effect.fail("fail")).pipe(Effect.exit);
+        yield* alarms.scheduleAlarm(input)
+        fixture.failNextSetAlarm()
+        const exit = yield* alarms.processDueAlarms(() => Effect.fail('fail')).pipe(Effect.exit)
 
-        assert.isTrue(Exit.isFailure(exit));
-        assert.strictEqual((yield* alarms.getAlarmStatus(input))!.attempts, 0);
-        assert.isUndefined((yield* alarms.getAlarmStatus(input))!.retryAt);
-        assert.strictEqual(fixture.currentAlarm(), 0);
+        assert.isTrue(Exit.isFailure(exit))
+        assert.strictEqual((yield* alarms.getAlarmStatus(input))!.attempts, 0)
+        assert.isUndefined((yield* alarms.getAlarmStatus(input))!.retryAt)
+        assert.strictEqual(fixture.currentAlarm(), 0)
       }),
-    );
-  }),
-);
+    )
+  }))
 
-it.effect("resets a successful repeat atomically after parked recovery", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('resets a successful repeat atomically after parked recovery', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
         const input = {
-          tag: "heartbeat",
-          id: "room",
-          payload: { room: "example" },
+          tag: 'heartbeat',
+          id: 'room',
+          payload: { room: 'example' },
           runAt: atMillis(0),
-          repeatEvery: "1 minute" as const,
+          repeatEvery: '1 minute' as const,
           progress: 7,
-        };
+        }
 
-        yield* alarms.scheduleAlarm(input);
+        yield* alarms.scheduleAlarm(input)
         yield* alarms
-          .processDueAlarms(() => Effect.fail("unavailable"))
+          .processDueAlarms(() => Effect.fail('unavailable'))
           .pipe(
             Effect.provideService(DurableObjectAlarm.ScheduleConfiguration, {
               unchangedAttemptBudget: 1,
             }),
-          );
-        const parked = fixture.row(input.tag, input.id)!;
+          )
+        const parked = fixture.row(input.tag, input.id)!
 
-        assert.strictEqual(parked.attempts, 1);
-        assert.strictEqual(parked.parked, 1);
-        assert.strictEqual(parked.retry_at, 3_600_000);
-        yield* TestClock.setTime(3_600_000);
-        fixture.failNextSetAlarm();
-        const rejected = yield* alarms.processDueAlarms(() => Effect.void).pipe(Effect.exit);
+        assert.strictEqual(parked.attempts, 1)
+        assert.strictEqual(parked.parked, 1)
+        assert.strictEqual(parked.retry_at, 3_600_000)
+        yield* TestClock.setTime(3_600_000)
+        fixture.failNextSetAlarm()
+        const rejected = yield* alarms.processDueAlarms(() => Effect.void).pipe(Effect.exit)
 
-        assert.isTrue(Exit.isFailure(rejected));
-        assert.deepStrictEqual(fixture.row(input.tag, input.id), parked);
-        assert.strictEqual(fixture.currentAlarm(), 3_600_000);
-        assert.strictEqual(fixture.tracker.transactionRollbacks, 1);
-        const result = yield* alarms.processDueAlarms(() => Effect.void);
-        const next = fixture.row(input.tag, input.id)!;
+        assert.isTrue(Exit.isFailure(rejected))
+        assert.deepStrictEqual(fixture.row(input.tag, input.id), parked)
+        assert.strictEqual(fixture.currentAlarm(), 3_600_000)
+        assert.strictEqual(fixture.tracker.transactionRollbacks, 1)
+        const result = yield* alarms.processDueAlarms(() => Effect.void)
+        const next = fixture.row(input.tag, input.id)!
 
-        assert.strictEqual(result.handled.length, 1);
-        assert.deepStrictEqual(result.failed, []);
-        assert.notStrictEqual(next.revision, parked.revision);
+        assert.strictEqual(result.handled.length, 1)
+        assert.deepStrictEqual(result.failed, [])
+        assert.notStrictEqual(next.revision, parked.revision)
         assert.deepStrictEqual(
           { ...next },
           {
@@ -246,186 +238,184 @@ it.effect("resets a successful repeat atomically after parked recovery", () =>
             parked: 0,
             retry_at: null,
           },
-        );
-        assert.strictEqual(fixture.currentAlarm(), 3_660_000);
+        )
+        assert.strictEqual(fixture.currentAlarm(), 3_660_000)
       }),
-    );
-  }),
-);
+    )
+  }))
 
 it.effect(
-  "deferred work cannot start without a guard and survives failed exit reconciliation",
+  'deferred work cannot start without a guard and survives failed exit reconciliation',
   () =>
-    Effect.gen(function* () {
-      const fixture = makeAlarmFixture();
+    Effect.gen(function*() {
+      const fixture = makeAlarmFixture()
 
       yield* fixture.run(
-        Effect.gen(function* () {
-          const maintenance = yield* Maintenance;
+        Effect.gen(function*() {
+          const maintenance = yield* Maintenance
 
-          fixture.failNextSetAlarm();
+          fixture.failNextSetAlarm()
           const rejected = yield* maintenance
-            .deferWakes(writeJob(fixture.storage, "unsafe"))
-            .pipe(Effect.exit);
+            .deferWakes(writeJob(fixture.storage, 'unsafe'))
+            .pipe(Effect.exit)
 
-          assert.isTrue(Exit.isFailure(rejected));
-          assert.isUndefined(fixture.job("job"));
-          assert.isNull(fixture.currentAlarm());
+          assert.isTrue(Exit.isFailure(rejected))
+          assert.isUndefined(fixture.job('job'))
+          assert.isNull(fixture.currentAlarm())
 
           const failedFlush = yield* maintenance
             .deferWakes(
-              Effect.gen(function* () {
+              Effect.gen(function*() {
                 yield* maintenance.transaction((tx) =>
-                  Effect.gen(function* () {
-                    yield* tx.scheduleAlarm(maintenanceInput(atMillis(1_000)));
-                    yield* writeJob(fixture.storage, "ready");
-                  }),
-                );
-                yield* maintenance.scheduleAlarmEarlier(maintenanceInput(atMillis(500)));
-                yield* maintenance.scheduleAlarmEarlier(maintenanceInput(atMillis(250)));
-                assert.deepStrictEqual(fixture.tracker.setAlarms, [1_000]);
-                fixture.failNextSetAlarm();
+                  Effect.gen(function*() {
+                    yield* tx.scheduleAlarm(maintenanceInput(atMillis(1_000)))
+                    yield* writeJob(fixture.storage, 'ready')
+                  })
+                )
+                yield* maintenance.scheduleAlarmEarlier(maintenanceInput(atMillis(500)))
+                yield* maintenance.scheduleAlarmEarlier(maintenanceInput(atMillis(250)))
+                assert.deepStrictEqual(fixture.tracker.setAlarms, [1_000])
+                fixture.failNextSetAlarm()
               }),
             )
-            .pipe(Effect.exit);
+            .pipe(Effect.exit)
 
-          assert.isTrue(Exit.isFailure(failedFlush));
-          assert.strictEqual(fixture.job("job"), "ready");
+          assert.isTrue(Exit.isFailure(failedFlush))
+          assert.strictEqual(fixture.job('job'), 'ready')
           assert.strictEqual(
             DateTime.toEpochMillis((yield* maintenance.getAlarmStatus(maintenanceRef))!.runAt),
             250,
-          );
-          assert.strictEqual(fixture.currentAlarm(), 1_000);
-          yield* maintenance.deferWakes(Effect.void);
-          assert.strictEqual(fixture.currentAlarm(), 250);
-          assert.deepStrictEqual(fixture.tracker.setAlarms, [1_000, 250]);
+          )
+          assert.strictEqual(fixture.currentAlarm(), 1_000)
+          yield* maintenance.deferWakes(Effect.void)
+          assert.strictEqual(fixture.currentAlarm(), 250)
+          assert.deepStrictEqual(fixture.tracker.setAlarms, [1_000, 250])
         }).pipe(Effect.provide(Maintenance.handlers({ maintenance: () => Effect.void }).layer)),
-      );
+      )
     }),
-);
+)
 
-it.effect("commits application writes and mixed alarm mutations in one transaction", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('commits application writes and mixed alarm mutations in one transaction', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
         const result = yield* alarms
           .transaction((tx) =>
-            Effect.gen(function* () {
-              yield* writeJob(fixture.storage, "ready");
+            Effect.gen(function*() {
+              yield* writeJob(fixture.storage, 'ready')
               yield* tx.scheduleAlarm({
-                tag: "job",
-                id: "a",
+                tag: 'job',
+                id: 'a',
                 runAt: atMillis(2_000),
-                payload: "old",
-              });
+                payload: 'old',
+              })
               yield* tx.scheduleAlarm({
-                tag: "job",
-                id: "b",
+                tag: 'job',
+                id: 'b',
                 runAt: atMillis(1_000),
                 payload: null,
-              });
+              })
               yield* tx.scheduleAlarm({
-                tag: "job",
-                id: "a",
+                tag: 'job',
+                id: 'a',
                 runAt: atMillis(3_000),
-                payload: "new",
-              });
+                payload: 'new',
+              })
               yield* tx.scheduleAlarm({
-                tag: "other",
-                id: "a",
+                tag: 'other',
+                id: 'a',
                 runAt: atMillis(4_000),
                 payload: null,
-              });
-              yield* tx.cancelAlarm({ tag: "job", id: "b" });
+              })
+              yield* tx.cancelAlarm({ tag: 'job', id: 'b' })
 
-              return (yield* Application).result;
-            }),
+              return (yield* Application).result
+            })
           )
-          .pipe(Effect.provideService(Application, { result: 42 }));
+          .pipe(Effect.provideService(Application, { result: 42 }))
 
-        assert.strictEqual(result, 42);
-        assert.strictEqual(fixture.tracker.transactionCalls, 1);
-        assert.strictEqual(fixture.job("job"), "ready");
-        assert.strictEqual(fixture.row("job", "a")?.payload, '"new"');
-        assert.strictEqual(fixture.row("job", "b"), undefined);
-        assert.strictEqual(fixture.row("other", "a")?.run_at, 4_000);
-        assert.strictEqual(fixture.currentAlarm(), 3_000);
+        assert.strictEqual(result, 42)
+        assert.strictEqual(fixture.tracker.transactionCalls, 1)
+        assert.strictEqual(fixture.job('job'), 'ready')
+        assert.strictEqual(fixture.row('job', 'a')?.payload, '"new"')
+        assert.strictEqual(fixture.row('job', 'b'), undefined)
+        assert.strictEqual(fixture.row('other', 'a')?.run_at, 4_000)
+        assert.strictEqual(fixture.currentAlarm(), 3_000)
 
         yield* alarms.transaction((tx) =>
-          Effect.gen(function* () {
-            yield* writeJob(fixture.storage, "cancelled");
-            yield* tx.cancelAlarm({ tag: "job", id: "a" });
-            yield* tx.cancelAlarm({ tag: "other", id: "a" });
-          }),
-        );
+          Effect.gen(function*() {
+            yield* writeJob(fixture.storage, 'cancelled')
+            yield* tx.cancelAlarm({ tag: 'job', id: 'a' })
+            yield* tx.cancelAlarm({ tag: 'other', id: 'a' })
+          })
+        )
 
-        assert.strictEqual(fixture.job("job"), "cancelled");
-        assert.strictEqual(fixture.row("job", "a"), undefined);
-        assert.strictEqual(fixture.row("other", "a"), undefined);
-        assert.strictEqual(fixture.currentAlarm(), null);
+        assert.strictEqual(fixture.job('job'), 'cancelled')
+        assert.strictEqual(fixture.row('job', 'a'), undefined)
+        assert.strictEqual(fixture.row('other', 'a'), undefined)
+        assert.strictEqual(fixture.currentAlarm(), null)
       }),
-    );
-  }),
-);
+    )
+  }))
 
-it.effect.each(["typed failure", "defect"] as const)(
-  "rolls back application and alarm changes on %s",
+it.effect.each(['typed failure', 'defect'] as const)(
+  'rolls back application and alarm changes on %s',
   (kind) =>
-    Effect.gen(function* () {
-      const fixture = makeAlarmFixture();
-      const failure = new Error("caller failed");
+    Effect.gen(function*() {
+      const fixture = makeAlarmFixture()
+      const failure = new Error('caller failed')
 
       yield* fixture.run(
-        Effect.gen(function* () {
-          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+        Effect.gen(function*() {
+          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
-          yield* writeJob(fixture.storage, "before");
+          yield* writeJob(fixture.storage, 'before')
           yield* alarms.scheduleAlarm({
-            tag: "job",
-            id: "a",
+            tag: 'job',
+            id: 'a',
             runAt: atMillis(2_000),
-            payload: "before",
-          });
+            payload: 'before',
+          })
           const exit = yield* alarms
             .transaction((tx) =>
-              Effect.gen(function* () {
-                yield* writeJob(fixture.storage, "during");
-                yield* tx.cancelAlarm({ tag: "job", id: "a" });
+              Effect.gen(function*() {
+                yield* writeJob(fixture.storage, 'during')
+                yield* tx.cancelAlarm({ tag: 'job', id: 'a' })
                 yield* tx.scheduleAlarm({
-                  tag: "job",
-                  id: "b",
+                  tag: 'job',
+                  id: 'b',
                   runAt: atMillis(1_000),
                   payload: null,
-                });
+                })
 
-                return yield* kind === "typed failure" ? Effect.fail(failure) : Effect.die(failure);
-              }),
+                return yield* kind === 'typed failure' ? Effect.fail(failure) : Effect.die(failure)
+              })
             )
-            .pipe(Effect.exit);
+            .pipe(Effect.exit)
 
-          assert.isTrue(Exit.isFailure(exit));
+          assert.isTrue(Exit.isFailure(exit))
           if (Exit.isFailure(exit)) {
-            assert.strictEqual(Cause.squash(exit.cause), failure);
-            assert.strictEqual(Cause.hasDies(exit.cause), kind === "defect");
+            assert.strictEqual(Cause.squash(exit.cause), failure)
+            assert.strictEqual(Cause.hasDies(exit.cause), kind === 'defect')
           }
-          assert.strictEqual(fixture.job("job"), "before");
-          assert.strictEqual(fixture.row("job", "a")?.payload, '"before"');
-          assert.strictEqual(fixture.row("job", "b"), undefined);
-          assert.strictEqual(fixture.currentAlarm(), 2_000);
-          assert.strictEqual(fixture.tracker.transactionRollbacks, 1);
+          assert.strictEqual(fixture.job('job'), 'before')
+          assert.strictEqual(fixture.row('job', 'a')?.payload, '"before"')
+          assert.strictEqual(fixture.row('job', 'b'), undefined)
+          assert.strictEqual(fixture.currentAlarm(), 2_000)
+          assert.strictEqual(fixture.tracker.transactionRollbacks, 1)
         }),
-      );
+      )
     }),
-);
+)
 
-it.effect("rolls back on interruption during native alarm reconciliation", () =>
-  Effect.gen(function* () {
-    const reconciled = yield* Deferred.make<void>();
-    const releaseNative = yield* Deferred.make<void>();
-    const context = yield* Effect.context<never>();
+it.effect('rolls back on interruption during native alarm reconciliation', () =>
+  Effect.gen(function*() {
+    const reconciled = yield* Deferred.make<void>()
+    const releaseNative = yield* Deferred.make<void>()
+    const context = yield* Effect.context<never>()
     const fixture = makeAlarmFixture({
       afterSetAlarm: () =>
         Effect.runPromiseWith(context)(
@@ -433,743 +423,733 @@ it.effect("rolls back on interruption during native alarm reconciliation", () =>
             Effect.andThen(Deferred.await(releaseNative)),
           ),
         ),
-    });
+    })
 
     const fiber = yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
         return yield* Effect.forkChild(
           alarms.transaction((tx) =>
-            Effect.gen(function* () {
-              yield* writeJob(fixture.storage, "during");
+            Effect.gen(function*() {
+              yield* writeJob(fixture.storage, 'during')
               yield* tx.scheduleAlarm({
-                tag: "job",
-                id: "a",
+                tag: 'job',
+                id: 'a',
                 runAt: atMillis(1_000),
                 payload: null,
-              });
-            }),
+              })
+            })
           ),
-        );
+        )
       }),
-    );
+    )
 
-    yield* Deferred.await(reconciled);
-    fiber.interruptUnsafe();
-    yield* Deferred.succeed(releaseNative, undefined);
-    const [exit] = yield* Fiber.awaitAll([fiber]);
+    yield* Deferred.await(reconciled)
+    fiber.interruptUnsafe()
+    yield* Deferred.succeed(releaseNative, undefined)
+    const [exit] = yield* Fiber.awaitAll([fiber])
 
-    assert.isTrue(Exit.isFailure(exit!));
+    assert.isTrue(Exit.isFailure(exit!))
     if (Exit.isFailure(exit!)) {
-      assert.isTrue(Cause.hasInterrupts(exit.cause));
+      assert.isTrue(Cause.hasInterrupts(exit.cause))
     }
-    assert.strictEqual(fixture.job("job"), undefined);
-    assert.strictEqual(fixture.row("job", "a"), undefined);
-    assert.strictEqual(fixture.currentAlarm(), null);
-    assert.strictEqual(fixture.tracker.transactionRollbacks, 1);
-  }),
-);
+    assert.strictEqual(fixture.job('job'), undefined)
+    assert.strictEqual(fixture.row('job', 'a'), undefined)
+    assert.strictEqual(fixture.currentAlarm(), null)
+    assert.strictEqual(fixture.tracker.transactionRollbacks, 1)
+  }))
 
-it.effect.each(["setAlarm", "deleteAlarm"] as const)(
-  "rolls back application writes when %s fails",
+it.effect.each(['setAlarm', 'deleteAlarm'] as const)(
+  'rolls back application writes when %s fails',
   (operation) =>
-    Effect.gen(function* () {
-      const fixture = makeAlarmFixture();
+    Effect.gen(function*() {
+      const fixture = makeAlarmFixture()
 
       yield* fixture.run(
-        Effect.gen(function* () {
-          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+        Effect.gen(function*() {
+          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
-          yield* writeJob(fixture.storage, "before");
+          yield* writeJob(fixture.storage, 'before')
           yield* alarms.scheduleAlarm({
-            tag: "job",
-            id: "a",
+            tag: 'job',
+            id: 'a',
             runAt: atMillis(2_000),
-            payload: "before",
-          });
-          if (operation === "setAlarm") {
-            fixture.failNextSetAlarm();
+            payload: 'before',
+          })
+          if (operation === 'setAlarm') {
+            fixture.failNextSetAlarm()
           } else {
-            fixture.failNextDeleteAlarm();
+            fixture.failNextDeleteAlarm()
           }
           const error = yield* alarms
             .transaction((tx) =>
-              Effect.gen(function* () {
-                yield* writeJob(fixture.storage, "during");
-                yield* tx.cancelAlarm({ tag: "job", id: "a" });
-                if (operation === "setAlarm") {
+              Effect.gen(function*() {
+                yield* writeJob(fixture.storage, 'during')
+                yield* tx.cancelAlarm({ tag: 'job', id: 'a' })
+                if (operation === 'setAlarm') {
                   yield* tx.scheduleAlarm({
-                    tag: "job",
-                    id: "b",
+                    tag: 'job',
+                    id: 'b',
                     runAt: atMillis(1_000),
                     payload: null,
-                  });
+                  })
                 }
-              }),
+              })
             )
-            .pipe(Effect.flip);
+            .pipe(Effect.flip)
 
-          assert.instanceOf(error, DurableObjectStorage.StorageOperationError);
-          assert.strictEqual(error.operation, operation);
-          assert.strictEqual(fixture.job("job"), "before");
-          assert.strictEqual(fixture.row("job", "a")?.payload, '"before"');
-          assert.strictEqual(fixture.row("job", "b"), undefined);
-          assert.strictEqual(fixture.currentAlarm(), 2_000);
+          assert.instanceOf(error, DurableObjectStorage.StorageOperationError)
+          assert.strictEqual(error.operation, operation)
+          assert.strictEqual(fixture.job('job'), 'before')
+          assert.strictEqual(fixture.row('job', 'a')?.payload, '"before"')
+          assert.strictEqual(fixture.row('job', 'b'), undefined)
+          assert.strictEqual(fixture.currentAlarm(), 2_000)
         }),
-      );
+      )
     }),
-);
+)
 
-it.effect.each(["lost reply", "interruption"] as const)(
-  "preserves committed state after %s",
+it.effect.each(['lost reply', 'interruption'] as const)(
+  'preserves committed state after %s',
   (kind) =>
-    Effect.gen(function* () {
-      const committed = yield* Deferred.make<void>();
-      const releaseReply = yield* Deferred.make<void>();
-      const context = yield* Effect.context<never>();
+    Effect.gen(function*() {
+      const committed = yield* Deferred.make<void>()
+      const releaseReply = yield* Deferred.make<void>()
+      const context = yield* Effect.context<never>()
       const fixture = makeAlarmFixture({
         afterCommit: () =>
           Effect.runPromiseWith(context)(
             Deferred.succeed(committed, undefined).pipe(
               Effect.andThen(Deferred.await(releaseReply)),
-              Effect.andThen(kind === "lost reply" ? Effect.fail("reply lost") : Effect.void),
+              Effect.andThen(kind === 'lost reply' ? Effect.fail('reply lost') : Effect.void),
             ),
           ),
-      });
+      })
       const fiber = yield* fixture.run(
-        Effect.gen(function* () {
-          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+        Effect.gen(function*() {
+          const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
           return yield* Effect.forkChild(
             alarms.transaction((tx) =>
-              Effect.gen(function* () {
-                yield* writeJob(fixture.storage, "committed");
+              Effect.gen(function*() {
+                yield* writeJob(fixture.storage, 'committed')
                 yield* tx.scheduleAlarm({
-                  tag: "job",
-                  id: "a",
+                  tag: 'job',
+                  id: 'a',
                   runAt: atMillis(1_000),
                   payload: null,
-                });
-              }),
+                })
+              })
             ),
-          );
+          )
         }),
-      );
+      )
 
-      yield* Deferred.await(committed);
-      if (kind === "interruption") {
-        fiber.interruptUnsafe();
+      yield* Deferred.await(committed)
+      if (kind === 'interruption') {
+        fiber.interruptUnsafe()
       }
-      yield* Deferred.succeed(releaseReply, undefined);
-      const [exit] = yield* Fiber.awaitAll([fiber]);
+      yield* Deferred.succeed(releaseReply, undefined)
+      const [exit] = yield* Fiber.awaitAll([fiber])
 
-      assert.isTrue(Exit.isFailure(exit!));
-      assert.strictEqual(fixture.job("job"), "committed");
-      assert.strictEqual(fixture.row("job", "a")?.run_at, 1_000);
-      assert.strictEqual(fixture.currentAlarm(), 1_000);
-      assert.strictEqual(fixture.tracker.transactionRollbacks, 0);
+      assert.isTrue(Exit.isFailure(exit!))
+      assert.strictEqual(fixture.job('job'), 'committed')
+      assert.strictEqual(fixture.row('job', 'a')?.run_at, 1_000)
+      assert.strictEqual(fixture.currentAlarm(), 1_000)
+      assert.strictEqual(fixture.tracker.transactionRollbacks, 0)
     }),
-);
+)
 
-it.effect("rejects escaped and forked transaction mutations without changing storage", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('rejects escaped and forked transaction mutations without changing storage', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
-        const input = { tag: "job", id: "a", runAt: atMillis(1_000), payload: null };
-        const escaped = yield* alarms.transaction((tx) => Effect.succeed(tx));
-        let aborted = escaped;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
+        const input = { tag: 'job', id: 'a', runAt: atMillis(1_000), payload: null }
+        const escaped = yield* alarms.transaction((tx) => Effect.succeed(tx))
+        let aborted = escaped
 
         yield* alarms
           .transaction((tx) =>
             Effect.sync(() => {
-              aborted = tx;
-            }).pipe(Effect.andThen(Effect.fail("abort"))),
+              aborted = tx
+            }).pipe(Effect.andThen(Effect.fail('abort')))
           )
-          .pipe(Effect.exit);
+          .pipe(Effect.exit)
 
-        for (const effect of [
-          escaped.scheduleAlarm(input),
-          escaped.cancelAlarm(input),
-          aborted.scheduleAlarm(input),
-          aborted.cancelAlarm(input),
-        ]) {
-          assert.instanceOf(yield* Effect.flip(effect), DurableObjectStorage.StorageOperationError);
+        for (
+          const effect of [
+            escaped.scheduleAlarm(input),
+            escaped.cancelAlarm(input),
+            aborted.scheduleAlarm(input),
+            aborted.cancelAlarm(input),
+          ]
+        ) {
+          assert.instanceOf(yield* Effect.flip(effect), DurableObjectStorage.StorageOperationError)
         }
         yield* alarms.transaction((tx) =>
-          Effect.gen(function* () {
+          Effect.gen(function*() {
             assert.instanceOf(
               yield* Effect.flip(escaped.scheduleAlarm(input)),
               DurableObjectStorage.StorageOperationError,
-            );
-            const fiber = yield* Effect.forkChild(tx.scheduleAlarm(input).pipe(Effect.flip));
+            )
+            const fiber = yield* Effect.forkChild(tx.scheduleAlarm(input).pipe(Effect.flip))
 
-            assert.instanceOf(yield* Fiber.join(fiber), DurableObjectStorage.StorageOperationError);
-          }),
-        );
-        assert.strictEqual(fixture.row("job", "a"), undefined);
-        assert.strictEqual(fixture.currentAlarm(), null);
+            assert.instanceOf(yield* Fiber.join(fiber), DurableObjectStorage.StorageOperationError)
+          })
+        )
+        assert.strictEqual(fixture.row('job', 'a'), undefined)
+        assert.strictEqual(fixture.currentAlarm(), null)
       }),
-    );
-  }),
-);
+    )
+  }))
 
-it.effect("schedules, replaces, and reconciles to the earliest logical alarm", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('schedules, replaces, and reconciles to the earliest logical alarm', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
         yield* alarms.scheduleAlarm({
-          tag: "email",
-          id: "a",
+          tag: 'email',
+          id: 'a',
           runAt: atMillis(2_000),
-          payload: { step: "first" },
-        });
+          payload: { step: 'first' },
+        })
         yield* alarms.scheduleAlarm({
-          tag: "email",
-          id: "b",
+          tag: 'email',
+          id: 'b',
           runAt: atMillis(3_000),
           payload: null,
-        });
+        })
         yield* alarms.scheduleAlarm({
-          tag: "email",
-          id: "b",
+          tag: 'email',
+          id: 'b',
           runAt: atMillis(1_000),
-          payload: "soon",
-        });
+          payload: 'soon',
+        })
         yield* alarms.scheduleAlarm({
-          tag: "email",
-          id: "b",
+          tag: 'email',
+          id: 'b',
           runAt: atMillis(4_000),
-          repeatEvery: "1 minute",
-          payload: { step: "replacement" },
-        });
+          repeatEvery: '1 minute',
+          payload: { step: 'replacement' },
+        })
       }),
-    );
+    )
 
-    assert.strictEqual(fixture.currentAlarm(), 2_000);
-    assert.strictEqual(fixture.row("email", "a")?.run_at, 2_000);
-    assert.strictEqual(fixture.row("email", "b")?.run_at, 4_000);
-    assert.strictEqual(fixture.row("email", "b")?.repeat_every_ms, 60_000);
-    assert.deepStrictEqual(JSON.parse(fixture.row("email", "b")?.payload ?? "null"), {
-      step: "replacement",
-    });
-  }),
-);
+    assert.strictEqual(fixture.currentAlarm(), 2_000)
+    assert.strictEqual(fixture.row('email', 'a')?.run_at, 2_000)
+    assert.strictEqual(fixture.row('email', 'b')?.run_at, 4_000)
+    assert.strictEqual(fixture.row('email', 'b')?.repeat_every_ms, 60_000)
+    assert.deepStrictEqual(JSON.parse(fixture.row('email', 'b')?.payload ?? 'null'), {
+      step: 'replacement',
+    })
+  }))
 
-it.effect("rolls back schedule writes when platform alarm reconciliation fails", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('rolls back schedule writes when platform alarm reconciliation fails', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
-    fixture.failNextSetAlarm();
+    fixture.failNextSetAlarm()
 
     const exit = yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
         yield* alarms.scheduleAlarm({
-          tag: "email",
-          id: "a",
+          tag: 'email',
+          id: 'a',
           runAt: atMillis(1_000),
           payload: null,
-        });
+        })
       }).pipe(Effect.exit),
-    );
+    )
 
-    assert.strictEqual(exit._tag, "Failure");
-    assert.strictEqual(fixture.row("email", "a"), undefined);
-    assert.strictEqual(fixture.currentAlarm(), null);
-    assert.strictEqual(fixture.tracker.transactionRollbacks, 1);
-  }),
-);
+    assert.strictEqual(exit._tag, 'Failure')
+    assert.strictEqual(fixture.row('email', 'a'), undefined)
+    assert.strictEqual(fixture.currentAlarm(), null)
+    assert.strictEqual(fixture.tracker.transactionRollbacks, 1)
+  }))
 
-it.effect("does not let one-shot acknowledgement delete a replacement schedule", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('does not let one-shot acknowledgement delete a replacement schedule', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
         yield* alarms.scheduleAlarm({
-          tag: "connection",
-          id: "reconnect",
+          tag: 'connection',
+          id: 'reconnect',
           runAt: atMillis(0),
-          payload: "old",
-        });
+          payload: 'old',
+        })
 
         yield* alarms.processDueAlarms((event) =>
           alarms.scheduleAlarm({
             tag: event.tag,
             id: event.id,
             runAt: atMillis(60_000),
-            payload: "new",
-          }),
-        );
+            payload: 'new',
+          })
+        )
       }),
-    );
+    )
 
-    assert.strictEqual(fixture.row("connection", "reconnect")?.run_at, 60_000);
+    assert.strictEqual(fixture.row('connection', 'reconnect')?.run_at, 60_000)
     assert.strictEqual(
-      JSON.parse(fixture.row("connection", "reconnect")?.payload ?? "null"),
-      "new",
-    );
-  }),
-);
+      JSON.parse(fixture.row('connection', 'reconnect')?.payload ?? 'null'),
+      'new',
+    )
+  }))
 
-it.effect("does not let repeating acknowledgement overwrite a replacement schedule", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('does not let repeating acknowledgement overwrite a replacement schedule', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
         yield* alarms.scheduleAlarm({
-          tag: "heartbeat",
-          id: "room",
+          tag: 'heartbeat',
+          id: 'room',
           runAt: atMillis(0),
-          repeatEvery: "1 minute",
-          payload: "old",
-        });
+          repeatEvery: '1 minute',
+          payload: 'old',
+        })
 
         yield* alarms.processDueAlarms((event) =>
           alarms.scheduleAlarm({
             tag: event.tag,
             id: event.id,
             runAt: atMillis(120_000),
-            payload: "replacement",
-          }),
-        );
+            payload: 'replacement',
+          })
+        )
       }),
-    );
+    )
 
-    assert.strictEqual(fixture.row("heartbeat", "room")?.run_at, 120_000);
-    assert.strictEqual(fixture.row("heartbeat", "room")?.repeat_every_ms, null);
+    assert.strictEqual(fixture.row('heartbeat', 'room')?.run_at, 120_000)
+    assert.strictEqual(fixture.row('heartbeat', 'room')?.repeat_every_ms, null)
     assert.strictEqual(
-      JSON.parse(fixture.row("heartbeat", "room")?.payload ?? "null"),
-      "replacement",
-    );
-  }),
-);
+      JSON.parse(fixture.row('heartbeat', 'room')?.payload ?? 'null'),
+      'replacement',
+    )
+  }))
 
-it.effect("limits due processing and immediately reconciles remaining due rows", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
-    const handled: Array<string> = [];
+it.effect('limits due processing and immediately reconciles remaining due rows', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
+    const handled: Array<string> = []
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
-        yield* alarms.scheduleAlarm({ tag: "jobs", id: "b", runAt: atMillis(0), payload: null });
-        yield* alarms.scheduleAlarm({ tag: "jobs", id: "a", runAt: atMillis(0), payload: null });
-        yield* alarms.scheduleAlarm({ tag: "jobs", id: "c", runAt: atMillis(0), payload: null });
+        yield* alarms.scheduleAlarm({ tag: 'jobs', id: 'b', runAt: atMillis(0), payload: null })
+        yield* alarms.scheduleAlarm({ tag: 'jobs', id: 'a', runAt: atMillis(0), payload: null })
+        yield* alarms.scheduleAlarm({ tag: 'jobs', id: 'c', runAt: atMillis(0), payload: null })
 
         const result = yield* alarms.processDueAlarms(
           (event) => Effect.sync(() => handled.push(event.id)),
           { limit: 2 },
-        );
+        )
 
         assert.deepStrictEqual(
           result.handled.map((event) => event.id),
-          ["a", "b"],
-        );
-        assert.deepStrictEqual(result.failed, []);
+          ['a', 'b'],
+        )
+        assert.deepStrictEqual(result.failed, [])
       }),
-    );
+    )
 
-    assert.deepStrictEqual(handled, ["a", "b"]);
-    assert.strictEqual(fixture.row("jobs", "a"), undefined);
-    assert.strictEqual(fixture.row("jobs", "b"), undefined);
-    assert.strictEqual(fixture.row("jobs", "c")?.run_at, 0);
-    assert.strictEqual(fixture.currentAlarm(), 0);
-  }),
-);
+    assert.deepStrictEqual(handled, ['a', 'b'])
+    assert.strictEqual(fixture.row('jobs', 'a'), undefined)
+    assert.strictEqual(fixture.row('jobs', 'b'), undefined)
+    assert.strictEqual(fixture.row('jobs', 'c')?.run_at, 0)
+    assert.strictEqual(fixture.currentAlarm(), 0)
+  }))
 
-it.effect("isolates logical failures by default and continues later due rows", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
-    const handled: Array<string> = [];
-    const observedFailures: Array<string> = [];
+it.effect('isolates logical failures by default and continues later due rows', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
+    const handled: Array<string> = []
+    const observedFailures: Array<string> = []
     const result = yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
-        yield* alarms.scheduleAlarm({ tag: "jobs", id: "a", runAt: atMillis(0), payload: null });
-        yield* alarms.scheduleAlarm({ tag: "jobs", id: "b", runAt: atMillis(0), payload: null });
-        yield* alarms.scheduleAlarm({ tag: "jobs", id: "c", runAt: atMillis(0), payload: null });
+        yield* alarms.scheduleAlarm({ tag: 'jobs', id: 'a', runAt: atMillis(0), payload: null })
+        yield* alarms.scheduleAlarm({ tag: 'jobs', id: 'b', runAt: atMillis(0), payload: null })
+        yield* alarms.scheduleAlarm({ tag: 'jobs', id: 'c', runAt: atMillis(0), payload: null })
 
         return yield* alarms.processDueAlarms(
           (event) => {
-            if (event.id === "b") {
-              return Effect.fail("logical failure");
+            if (event.id === 'b') {
+              return Effect.fail('logical failure')
             }
 
-            return Effect.sync(() => handled.push(event.id));
+            return Effect.sync(() => handled.push(event.id))
           },
           {
-            retryFailedAfter: "1 minute",
+            retryFailedAfter: '1 minute',
             onFailure: (failure) =>
               Effect.sync(() => {
-                observedFailures.push(failure.id);
+                observedFailures.push(failure.id)
               }),
           },
-        );
+        )
       }),
-    );
+    )
 
-    assert.deepStrictEqual(handled, ["a", "c"]);
+    assert.deepStrictEqual(handled, ['a', 'c'])
     assert.deepStrictEqual(
       result.handled.map((event) => event.id),
-      ["a", "c"],
-    );
+      ['a', 'c'],
+    )
     assert.deepStrictEqual(
       result.failed.map((failure) => failure.id),
-      ["b"],
-    );
-    assert.deepStrictEqual(observedFailures, ["b"]);
-    assert.strictEqual(fixture.row("jobs", "a"), undefined);
-    assert.strictEqual(fixture.row("jobs", "b")?.run_at, 0);
-    assert.strictEqual(fixture.row("jobs", "c"), undefined);
-    assert.ok((fixture.currentAlarm() ?? 0) >= 60_000);
-  }),
-);
+      ['b'],
+    )
+    assert.deepStrictEqual(observedFailures, ['b'])
+    assert.strictEqual(fixture.row('jobs', 'a'), undefined)
+    assert.strictEqual(fixture.row('jobs', 'b')?.run_at, 0)
+    assert.strictEqual(fixture.row('jobs', 'c'), undefined)
+    assert.ok((fixture.currentAlarm() ?? 0) >= 60_000)
+  }))
 
-it.effect("surfaces invalid input as typed scheduler errors", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('surfaces invalid input as typed scheduler errors', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
     const invalidRef = yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
         return yield* alarms
-          .scheduleAlarm({ tag: "", id: "a", runAt: atMillis(1), payload: null })
-          .pipe(Effect.exit);
+          .scheduleAlarm({ tag: '', id: 'a', runAt: atMillis(1), payload: null })
+          .pipe(Effect.exit)
       }),
-    );
+    )
     const invalidRepeat = yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
         return yield* alarms
           .scheduleAlarm({
-            tag: "jobs",
-            id: "a",
+            tag: 'jobs',
+            id: 'a',
             runAt: atMillis(1),
             repeatEvery: 0,
             payload: null,
           })
-          .pipe(Effect.exit);
+          .pipe(Effect.exit)
       }),
-    );
+    )
 
-    assert.strictEqual(invalidRef._tag, "Failure");
-    assert.strictEqual(invalidRepeat._tag, "Failure");
-    if (invalidRef._tag === "Failure") {
-      const error = Cause.squash(invalidRef.cause);
+    assert.strictEqual(invalidRef._tag, 'Failure')
+    assert.strictEqual(invalidRepeat._tag, 'Failure')
+    if (invalidRef._tag === 'Failure') {
+      const error = Cause.squash(invalidRef.cause)
 
-      assert.instanceOf(error, DurableObjectAlarm.InvalidAlarmRefError);
-      assert.strictEqual(error._tag, "InvalidAlarmRefError");
+      assert.instanceOf(error, DurableObjectAlarm.InvalidAlarmRefError)
+      assert.strictEqual(error._tag, 'InvalidAlarmRefError')
     }
-    if (invalidRepeat._tag === "Failure") {
-      const error = Cause.squash(invalidRepeat.cause);
+    if (invalidRepeat._tag === 'Failure') {
+      const error = Cause.squash(invalidRepeat.cause)
 
-      assert.instanceOf(error, DurableObjectAlarm.InvalidRepeatEveryError);
-      assert.strictEqual(error._tag, "InvalidRepeatEveryError");
+      assert.instanceOf(error, DurableObjectAlarm.InvalidRepeatEveryError)
+      assert.strictEqual(error._tag, 'InvalidRepeatEveryError')
     }
-  }),
-);
+  }))
 
-it.effect("routes typed logical alarm definitions through decoded payload handlers", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('routes typed logical alarm definitions through decoded payload handlers', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
 
-    class RoomAlarms extends DurableObjectAlarm.Tag<RoomAlarms>()("RoomAlarms", {
+    class RoomAlarms extends DurableObjectAlarm.Tag<RoomAlarms>()('RoomAlarms', {
       reconnectGrace: Schema.Struct({
         connectionId: Schema.String,
         userId: Schema.String,
         revision: Schema.FiniteFromString,
       }),
     }) {}
-    const handled: Array<string> = [];
+    const handled: Array<string> = []
     const registration = RoomAlarms.handlers({
       reconnectGrace: ({ payload }) =>
         Effect.sync(() => {
-          handled.push(`${payload.userId}:${payload.connectionId}:${payload.revision + 1}`);
+          handled.push(`${payload.userId}:${payload.connectionId}:${payload.revision + 1}`)
         }),
-    });
+    })
 
     yield* fixture.run(
-      Effect.gen(function* () {
-        const roomAlarms = yield* RoomAlarms;
+      Effect.gen(function*() {
+        const roomAlarms = yield* RoomAlarms
 
         yield* roomAlarms.scheduleAlarm({
-          tag: "reconnectGrace",
-          id: "connection-1",
+          tag: 'reconnectGrace',
+          id: 'connection-1',
           runAt: atMillis(0),
-          payload: { connectionId: "connection-1", userId: "user-1", revision: 2 },
-        });
+          payload: { connectionId: 'connection-1', userId: 'user-1', revision: 2 },
+        })
 
         assert.strictEqual(
-          fixture.row("reconnectGrace", "connection-1")?.payload,
+          fixture.row('reconnectGrace', 'connection-1')?.payload,
           '{"connectionId":"connection-1","userId":"user-1","revision":"2"}',
-        );
+        )
 
-        yield* registration.run;
+        yield* registration.run
       }).pipe(Effect.provide(registration.layer)),
-    );
+    )
 
-    assert.deepStrictEqual(handled, ["user-1:connection-1:3"]);
-  }),
-);
+    assert.deepStrictEqual(handled, ['user-1:connection-1:3'])
+  }))
 
 it.effect(
-  "rolls back application writes and typed alarm mutations when payload validation fails",
+  'rolls back application writes and typed alarm mutations when payload validation fails',
   () =>
-    Effect.gen(function* () {
-      const fixture = makeAlarmFixture();
+    Effect.gen(function*() {
+      const fixture = makeAlarmFixture()
 
-      class JobAlarms extends DurableObjectAlarm.Tag<JobAlarms>()("JobAlarms", {
+      class JobAlarms extends DurableObjectAlarm.Tag<JobAlarms>()('JobAlarms', {
         job: Schema.NonEmptyString,
       }) {}
-      const registration = JobAlarms.handlers({ job: () => Effect.void });
+      const registration = JobAlarms.handlers({ job: () => Effect.void })
 
       yield* fixture.run(
-        Effect.gen(function* () {
-          const alarms = yield* JobAlarms;
+        Effect.gen(function*() {
+          const alarms = yield* JobAlarms
 
           yield* alarms.scheduleAlarm({
-            tag: "job",
-            id: "a",
+            tag: 'job',
+            id: 'a',
             runAt: atMillis(2_000),
-            payload: "before",
-          });
-          yield* writeJob(fixture.storage, "before");
+            payload: 'before',
+          })
+          yield* writeJob(fixture.storage, 'before')
           const exit = yield* alarms
             .transaction((tx) =>
-              Effect.gen(function* () {
-                yield* writeJob(fixture.storage, "during");
-                yield* tx.cancelAlarm({ tag: "job", id: "a" });
+              Effect.gen(function*() {
+                yield* writeJob(fixture.storage, 'during')
+                yield* tx.cancelAlarm({ tag: 'job', id: 'a' })
                 yield* tx.scheduleAlarm({
-                  tag: "job",
-                  id: "b",
+                  tag: 'job',
+                  id: 'b',
                   runAt: atMillis(1_000),
-                  payload: "",
-                });
-              }),
+                  payload: '',
+                })
+              })
             )
-            .pipe(Effect.exit);
+            .pipe(Effect.exit)
 
-          assert.isTrue(Exit.isFailure(exit));
+          assert.isTrue(Exit.isFailure(exit))
           if (Exit.isFailure(exit)) {
             assert.instanceOf(
               Cause.squash(exit.cause),
               DurableObjectAlarm.InvalidAlarmPayloadError,
-            );
+            )
           }
-          assert.strictEqual(fixture.job("job"), "before");
-          assert.strictEqual(fixture.row("job", "a")?.payload, '"before"');
-          assert.isUndefined(fixture.row("job", "b"));
-          assert.strictEqual(fixture.currentAlarm(), 2_000);
+          assert.strictEqual(fixture.job('job'), 'before')
+          assert.strictEqual(fixture.row('job', 'a')?.payload, '"before"')
+          assert.isUndefined(fixture.row('job', 'b'))
+          assert.strictEqual(fixture.currentAlarm(), 2_000)
         }).pipe(Effect.provide(registration.layer)),
-      );
+      )
     }),
-);
+)
 
-it.effect("reports unknown stored tags without acknowledging their alarms", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
-    const JobAlarms = DurableObjectAlarm.define({ job: Schema.Null });
+it.effect('reports unknown stored tags without acknowledging their alarms', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
+    const JobAlarms = DurableObjectAlarm.define({ job: Schema.Null })
     const result = yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
-        yield* alarms.scheduleAlarm({ tag: "unknown", id: "a", runAt: atMillis(0), payload: null });
+        yield* alarms.scheduleAlarm({ tag: 'unknown', id: 'a', runAt: atMillis(0), payload: null })
 
-        return yield* JobAlarms.handlers({ job: () => Effect.void });
+        return yield* JobAlarms.handlers({ job: () => Effect.void })
       }),
-    );
+    )
 
-    assert.deepStrictEqual(result.handled, []);
-    assert.strictEqual(result.failed.length, 1);
-    assert.strictEqual(result.failed[0]?.tag, "unknown");
-    assert.isDefined(fixture.row("unknown", "a"));
-    assert.ok((fixture.currentAlarm() ?? 0) > 0);
-  }),
-);
+    assert.deepStrictEqual(result.handled, [])
+    assert.strictEqual(result.failed.length, 1)
+    assert.strictEqual(result.failed[0]?.tag, 'unknown')
+    assert.isDefined(fixture.row('unknown', 'a'))
+    assert.ok((fixture.currentAlarm() ?? 0) > 0)
+  }))
 
-it.effect("applies per-tag failure policies from typed alarm definitions", () =>
-  Effect.gen(function* () {
-    const fixture = makeAlarmFixture();
+it.effect('applies per-tag failure policies from typed alarm definitions', () =>
+  Effect.gen(function*() {
+    const fixture = makeAlarmFixture()
     const alarmsDefinition = DurableObjectAlarm.define({
       heartbeat: {
         payload: Schema.Null,
-        failure: "skip-and-advance-repeat",
+        failure: 'skip-and-advance-repeat',
       },
       maintenance: Schema.Null,
       reconnectGrace: {
         payload: Schema.Struct({ connectionId: Schema.String }),
-        failure: "retry",
-        retry: { initialDelay: "2 minutes" },
+        failure: 'retry',
+        retry: { initialDelay: '2 minutes' },
       },
-    });
-    const handled: Array<string> = [];
+    })
+    const handled: Array<string> = []
 
     const result = yield* fixture.run(
-      Effect.gen(function* () {
-        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm;
+      Effect.gen(function*() {
+        const alarms = yield* DurableObjectAlarm.DurableObjectAlarm
 
         yield* alarms.scheduleAlarm({
-          tag: "heartbeat",
-          id: "room",
+          tag: 'heartbeat',
+          id: 'room',
           runAt: atMillis(0),
-          repeatEvery: "1 minute",
+          repeatEvery: '1 minute',
           payload: null,
-        });
+        })
         yield* alarms.scheduleAlarm({
-          tag: "reconnectGrace",
-          id: "connection-1",
+          tag: 'reconnectGrace',
+          id: 'connection-1',
           runAt: atMillis(0),
-          payload: { connectionId: "connection-1" },
-        });
+          payload: { connectionId: 'connection-1' },
+        })
         yield* alarms.scheduleAlarm({
-          tag: "maintenance",
-          id: "cleanup",
+          tag: 'maintenance',
+          id: 'cleanup',
           runAt: atMillis(0),
           payload: null,
-        });
+        })
 
         return yield* alarmsDefinition.handlers({
-          heartbeat: () => Effect.fail("heartbeat failed"),
-          reconnectGrace: () => Effect.fail("reconnect failed"),
+          heartbeat: () => Effect.fail('heartbeat failed'),
+          reconnectGrace: () => Effect.fail('reconnect failed'),
           maintenance: (event) => Effect.sync(() => handled.push(event.id)),
-        });
+        })
       }),
-    );
+    )
 
-    assert.deepStrictEqual(handled, ["cleanup"]);
+    assert.deepStrictEqual(handled, ['cleanup'])
     assert.deepStrictEqual(
       result.failed.map((failure) => failure.tag),
-      ["heartbeat", "reconnectGrace"],
-    );
-    assert.ok((fixture.row("heartbeat", "room")?.run_at ?? 0) > 0);
-    assert.ok((fixture.currentAlarm() ?? 0) >= 60_000);
-    assert.strictEqual(fixture.row("maintenance", "cleanup"), undefined);
-  }),
-);
+      ['heartbeat', 'reconnectGrace'],
+    )
+    assert.ok((fixture.row('heartbeat', 'room')?.run_at ?? 0) > 0)
+    assert.ok((fixture.currentAlarm() ?? 0) >= 60_000)
+    assert.strictEqual(fixture.row('maintenance', 'cleanup'), undefined)
+  }))
 
-test("DurableObject.make registers the typed scheduler for application layers, RPC and alarm handlers", async () => {
-  const fixture = makeAlarmFixture();
-  const calls: Array<string> = [];
-  const rawFinished = Deferred.makeUnsafe<void>();
+test('DurableObject.make registers the typed scheduler for application layers, RPC and alarm handlers', async () => {
+  const fixture = makeAlarmFixture()
+  const calls: Array<string> = []
+  const rawFinished = Deferred.makeUnsafe<void>()
 
-  class JobAlarms extends DurableObjectAlarm.Tag<JobAlarms>()("JobAlarms", { jobs: Schema.Null }) {}
+  class JobAlarms extends DurableObjectAlarm.Tag<JobAlarms>()('JobAlarms', { jobs: Schema.Null }) {}
   const applicationLayer = Layer.effect(
     Application,
-    Effect.gen(function* () {
-      const alarms = yield* JobAlarms;
+    Effect.gen(function*() {
+      const alarms = yield* JobAlarms
 
-      yield* alarms.scheduleAlarm({ tag: "jobs", id: "0", runAt: atMillis(0), payload: null });
+      yield* alarms.scheduleAlarm({ tag: 'jobs', id: '0', runAt: atMillis(0), payload: null })
 
-      return { result: 42 };
+      return { result: 42 }
     }),
-  );
+  )
   const Live = DurableObject.make(applicationLayer, {
     rpc: {
-      schedule: Effect.fn("schedule")(function* () {
-        const alarms = yield* JobAlarms;
+      schedule: Effect.fn('schedule')(function*() {
+        const alarms = yield* JobAlarms
 
-        yield* alarms.scheduleAlarm({ tag: "jobs", id: "a", runAt: atMillis(0), payload: null });
-        yield* (yield* Maintenance).scheduleAlarm(maintenanceInput(atMillis(0)));
+        yield* alarms.scheduleAlarm({ tag: 'jobs', id: 'a', runAt: atMillis(0), payload: null })
+        yield* (yield* Maintenance).scheduleAlarm(maintenanceInput(atMillis(0)))
       }),
     },
     alarms: DurableObjectAlarm.mergeAll(
       JobAlarms.handlers({
-        jobs: Effect.fn("jobs")(function* (event) {
-          const alarms = yield* JobAlarms;
+        jobs: Effect.fn('jobs')(function*(event) {
+          const alarms = yield* JobAlarms
 
-          yield* alarms.cancelAlarm(event);
-          calls.push(`logical:${event.id}`);
+          yield* alarms.cancelAlarm(event)
+          calls.push(`logical:${event.id}`)
         }),
       }),
       Maintenance.handlers({
         maintenance: () =>
-          Effect.gen(function* () {
+          Effect.gen(function*() {
             // A manual-only dispatcher must not delay raw dispatch after automatic work.
-            yield* Deferred.await(rawFinished);
-            yield* (yield* Maintenance).cancelAlarm(maintenanceRef);
-            calls.push("manual");
+            yield* Deferred.await(rawFinished)
+            yield* (yield* Maintenance).cancelAlarm(maintenanceRef)
+            calls.push('manual')
           }),
       }),
     ),
     alarm: () =>
-      Effect.gen(function* () {
-        calls.push("raw");
-        yield* Deferred.succeed(rawFinished, undefined);
+      Effect.gen(function*() {
+        calls.push('raw')
+        yield* Deferred.succeed(rawFinished, undefined)
       }),
-  });
+  })
 
-  const instance = new Live(fixture.state, makePartialTestDouble<Cloudflare.Env>({}));
+  const instance = new Live(fixture.state, makePartialTestDouble<Cloudflare.Env>({}))
 
-  await instance.schedule();
+  await instance.schedule()
 
   interface AlarmHandler {
-    alarm(): Promise<void> | void;
+    alarm(): Promise<void> | void
   }
 
-  await makePartialTestDouble<AlarmHandler>(instance).alarm();
+  await makePartialTestDouble<AlarmHandler>(instance).alarm()
 
-  expect(calls).toEqual(["logical:0", "logical:a", "raw", "manual"]);
-});
+  expect(calls).toEqual(['logical:0', 'logical:a', 'raw', 'manual'])
+})
 
-type SqlFixtureRow = Record<string, globalThis.SqlStorageValue>;
+type SqlFixtureRow = Record<string, globalThis.SqlStorageValue>
 
 interface StoredAlarmRow extends SqlFixtureRow {
-  readonly alarm_id: string;
-  readonly payload: string;
-  readonly repeat_every_ms: number | null;
-  readonly run_at: number;
-  readonly storage_id: string;
-  readonly tag: string;
+  readonly alarm_id: string
+  readonly payload: string
+  readonly repeat_every_ms: number | null
+  readonly run_at: number
+  readonly storage_id: string
+  readonly tag: string
 }
 
 interface AlarmFixtureTracker {
-  readonly setAlarms: Array<number>;
-  readonly deletedAlarms: Array<null>;
-  transactionRollbacks: number;
-  transactionCalls: number;
+  readonly setAlarms: Array<number>
+  readonly deletedAlarms: Array<null>
+  transactionRollbacks: number
+  transactionCalls: number
 }
 
 interface AlarmFixtureOptions {
-  readonly onTransaction?: (calls: number) => void;
-  readonly afterCommit?: () => Promise<void>;
-  readonly afterSetAlarm?: () => Promise<void>;
+  readonly onTransaction?: (calls: number) => void
+  readonly afterCommit?: () => Promise<void>
+  readonly afterSetAlarm?: () => Promise<void>
 }
 
 function makeAlarmFixture(options: AlarmFixtureOptions = {}) {
-  const database = new DatabaseSync(":memory:");
+  const database = new DatabaseSync(':memory:')
 
-  database.exec("CREATE TABLE application_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL)");
+  database.exec('CREATE TABLE application_jobs (id TEXT PRIMARY KEY, status TEXT NOT NULL)')
   const tracker: AlarmFixtureTracker = {
     setAlarms: [],
     deletedAlarms: [],
     transactionRollbacks: 0,
     transactionCalls: 0,
-  };
-  let currentAlarm: number | null = null;
-  let rejectNextSetAlarm = false;
-  let rejectNextDeleteAlarm = false;
-  let transactionTail = Promise.resolve();
+  }
+  let currentAlarm: number | null = null
+  let rejectNextSetAlarm = false
+  let rejectNextDeleteAlarm = false
+  let transactionTail = Promise.resolve()
 
-  const sql = makeSqlStorage(database);
+  const sql = makeSqlStorage(database)
   const rawStorageImplementation = {
     get: async () => undefined,
     put: async () => undefined,
@@ -1178,64 +1158,64 @@ function makeAlarmFixture(options: AlarmFixtureOptions = {}) {
     getAlarm: async () => currentAlarm,
     setAlarm: async (scheduledTime: number | Date) => {
       if (rejectNextSetAlarm) {
-        rejectNextSetAlarm = false;
-        throw new Error("setAlarm failed");
+        rejectNextSetAlarm = false
+        throw new Error('setAlarm failed')
       }
 
-      currentAlarm = scheduledTime instanceof Date ? scheduledTime.getTime() : scheduledTime;
-      tracker.setAlarms.push(currentAlarm);
-      await options.afterSetAlarm?.();
+      currentAlarm = scheduledTime instanceof Date ? scheduledTime.getTime() : scheduledTime
+      tracker.setAlarms.push(currentAlarm)
+      await options.afterSetAlarm?.()
     },
     deleteAlarm: async () => {
       if (rejectNextDeleteAlarm) {
-        rejectNextDeleteAlarm = false;
-        throw new Error("deleteAlarm failed");
+        rejectNextDeleteAlarm = false
+        throw new Error('deleteAlarm failed')
       }
-      currentAlarm = null;
-      tracker.deletedAlarms.push(null);
+      currentAlarm = null
+      tracker.deletedAlarms.push(null)
     },
     transaction: async <T>(closure: (txn: globalThis.DurableObjectTransaction) => Promise<T>) => {
-      tracker.transactionCalls += 1;
-      options.onTransaction?.(tracker.transactionCalls);
+      tracker.transactionCalls += 1
+      options.onTransaction?.(tracker.transactionCalls)
       // Model workerd's serial admission of independent native transactions.
       // Nested transactions are outside this fixture's supported operations.
-      const previous = transactionTail;
-      const gate = Promise.withResolvers<void>();
+      const previous = transactionTail
+      const gate = Promise.withResolvers<void>()
 
-      transactionTail = gate.promise;
-      await previous;
-      let result: T;
+      transactionTail = gate.promise
+      await previous
+      let result: T
 
       try {
-        database.exec("BEGIN");
-        const alarmSnapshot = currentAlarm;
-        const setAlarmsLength = tracker.setAlarms.length;
-        const deletedAlarmsLength = tracker.deletedAlarms.length;
+        database.exec('BEGIN')
+        const alarmSnapshot = currentAlarm
+        const setAlarmsLength = tracker.setAlarms.length
+        const deletedAlarmsLength = tracker.deletedAlarms.length
 
         try {
           result = await closure(
             makePartialTestDouble<globalThis.DurableObjectTransaction>({ rollback: () => {} }),
-          );
+          )
         } catch (error) {
-          database.exec("ROLLBACK");
-          currentAlarm = alarmSnapshot;
-          tracker.setAlarms.length = setAlarmsLength;
-          tracker.deletedAlarms.length = deletedAlarmsLength;
-          tracker.transactionRollbacks += 1;
-          throw error;
+          database.exec('ROLLBACK')
+          currentAlarm = alarmSnapshot
+          tracker.setAlarms.length = setAlarmsLength
+          tracker.deletedAlarms.length = deletedAlarmsLength
+          tracker.transactionRollbacks += 1
+          throw error
         }
-        database.exec("COMMIT");
+        database.exec('COMMIT')
       } finally {
-        gate.resolve();
+        gate.resolve()
       }
       // Commit is complete. A failed or interrupted reply cannot roll it back.
-      await options.afterCommit?.();
+      await options.afterCommit?.()
 
-      return result;
+      return result
     },
     transactionSync: <T>(closure: () => T) => closure(),
     sync: async () => undefined,
-    getCurrentBookmark: async () => "bookmark",
+    getCurrentBookmark: async () => 'bookmark',
     onNextSessionRestoreBookmark: async (bookmark: string) => bookmark,
     sql,
     kv: {
@@ -1244,11 +1224,12 @@ function makeAlarmFixture(options: AlarmFixtureOptions = {}) {
       delete: () => false,
       list: () => [][Symbol.iterator](),
     },
-  };
+  }
   // SAFETY: The alarm fixture implements the concrete storage operations used by the scheduler;
   // unused overload branches remain outside this state-owned adapter.
-  const rawStorage = rawStorageImplementation as typeof rawStorageImplementation &
-    globalThis.DurableObjectStorage;
+  const rawStorage = rawStorageImplementation as
+    & typeof rawStorageImplementation
+    & globalThis.DurableObjectStorage
   const state = makePartialTestDouble<globalThis.DurableObjectState>({
     id: makePartialTestDouble<globalThis.DurableObjectId>({}),
     storage: rawStorage,
@@ -1263,7 +1244,7 @@ function makeAlarmFixture(options: AlarmFixtureOptions = {}) {
     getHibernatableWebSocketEventTimeout: () => null,
     getTags: () => [],
     abort: () => {},
-  });
+  })
   const layer = DurableObjectAlarm.DurableObjectAlarm.layer.pipe(
     Layer.provide(
       Layer.succeed(
@@ -1272,20 +1253,19 @@ function makeAlarmFixture(options: AlarmFixtureOptions = {}) {
       ),
     ),
     Layer.merge(NodeCrypto.layer),
-  );
+  )
 
   return {
     state,
     storage: DurableObjectStorage.fromDurableObjectStorage(rawStorage),
     tracker,
-    job: (id: string) =>
-      database.prepare("SELECT status FROM application_jobs WHERE id = ?").get(id)?.status,
+    job: (id: string) => database.prepare('SELECT status FROM application_jobs WHERE id = ?').get(id)?.status,
     currentAlarm: () => currentAlarm,
     failNextSetAlarm: () => {
-      rejectNextSetAlarm = true;
+      rejectNextSetAlarm = true
     },
     failNextDeleteAlarm: () => {
-      rejectNextDeleteAlarm = true;
+      rejectNextDeleteAlarm = true
     },
     row: (tag: string, id: string) => {
       if (
@@ -1293,80 +1273,78 @@ function makeAlarmFixture(options: AlarmFixtureOptions = {}) {
           .prepare("SELECT name FROM sqlite_master WHERE name = 'effect_cf_scheduled_alarms'")
           .get() === undefined
       ) {
-        return undefined;
+        return undefined
       }
 
       // SAFETY: the query selects the scheduler-created alarm row columns.
       return database
-        .prepare("SELECT * FROM effect_cf_scheduled_alarms WHERE storage_id = ?")
-        .get(storageId(tag, id)) as StoredAlarmRow | undefined;
+        .prepare('SELECT * FROM effect_cf_scheduled_alarms WHERE storage_id = ?')
+        .get(storageId(tag, id)) as StoredAlarmRow | undefined
     },
     run: <A, E, R>(effect: Effect.Effect<A, E, R>) => effect.pipe(Effect.provide(layer)),
-  };
+  }
 }
 
 function makeSqlStorage(database: DatabaseSync): globalThis.SqlStorage {
   return makePartialTestDouble<globalThis.SqlStorage>({
     exec: <T extends SqlFixtureRow>(query: string, ...bindings: globalThis.SqlStorageValue[]) => {
-      if (query.trim().startsWith("CREATE TABLE")) {
-        database.exec(query);
+      if (query.trim().startsWith('CREATE TABLE')) {
+        database.exec(query)
 
-        return cursor<T>([], 0);
+        return cursor<T>([], 0)
       }
       // SAFETY: alarm/job queries only return SQLite text, number and null values;
       // the Cloudflare cursor generic projects the same columns from this real SQLite engine.
       const rows = database
         .prepare(query)
         .all(
-          ...bindings.map((value) =>
-            value instanceof ArrayBuffer ? new Uint8Array(value) : value,
-          ),
-        ) as T[];
-      const writes = query.trim().startsWith("SELECT")
+          ...bindings.map((value) => value instanceof ArrayBuffer ? new Uint8Array(value) : value),
+        ) as T[]
+      const writes = query.trim().startsWith('SELECT')
         ? 0
-        : Number(database.prepare("SELECT changes() AS count").get()?.count);
+        : Number(database.prepare('SELECT changes() AS count').get()?.count)
 
-      return cursor(rows, writes);
+      return cursor(rows, writes)
     },
     databaseSize: 0,
-  });
+  })
 }
 
 function cursor<T extends SqlFixtureRow>(
   rows: Array<T>,
   rowsWritten: number,
 ): globalThis.SqlStorageCursor<T> {
-  let index = 0;
+  let index = 0
 
   return makePartialTestDouble<globalThis.SqlStorageCursor<T>>({
     next: () => {
-      const value = rows[index];
+      const value = rows[index]
 
-      index += 1;
+      index += 1
 
-      return value === undefined ? { done: true, value: undefined } : { done: false, value };
+      return value === undefined ? { done: true, value: undefined } : { done: false, value }
     },
     toArray: () => rows,
     one: () => {
-      const value = rows[0];
+      const value = rows[0]
 
       if (value === undefined) {
-        throw new Error("No rows");
+        throw new Error('No rows')
       }
 
-      return value;
+      return value
     },
     raw: () => [][Symbol.iterator](),
     columnNames: [],
     rowsRead: rows.length,
     rowsWritten,
-  });
+  })
 }
 
 function storageId(tag: string, id: string): string {
-  return `effect-cf-alarm:${encodeURIComponent(tag)}:${encodeURIComponent(id)}`;
+  return `effect-cf-alarm:${encodeURIComponent(tag)}:${encodeURIComponent(id)}`
 }
 
 function atMillis(millis: number): DateTime.Utc {
-  return DateTime.toUtc(DateTime.makeUnsafe(millis));
+  return DateTime.toUtc(DateTime.makeUnsafe(millis))
 }

@@ -8,8 +8,8 @@
     "noEmitOnError": true,
     "skipLibCheck": true,
     "paths": {
-      "effect-cf": ["./node_modules/effect-cf/dist/index.d.mts"],
-      "effect-cf/sandbox": ["./node_modules/effect-cf/dist/Sandbox.d.mts"]
+      "@systemfsoftware/effect-cf": ["./node_modules/effect-cf/dist/index.d.mts"],
+      "@systemfsoftware/effect-cf/sandbox": ["./node_modules/effect-cf/dist/Sandbox.d.mts"]
     },
     "rootDir": "src",
     "outDir": "dist"

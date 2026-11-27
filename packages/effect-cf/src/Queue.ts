@@ -1,56 +1,58 @@
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import type { Scope } from "effect";
+import type { Scope } from 'effect'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
 
-import type { ExecutionContext, WorkerContext } from "./Worker";
-import type { WorkerEnvironment } from "./Environment";
-import type * as QueueDefinition from "./QueueDefinition";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import type { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
+import type * as QueueDefinition from './QueueDefinition'
+import type { ExecutionContext, WorkerContext } from './Worker'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
-export type { MessageSendRequest, QueueOperationError, QueueProducer } from "./QueueBinding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
+export type { MessageSendRequest, QueueOperationError, QueueProducer } from './QueueBinding'
 
 export interface QueueMessage<Body> {
-  readonly raw: globalThis.Message<unknown>;
-  readonly id: string;
-  readonly timestamp: Date;
-  readonly body: Body;
-  readonly attempts: number;
-  readonly ack: Effect.Effect<void>;
-  readonly retry: (options?: globalThis.QueueRetryOptions) => Effect.Effect<void>;
+  readonly raw: globalThis.Message<unknown>
+  readonly id: string
+  readonly timestamp: Date
+  readonly body: Body
+  readonly attempts: number
+  readonly ack: Effect.Effect<void>
+  readonly retry: (options?: globalThis.QueueRetryOptions) => Effect.Effect<void>
 }
 
 export interface QueueBatch<Body> {
-  readonly raw: globalThis.MessageBatch<unknown>;
-  readonly messages: ReadonlyArray<QueueMessage<Body>>;
-  readonly queue: string;
-  readonly metadata: globalThis.MessageBatchMetadata;
-  readonly ackAll: Effect.Effect<void>;
-  readonly retryAll: (options?: globalThis.QueueRetryOptions) => Effect.Effect<void>;
+  readonly raw: globalThis.MessageBatch<unknown>
+  readonly messages: ReadonlyArray<QueueMessage<Body>>
+  readonly queue: string
+  readonly metadata: globalThis.MessageBatchMetadata
+  readonly ackAll: Effect.Effect<void>
+  readonly retryAll: (options?: globalThis.QueueRetryOptions) => Effect.Effect<void>
 }
 
-export class QueueMessageDecodeError extends Data.TaggedError("QueueMessageDecodeError")<{
-  readonly queue: string;
-  readonly messageId: string;
-  readonly index: number;
-  readonly cause: unknown;
+export class QueueMessageDecodeError extends Data.TaggedError('QueueMessageDecodeError')<{
+  readonly queue: string
+  readonly messageId: string
+  readonly index: number
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Queue "${this.queue}" failed to decode message "${this.messageId}" at index ${this.index}: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Queue "${this.queue}" failed to decode message "${this.messageId}" at index ${this.index}: ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
-type RuntimeContext<ROut> = ExecutionContext | WorkerContext | WorkerEnvironment | ROut;
+type RuntimeContext<ROut> = ExecutionContext | WorkerContext | WorkerEnvironment | ROut
 
-type QueueHandlerContext<ROut> = RuntimeContext<ROut> | Scope.Scope;
-type EncodedQueueBody = globalThis.Message<unknown>["body"];
+type QueueHandlerContext<ROut> = RuntimeContext<ROut> | Scope.Scope
+type EncodedQueueBody = globalThis.Message<unknown>['body']
 
 export type QueueHandler<ROut, Body = unknown> = (
   batch: QueueBatch<Body>,
-) => Effect.Effect<void, unknown, QueueHandlerContext<ROut>>;
+) => Effect.Effect<void, unknown, QueueHandlerContext<ROut>>
 
 export interface QueueOptions<ROut, Body = unknown> {
-  readonly queue: QueueHandler<ROut, Body>;
+  readonly queue: QueueHandler<ROut, Body>
 }
 
 export const fromMessage = <Body>(message: globalThis.Message<unknown>, body: Body) => ({
@@ -61,7 +63,7 @@ export const fromMessage = <Body>(message: globalThis.Message<unknown>, body: Bo
   attempts: message.attempts,
   ack: Effect.sync(() => message.ack()),
   retry: (options?: globalThis.QueueRetryOptions) => Effect.sync(() => message.retry(options)),
-});
+})
 
 export const fromMessageBatch = <Body>(
   batch: globalThis.MessageBatch<unknown>,
@@ -73,17 +75,17 @@ export const fromMessageBatch = <Body>(
   metadata: batch.metadata,
   ackAll: Effect.sync(() => batch.ackAll()),
   retryAll: (options?: globalThis.QueueRetryOptions) => Effect.sync(() => batch.retryAll(options)),
-});
+})
 
 export const decodeBatch = <Body>(
   batch: globalThis.MessageBatch<unknown>,
   decodeBody: (body: EncodedQueueBody) => Effect.Effect<Body, unknown>,
 ): Effect.Effect<QueueBatch<Body>, QueueMessageDecodeError> =>
-  Effect.gen(function* () {
-    const messages: Array<QueueMessage<Body>> = [];
+  Effect.gen(function*() {
+    const messages: Array<QueueMessage<Body>> = []
 
     for (let index = 0; index < batch.messages.length; index++) {
-      const message = batch.messages[index];
+      const message = batch.messages[index]
       const body = yield* decodeBody(message.body).pipe(
         Effect.mapError(
           (cause) =>
@@ -94,34 +96,33 @@ export const decodeBatch = <Body>(
               cause,
             }),
         ),
-      );
+      )
 
-      messages.push(fromMessage(message, body));
+      messages.push(fromMessage(message, body))
     }
 
-    return fromMessageBatch(batch, messages);
-  });
+    return fromMessageBatch(batch, messages)
+  })
 
 export type Definition<
   Id extends string = string,
-  Message extends QueueDefinition.Definition.Any["message"] =
-    QueueDefinition.Definition.Any["message"],
-> = QueueDefinition.Definition<Id, Message>;
+  Message extends QueueDefinition.Definition.Any['message'] = QueueDefinition.Definition.Any['message'],
+> = QueueDefinition.Definition<Id, Message>
 
 export namespace Definition {
-  export type Any = QueueDefinition.Definition.Any;
+  export type Any = QueueDefinition.Definition.Any
 }
 
-export type LayerOptions = QueueDefinition.LayerOptions;
+export type LayerOptions = QueueDefinition.LayerOptions
 
-export { implement, Tag, type TagClass } from "./QueueDefinition";
+export { implement, Tag, type TagClass } from './QueueDefinition'
 
 export type Handler<ROut, Self extends QueueDefinition.Definition.Any> = QueueDefinition.Handler<
   ROut,
   Self
->;
+>
 
 export type Options<ROut, Self extends QueueDefinition.Definition.Any> = QueueDefinition.Options<
   ROut,
   Self
->;
+>

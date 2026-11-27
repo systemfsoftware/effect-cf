@@ -1,5 +1,5 @@
-import { ContainerNamespace } from "effect-cf";
+import { ContainerNamespace } from '@systemfsoftware/effect-cf'
 
-export class Containers extends ContainerNamespace.Tag<Containers>()("Containers") {}
+export class Containers extends ContainerNamespace.Tag<Containers>()('Containers') {}
 
-export const bindingLayer = Containers.layer({ binding: "CONTAINERS" });
+export const bindingLayer = Containers.layer({ binding: 'CONTAINERS' })

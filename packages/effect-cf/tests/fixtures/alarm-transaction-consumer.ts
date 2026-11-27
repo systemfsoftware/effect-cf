@@ -1,25 +1,25 @@
-import { DateTime, Effect, Schema } from "effect";
-import { SqlClient } from "effect/sql";
-import { DurableObjectAlarm, DurableObjectSqlite } from "effect-cf";
+import { DurableObjectAlarm, DurableObjectSqlite } from '@systemfsoftware/effect-cf'
+import { DateTime, Effect, Schema } from 'effect'
+import { SqlClient } from 'effect/sql'
 
 // Register JobAlarms.handlers(...) on the DO that uses this application layer.
-export const AlarmStorageLive = DurableObjectSqlite.layer();
-export class JobAlarms extends DurableObjectAlarm.Tag<JobAlarms>()("JobAlarms", {
+export const AlarmStorageLive = DurableObjectSqlite.layer()
+export class JobAlarms extends DurableObjectAlarm.Tag<JobAlarms>()('JobAlarms', {
   job: Schema.Null,
 }) {}
 
-export const scheduleJob = Effect.fn("scheduleJob")(function* (id: string, runAt: DateTime.Utc) {
-  const alarms = yield* JobAlarms;
-  const sql = yield* SqlClient.SqlClient;
+export const scheduleJob = Effect.fn('scheduleJob')(function*(id: string, runAt: DateTime.Utc) {
+  const alarms = yield* JobAlarms
+  const sql = yield* SqlClient.SqlClient
 
-  yield* sql`CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, run_at INTEGER NOT NULL)`;
+  yield* sql`CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, run_at INTEGER NOT NULL)`
 
   return yield* alarms.transaction((tx) =>
-    Effect.gen(function* () {
-      yield* sql`INSERT OR REPLACE INTO jobs (id, run_at) VALUES (${id}, ${DateTime.toEpochMillis(runAt)})`;
-      yield* tx.scheduleAlarm({ tag: "job", id, runAt, payload: null });
+    Effect.gen(function*() {
+      yield* sql`INSERT OR REPLACE INTO jobs (id, run_at) VALUES (${id}, ${DateTime.toEpochMillis(runAt)})`
+      yield* tx.scheduleAlarm({ tag: 'job', id, runAt, payload: null })
 
-      return id;
-    }),
-  );
-});
+      return id
+    })
+  )
+})

@@ -43,10 +43,24 @@ jobs:
       - run: pnpm run patch:tsgo
       - run: pnpm run check:types
       - run: pnpm run build
+      - name: Every published package packs with its dist
+        run: |
+          set -euo pipefail
+          for dir in packages/*; do
+            name=$(jq -r .name "$dir/package.json")
+            out=$(mktemp -d)
+            pnpm --dir "$dir" pack --pack-destination "$out" >/dev/null
+            tgz=$(ls "$out"/*.tgz)
+            listing="$out/contents.txt"
+            tar -tzf "$tgz" > "$listing"
+            grep -qx 'package/package.json' "$listing"
+            grep -qx 'package/dist/index.mjs' "$listing"
+            echo "$name packs"
+          done
   changeset:
     name: change intent
     if: github.event_name == 'pull_request' && github.head_ref != 'changeset-release/main'
-    uses: systemfsoftware/pnpm-release-management/.github/workflows/changeset-check.yml@a7c8ca88d2ace4fb62bfeff20f594d11cffe3780
+    uses: systemfsoftware/pnpm-release-management/.github/workflows/changeset-check.yml@292288250ae39b491c79ce6818267972df71be7a
     permissions:
       contents: read
       pull-requests: read
@@ -85,11 +99,26 @@ jobs:
           pnpm run check:containers
       - name: Run tests
         run: pnpm run test
+  nix:
+    name: nix flake
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: cachix/install-nix-action@bb0495a1086c46893eee56f32fd192dfe4a15bb9
+        with:
+          extra_nix_config: |
+            extra-substituters = https://nix.systemfsoftware.com
+            extra-trusted-public-keys = nix-cache-1:wXA8I4DayNW9q6enUyQA/P/nT38pGSTLt374t3gsn7M=
+      - name: The Nix workspace build produces the release tarballs
+        run: nix build .#packages.x86_64-linux.workspace-tarballs
   check:
     name: checks / check
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    needs: [lint, build-and-pack, changeset, test]
+    needs: [lint, build-and-pack, changeset, test, nix]
     if: ${{ always() }}
     steps:
       - name: Require every job to succeed
@@ -97,12 +126,13 @@ jobs:
           LINT: ${{ needs.lint.result }}
           BUILD_AND_PACK: ${{ needs.build-and-pack.result }}
           TEST: ${{ needs.test.result }}
+          NIX: ${{ needs.nix.result }}
           CHANGESET: ${{ needs.changeset.result }}
           EVENT: ${{ github.event_name }}
           HEAD_REF: ${{ github.head_ref }}
         run: |
           status=0
-          for pair in "lint:$LINT" "build-and-pack:$BUILD_AND_PACK" "test:$TEST"; do
+          for pair in "lint:$LINT" "build-and-pack:$BUILD_AND_PACK" "test:$TEST" "nix:$NIX"; do
             case "$pair" in
               *:success) ;;
               *) echo "A required job finished as: $pair"; status=1 ;;

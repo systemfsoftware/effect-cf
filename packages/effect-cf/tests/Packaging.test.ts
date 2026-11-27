@@ -1,16 +1,16 @@
-import { NodeServices } from "@effect/platform-node";
-import { beforeAll, expect, it } from "@effect/vitest";
-import { Effect, FileSystem, Path, Stream } from "effect";
-import { ChildProcess, ChildProcessSpawner } from "effect/process";
-import { build, type Plugin } from "esbuild";
+import { NodeServices } from '@effect/platform-node'
+import { beforeAll, expect, it } from '@effect/vitest'
+import { Effect, FileSystem, Path, Stream } from 'effect'
+import { ChildProcess, ChildProcessSpawner } from 'effect/process'
+import { build, type Plugin } from 'esbuild'
 
-const run = Effect.fn("Packaging.run")(function* (args: ReadonlyArray<string>) {
-  const path = yield* Path.Path;
-  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner;
-  const cwd = yield* path.fromFileUrl(new URL("../../../", import.meta.url));
+const run = Effect.fn('Packaging.run')(function*(args: ReadonlyArray<string>) {
+  const path = yield* Path.Path
+  const spawner = yield* ChildProcessSpawner.ChildProcessSpawner
+  const cwd = yield* path.fromFileUrl(new URL('../../../', import.meta.url))
   const child = yield* spawner.spawn(
-    ChildProcess.make("vp", args, { cwd, stdout: "pipe", stderr: "pipe" }),
-  );
+    ChildProcess.make('vp', args, { cwd, stdout: 'pipe', stderr: 'pipe' }),
+  )
   const [output, errors, exitCode] = yield* Effect.all(
     [
       child.stdout.pipe(Stream.decodeText(), Stream.mkString),
@@ -18,209 +18,209 @@ const run = Effect.fn("Packaging.run")(function* (args: ReadonlyArray<string>) {
       child.exitCode,
     ],
     { concurrency: 3 },
-  );
+  )
 
   if (exitCode !== 0) {
-    expect.unreachable(`vp exited with code ${exitCode}:\n${output}\n${errors}`);
+    expect.unreachable(`vp exited with code ${exitCode}:\n${output}\n${errors}`)
   }
 
-  return output;
-}, Effect.scoped);
+  return output
+}, Effect.scoped)
 
 beforeAll(
   () =>
-    run(["run", "--no-cache", "--concurrency-limit", "1", "effect-cf#build"]).pipe(
+    run(['run', '--no-cache', '--concurrency-limit', '1', '@systemfsoftware/effect-cf#build']).pipe(
       Effect.asVoid,
-      Effect.timeout("60 seconds"),
+      Effect.timeout('60 seconds'),
       Effect.provide(NodeServices.layer),
       Effect.runPromise,
     ),
   65_000,
-);
+)
 
 const rejectOptionalPeers: Plugin = {
-  name: "reject-optional-peers",
+  name: 'reject-optional-peers',
   setup(build) {
     build.onResolve({ filter: /^@cloudflare\/(?:computer|sandbox)(?:\/.*)?$/ }, (args) => ({
       errors: [{ text: `unexpected optional peer import: ${args.path}` }],
-    }));
+    }))
   },
-};
+}
 
-it.live("the WebSocket RPC client subpath bundles for browsers without Cloudflare imports", () =>
-  Effect.gen(function* () {
+it.live('the WebSocket RPC client subpath bundles for browsers without Cloudflare imports', () =>
+  Effect.gen(function*() {
     const result = yield* Effect.promise(() =>
       build({
         stdin: {
-          contents: 'export { layer } from "effect-cf/rpc-websocket-client";',
-          resolveDir: new URL("../", import.meta.url).pathname,
+          contents: 'export { layer } from "@systemfsoftware/effect-cf/rpc-websocket-client";',
+          resolveDir: new URL('../', import.meta.url).pathname,
         },
         bundle: true,
-        format: "esm",
-        platform: "browser",
+        format: 'esm',
+        platform: 'browser',
         write: false,
-      }),
-    );
+      })
+    )
 
-    expect(result.outputFiles).toHaveLength(1);
-  }),
-);
+    expect(result.outputFiles).toHaveLength(1)
+  }))
 
-it.live("the root package bundles Durable Object consumers without optional peers", () =>
-  Effect.gen(function* () {
+it.live('the root package bundles Durable Object consumers without optional peers', () =>
+  Effect.gen(function*() {
     const result = yield* Effect.promise(() =>
       build({
-        entryPoints: [new URL("./fixtures/durable-object-consumer.ts", import.meta.url).pathname],
+        entryPoints: [new URL('./fixtures/durable-object-consumer.ts', import.meta.url).pathname],
         bundle: true,
         // Workers provides async_hooks natively at our supported compatibility date.
-        external: ["cloudflare:*", "node:async_hooks"],
-        format: "esm",
-        platform: "browser",
+        external: ['cloudflare:*', 'node:async_hooks'],
+        format: 'esm',
+        platform: 'browser',
         plugins: [rejectOptionalPeers],
         write: false,
-      }),
-    );
+      })
+    )
 
-    expect(result.outputFiles).toHaveLength(1);
-  }),
-);
+    expect(result.outputFiles).toHaveLength(1)
+  }))
 
-it.live("the root package bundles KV consumers without unrelated runtime imports", () =>
-  Effect.gen(function* () {
+it.live('the root package bundles KV consumers without unrelated runtime imports', () =>
+  Effect.gen(function*() {
     const result = yield* Effect.promise(() =>
       build({
         stdin: {
-          contents: 'import { Kv } from "effect-cf"; export const Tag = Kv.Tag;',
-          resolveDir: new URL("../", import.meta.url).pathname,
+          contents: 'import { Kv } from "@systemfsoftware/effect-cf"; export const Tag = Kv.Tag;',
+          resolveDir: new URL('../', import.meta.url).pathname,
         },
         bundle: true,
-        external: ["cloudflare:*", "node:async_hooks"],
-        format: "esm",
+        external: ['cloudflare:*', 'node:async_hooks'],
+        format: 'esm',
         metafile: true,
-        platform: "browser",
+        platform: 'browser',
         write: false,
-      }),
-    );
+      })
+    )
     const imports = Object.values(result.metafile.outputs).flatMap((output) =>
-      output.imports.map((entry) => entry.path),
-    );
+      output.imports.map((entry) => entry.path)
+    )
 
-    expect(imports).not.toContain("cloudflare:workers");
-    expect(imports).not.toContain("cloudflare:workflows");
-    expect(imports).not.toContain("node:async_hooks");
-  }),
-);
+    expect(imports).not.toContain('cloudflare:workers')
+    expect(imports).not.toContain('cloudflare:workflows')
+    expect(imports).not.toContain('node:async_hooks')
+  }))
 
 // https://github.com/danieljvdm/effect-cf/commit/f6c9c9f8ff504d44ab9c5c0d0fa6fc4c47a98039
-it.live.each(["Queue", "Workflow"])(
-  "published %s factories initialize when definitions are imported first",
+it.live.each(['Queue', 'Workflow'])(
+  'published %s factories initialize when definitions are imported first',
   (family) =>
-    Effect.gen(function* () {
-      const path = yield* Path.Path;
+    Effect.gen(function*() {
+      const path = yield* Path.Path
       const fixture = yield* path.fromFileUrl(
-        new URL("./fixtures/definition-initialization.mjs", import.meta.url),
-      );
+        new URL('./fixtures/definition-initialization.mjs', import.meta.url),
+      )
       const output = yield* run([
-        "exec",
-        "node",
-        "--experimental-strip-types",
+        'exec',
+        'node',
+        '--experimental-strip-types',
         fixture,
-        new URL("../dist/", import.meta.url).href,
+        new URL('../dist/', import.meta.url).href,
         family,
-      ]);
+      ])
 
-      expect(output).toBe("ok\n");
+      expect(output).toBe('ok\n')
     }).pipe(Effect.provide(NodeServices.layer)),
-);
+)
 
 // Separate consumer modules prevent one namespace's exports from hiding another's missing types.
-it.live.each(["tsconfig.workers-types.json", "tsconfig.workers-types-composite.json"])(
-  "external package consumers emit portable declarations with %s",
+it.live.each(['tsconfig.workers-types.json', 'tsconfig.workers-types-composite.json'])(
+  'external package consumers emit portable declarations with %s',
   (config) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const packageRoot = yield* path.fromFileUrl(new URL("../", import.meta.url));
-      const repoRoot = path.resolve(packageRoot, "../..");
-      const consumer = yield* fs.makeTempDirectoryScoped({ prefix: "effect-cf-declarations-" });
+    Effect.gen(function*() {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const packageRoot = yield* path.fromFileUrl(new URL('../', import.meta.url))
+      const repoRoot = path.resolve(packageRoot, '../..')
+      const consumer = yield* fs.makeTempDirectoryScoped({ prefix: 'effect-cf-declarations-' })
 
-      yield* fs.copy(path.join(packageRoot, "tests/fixtures/declaration-emit"), consumer);
-      yield* fs.makeDirectory(path.join(consumer, "node_modules/@cloudflare"), {
+      yield* fs.copy(path.join(packageRoot, 'tests/fixtures/declaration-emit'), consumer)
+      yield* fs.makeDirectory(path.join(consumer, 'node_modules/@cloudflare'), {
         recursive: true,
-      });
-      yield* fs.symlink(packageRoot, path.join(consumer, "node_modules/effect-cf"));
+      })
+      yield* fs.makeDirectory(path.join(consumer, 'node_modules/@systemfsoftware'), {
+        recursive: true,
+      })
+      yield* fs.symlink(packageRoot, path.join(consumer, 'node_modules/@systemfsoftware/effect-cf'))
       yield* fs.symlink(
-        path.join(repoRoot, "node_modules/effect"),
-        path.join(consumer, "node_modules/effect"),
-      );
+        path.join(repoRoot, 'node_modules/effect'),
+        path.join(consumer, 'node_modules/effect'),
+      )
       yield* fs.symlink(
-        path.join(packageRoot, "node_modules/@cloudflare/workers-types"),
-        path.join(consumer, "node_modules/@cloudflare/workers-types"),
-      );
+        path.join(packageRoot, 'node_modules/@cloudflare/workers-types'),
+        path.join(consumer, 'node_modules/@cloudflare/workers-types'),
+      )
       yield* run([
-        "exec",
-        "tsc",
-        "--noEmit",
-        "false",
-        "--emitDeclarationOnly",
-        "-p",
+        'exec',
+        'tsc',
+        '--noEmit',
+        'false',
+        '--emitDeclarationOnly',
+        '-p',
         path.join(consumer, config),
-      ]);
+      ])
 
-      expect(yield* fs.exists(path.join(consumer, "dist/r2.d.ts"))).toBe(true);
+      expect(yield* fs.exists(path.join(consumer, 'dist/r2.d.ts'))).toBe(true)
     }).pipe(Effect.provide(NodeServices.layer)),
   60_000,
-);
+)
 
-it.live.each(["tsconfig.wrangler-types.json", "tsconfig.wrangler-types-composite.json"])(
-  "external package consumers emit declarations with Wrangler-generated runtime types and %s",
+it.live.each(['tsconfig.wrangler-types.json', 'tsconfig.wrangler-types-composite.json'])(
+  'external package consumers emit declarations with Wrangler-generated runtime types and %s',
   (config) =>
-    Effect.gen(function* () {
-      const fs = yield* FileSystem.FileSystem;
-      const path = yield* Path.Path;
-      const packageRoot = yield* path.fromFileUrl(new URL("../", import.meta.url));
-      const repoRoot = path.resolve(packageRoot, "../..");
-      const fixtureRoot = path.join(packageRoot, "tests/fixtures/declaration-emit");
+    Effect.gen(function*() {
+      const fs = yield* FileSystem.FileSystem
+      const path = yield* Path.Path
+      const packageRoot = yield* path.fromFileUrl(new URL('../', import.meta.url))
+      const repoRoot = path.resolve(packageRoot, '../..')
+      const fixtureRoot = path.join(packageRoot, 'tests/fixtures/declaration-emit')
       const temporaryConsumer = yield* fs.makeTempDirectoryScoped({
-        prefix: "effect-cf-wrangler-types-",
-      });
-      const consumer = yield* fs.realPath(temporaryConsumer);
-      const generatedTypes = path.join(consumer, "worker-configuration.d.ts");
-      const installedPackage = path.join(consumer, "node_modules/effect-cf");
+        prefix: 'effect-cf-wrangler-types-',
+      })
+      const consumer = yield* fs.realPath(temporaryConsumer)
+      const generatedTypes = path.join(consumer, 'worker-configuration.d.ts')
+      const installedPackage = path.join(consumer, 'node_modules/@systemfsoftware/effect-cf')
 
-      yield* fs.copy(fixtureRoot, consumer);
-      yield* fs.makeDirectory(installedPackage, { recursive: true });
-      yield* fs.copy(path.join(packageRoot, "dist"), path.join(installedPackage, "dist"));
+      yield* fs.copy(fixtureRoot, consumer)
+      yield* fs.makeDirectory(installedPackage, { recursive: true })
+      yield* fs.copy(path.join(packageRoot, 'dist'), path.join(installedPackage, 'dist'))
       yield* fs.copy(
-        path.join(packageRoot, "package.json"),
-        path.join(installedPackage, "package.json"),
-      );
+        path.join(packageRoot, 'package.json'),
+        path.join(installedPackage, 'package.json'),
+      )
       yield* fs.symlink(
-        path.join(repoRoot, "node_modules/effect"),
-        path.join(consumer, "node_modules/effect"),
-      );
-      expect(yield* fs.exists(path.join(consumer, "node_modules/@cloudflare/workers-types"))).toBe(
+        path.join(repoRoot, 'node_modules/effect'),
+        path.join(consumer, 'node_modules/effect'),
+      )
+      expect(yield* fs.exists(path.join(consumer, 'node_modules/@cloudflare/workers-types'))).toBe(
         false,
-      );
+      )
       yield* run([
-        "exec",
-        "wrangler",
-        "types",
+        'exec',
+        'wrangler',
+        'types',
         generatedTypes,
-        "--config",
-        path.join(consumer, "wrangler.jsonc"),
-      ]);
+        '--config',
+        path.join(consumer, 'wrangler.jsonc'),
+      ])
       yield* run([
-        "exec",
-        "tsc",
-        "--noEmit",
-        "false",
-        "--emitDeclarationOnly",
-        "-p",
+        'exec',
+        'tsc',
+        '--noEmit',
+        'false',
+        '--emitDeclarationOnly',
+        '-p',
         path.join(consumer, config),
-      ]);
+      ])
 
-      expect(yield* fs.exists(path.join(consumer, "dist/r2.d.ts"))).toBe(true);
+      expect(yield* fs.exists(path.join(consumer, 'dist/r2.d.ts'))).toBe(true)
     }).pipe(Effect.provide(NodeServices.layer)),
   60_000,
-);
+)

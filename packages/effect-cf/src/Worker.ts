@@ -1,40 +1,40 @@
-import { WorkerEntrypoint as CloudflareWorkerEntrypoint } from "cloudflare:workers";
-import * as Context from "effect/Context";
-import type { Digest, SecureRandom } from "effect/crypto";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as References from "effect/References";
-import * as Tracer from "effect/Tracer";
-import type { Cause, ManagedRuntime, Scope } from "effect";
-import * as HttpEffect from "effect/http/HttpEffect";
-import * as HttpMiddleware from "effect/http/HttpMiddleware";
-import { ClientAbort } from "effect/http/HttpServerError";
-import * as HttpServerRequest from "effect/http/HttpServerRequest";
-import * as HttpServerResponse from "effect/http/HttpServerResponse";
+import { WorkerEntrypoint as CloudflareWorkerEntrypoint } from 'cloudflare:workers'
+import type { Cause, ManagedRuntime, Scope } from 'effect'
+import * as Context from 'effect/Context'
+import type { Digest, SecureRandom } from 'effect/crypto'
+import * as Effect from 'effect/Effect'
+import * as HttpEffect from 'effect/http/HttpEffect'
+import * as HttpMiddleware from 'effect/http/HttpMiddleware'
+import { ClientAbort } from 'effect/http/HttpServerError'
+import * as HttpServerRequest from 'effect/http/HttpServerRequest'
+import * as HttpServerResponse from 'effect/http/HttpServerResponse'
+import * as Layer from 'effect/Layer'
+import * as References from 'effect/References'
+import * as Tracer from 'effect/Tracer'
 
-import { WorkerEnvironment, type WorkerEnv } from "./Environment";
-import { fromMessage, fromMessageBatch, type QueueHandler } from "./Queue";
-import * as RpcDefinition from "./RpcDefinition";
-import * as RpcTargets from "./RpcTargets";
-import type { ReceiverOptions, RpcInvocationInfo } from "./RpcTracing";
-import * as Entrypoint from "./internal/Entrypoint";
-import * as Runtime from "./internal/Runtime";
-import * as Telemetry from "./internal/Telemetry";
-import { fromExecutionContext } from "./internal/WorkerContext";
+import { type WorkerEnv, WorkerEnvironment } from './Environment'
+import * as Entrypoint from './internal/Entrypoint'
+import * as Runtime from './internal/Runtime'
+import * as Telemetry from './internal/Telemetry'
+import { fromExecutionContext } from './internal/WorkerContext'
+import { fromMessage, fromMessageBatch, type QueueHandler } from './Queue'
+import * as RpcDefinition from './RpcDefinition'
+import * as RpcTargets from './RpcTargets'
+import type { ReceiverOptions, RpcInvocationInfo } from './RpcTracing'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 export type {
   ServiceBindingFetchError,
   ServiceBindingRpcError,
   ServiceCall,
   ServiceRpc,
   ServiceScopedCall,
-} from "./ServiceBinding";
+} from './ServiceBinding'
 
 export class ExecutionContext extends Context.Service<
   ExecutionContext,
   globalThis.ExecutionContext
->()("effect-cf/ExecutionContext") {}
+>()('effect-cf/ExecutionContext') {}
 
 export interface WorkerContextWaitUntilOptions<E, R> {
   /**
@@ -42,59 +42,59 @@ export interface WorkerContextWaitUntilOptions<E, R> {
    * routes the failure to `onFailure`, while `"propagate"` also rejects the
    * native `waitUntil` promise.
    */
-  readonly mode?: "observe" | "propagate";
-  readonly onFailure?: (cause: Cause.Cause<E>) => Effect.Effect<void, never, R>;
+  readonly mode?: 'observe' | 'propagate'
+  readonly onFailure?: (cause: Cause.Cause<E>) => Effect.Effect<void, never, R>
 }
 
 export interface WorkerContextService {
-  readonly raw: globalThis.ExecutionContext;
+  readonly raw: globalThis.ExecutionContext
   waitUntil<A, E, R, R2 = never>(
     effect: Effect.Effect<A, E, R>,
     options?: WorkerContextWaitUntilOptions<E, R2>,
-  ): Effect.Effect<void, never, R | R2>;
+  ): Effect.Effect<void, never, R | R2>
   waitUntilPropagating<A, E, R, R2 = never>(
     effect: Effect.Effect<A, E, R>,
-    options?: Omit<WorkerContextWaitUntilOptions<E, R2>, "mode">,
-  ): Effect.Effect<void, never, R | R2>;
-  readonly passThroughOnException: Effect.Effect<void>;
-  abort(reason?: string): Effect.Effect<void>;
+    options?: Omit<WorkerContextWaitUntilOptions<E, R2>, 'mode'>,
+  ): Effect.Effect<void, never, R | R2>
+  readonly passThroughOnException: Effect.Effect<void>
+  abort(reason?: string): Effect.Effect<void>
 }
 
 export class WorkerContext extends Context.Service<WorkerContext, WorkerContextService>()(
-  "effect-cf/WorkerContext",
+  'effect-cf/WorkerContext',
 ) {}
 
 export class NativeRequest extends Context.Service<NativeRequest, Request>()(
-  "effect-cf/NativeRequest",
+  'effect-cf/NativeRequest',
 ) {}
 
 export const isWebSocketUpgrade = (request: Request): boolean =>
-  request.headers.get("Upgrade")?.toLowerCase() === "websocket";
+  request.headers.get('Upgrade')?.toLowerCase() === 'websocket'
 
 export type ReservedMethodName =
   | RpcDefinition.ReservedMethodName
-  | "fetch"
-  | "connect"
-  | "queue"
-  | "scheduled"
-  | "tail"
-  | "tailStream"
-  | "test"
-  | "trace"
-  | "alarm"
-  | "webSocketMessage"
-  | "webSocketClose"
-  | "webSocketError";
+  | 'fetch'
+  | 'connect'
+  | 'queue'
+  | 'scheduled'
+  | 'tail'
+  | 'tailStream'
+  | 'test'
+  | 'trace'
+  | 'alarm'
+  | 'webSocketMessage'
+  | 'webSocketClose'
+  | 'webSocketError'
 
 const reservedMethodNames = new Set<string>([
   ...RpcDefinition.reservedMethodNames,
-  "queue",
-  "scheduled",
-  "tail",
-  "tailStream",
-  "test",
-  "trace",
-]);
+  'queue',
+  'scheduled',
+  'tail',
+  'tailStream',
+  'test',
+  'trace',
+])
 
 type WorkerBaseContext<ROut> =
   | Digest.Digest
@@ -102,26 +102,26 @@ type WorkerBaseContext<ROut> =
   | ExecutionContext
   | WorkerContext
   | WorkerEnvironment
-  | ROut;
+  | ROut
 type WorkerFetchContext<ROut> =
   | WorkerBaseContext<ROut>
   | NativeRequest
   | HttpServerRequest.HttpServerRequest
-  | Scope.Scope;
-type WorkerRpcContext<ROut> = WorkerBaseContext<ROut> | Scope.Scope;
+  | Scope.Scope
+type WorkerRpcContext<ROut> = WorkerBaseContext<ROut> | Scope.Scope
 
-type RuntimeContext<ROut> = WorkerBaseContext<ROut>;
+type RuntimeContext<ROut> = WorkerBaseContext<ROut>
 /** Override to instrument the whole event, then call super[RunSymbol]. */
-export const RunSymbol = Symbol.for("effect-cf/Worker/run");
-const FetchSymbol = Symbol.for("effect-cf/Worker/fetch");
+export const RunSymbol = Symbol.for('effect-cf/Worker/run')
+const FetchSymbol = Symbol.for('effect-cf/Worker/fetch')
 
 /** Metadata available before an event effect or its event layer starts. */
 export interface RunOptions extends Runtime.RunOptions {
-  readonly event?: "fetch" | "rpc" | "queue";
-  readonly rpc?: RpcInvocationInfo;
+  readonly event?: 'fetch' | 'rpc' | 'queue'
+  readonly rpc?: RpcInvocationInfo
 }
 
-export type WorkerFetchSuccess = Response | HttpServerResponse.HttpServerResponse;
+export type WorkerFetchSuccess = Response | HttpServerResponse.HttpServerResponse
 
 /**
  * Effect type for `fetch` handlers executed by {@link make}.
@@ -130,43 +130,36 @@ export type WorkerHandler<ROut, A = WorkerFetchSuccess> = Effect.Effect<
   A,
   unknown,
   WorkerFetchContext<ROut>
->;
+>
 
 /**
  * Effect type for worker RPC handlers.
  */
-export type WorkerRpcHandler<ROut, A = unknown> = Effect.Effect<A, unknown, WorkerRpcContext<ROut>>;
+export type WorkerRpcHandler<ROut, A = unknown> = Effect.Effect<A, unknown, WorkerRpcContext<ROut>>
 
 /**
  * Shape of worker RPC handlers passed to {@link make}.
  */
-export type WorkerRpc<ROut> = Record<string, (...args: Array<any>) => WorkerRpcHandler<ROut>>;
+export type WorkerRpc<ROut> = Record<string, (...args: Array<any>) => WorkerRpcHandler<ROut>>
 
 export type WorkerRpcContract<Rpc extends WorkerRpc<ROut>, ROut> = {
   readonly [Key in keyof Rpc]: Rpc[Key] extends (
     ...args: infer Args
-  ) => Effect.Effect<infer A, unknown, WorkerRpcContext<ROut>>
-    ? (...args: Args) => Promise<A>
-    : never;
-};
+  ) => Effect.Effect<infer A, unknown, WorkerRpcContext<ROut>> ? (...args: Args) => Promise<A>
+    : never
+}
 
 export type RpcHandlers<ROut, Api> = {
   readonly [
-    Key in keyof Api as Key extends keyof CloudflareWorkerEntrypoint
-      ? never
-      : Key extends string
-        ? Key extends ReservedMethodName
-          ? never
-          : [Api[Key]] extends [never]
-            ? never
-            : Api[Key] extends (...args: Array<any>) => Promise<any>
-              ? Key
-              : never
+    Key in keyof Api as Key extends keyof CloudflareWorkerEntrypoint ? never
+      : Key extends string ? Key extends ReservedMethodName ? never
+        : [Api[Key]] extends [never] ? never
+        : Api[Key] extends (...args: Array<any>) => Promise<any> ? Key
         : never
-  ]: Api[Key] extends (...args: infer Args) => Promise<infer A>
-    ? (...args: Args) => WorkerRpcHandler<ROut, A>
-    : never;
-};
+      : never
+  ]: Api[Key] extends (...args: infer Args) => Promise<infer A> ? (...args: Args) => WorkerRpcHandler<ROut, A>
+    : never
+}
 
 export interface WorkerOptions<
   RRuntime,
@@ -184,13 +177,13 @@ export interface WorkerOptions<
    * guarantee. Fetch, queue, and RPC handlers schedule a best-effort telemetry
    * flush capped at two seconds.
    */
-  readonly eventLayer?: Layer.Layer<REvent, EventLayerError, WorkerBaseContext<RRuntime>>;
+  readonly eventLayer?: Layer.Layer<REvent, EventLayerError, WorkerBaseContext<RRuntime>>
   readonly fetch?: Effect.Effect<
     WorkerFetchSuccess,
     unknown,
     WorkerFetchContext<RRuntime | REvent>
-  >;
-  readonly queue?: QueueHandler<RRuntime | REvent>;
+  >
+  readonly queue?: QueueHandler<RRuntime | REvent>
   /**
    * Optional RPC methods exposed as class instance methods.
    *
@@ -198,9 +191,9 @@ export interface WorkerOptions<
    * `WorkerContext.waitUntil`, including when the handler fails. The scheduled
    * flush silently settles within two seconds even if the exporter does not.
    */
-  readonly rpc?: Rpc;
+  readonly rpc?: Rpc
   /** Accept live native trace metadata. The client must also enable rpcTracing. */
-  readonly rpcTracing?: ReceiverOptions;
+  readonly rpcTracing?: ReceiverOptions
 }
 
 type WorkerOptionsWithEventLayer<
@@ -208,39 +201,43 @@ type WorkerOptionsWithEventLayer<
   REvent,
   EventLayerError,
   Rpc extends WorkerRpc<RRuntime | REvent> = Record<never, never>,
-> = Omit<WorkerOptions<RRuntime, REvent, EventLayerError, Rpc>, "eventLayer"> & {
-  readonly eventLayer: Layer.Layer<REvent, EventLayerError, WorkerBaseContext<RRuntime>>;
-};
+> = Omit<WorkerOptions<RRuntime, REvent, EventLayerError, Rpc>, 'eventLayer'> & {
+  readonly eventLayer: Layer.Layer<REvent, EventLayerError, WorkerBaseContext<RRuntime>>
+}
 
-export type FetchWorkerOptions<RRuntime, REvent = never, EventLayerError = never> = Omit<
-  WorkerOptions<RRuntime, REvent, EventLayerError, Record<never, never>>,
-  "rpc"
-> & {
-  readonly rpc?: never;
-};
+export type FetchWorkerOptions<RRuntime, REvent = never, EventLayerError = never> =
+  & Omit<
+    WorkerOptions<RRuntime, REvent, EventLayerError, Record<never, never>>,
+    'rpc'
+  >
+  & {
+    readonly rpc?: never
+  }
 
-type FetchWorkerOptionsWithEventLayer<RRuntime, REvent, EventLayerError> = Omit<
-  FetchWorkerOptions<RRuntime, REvent, EventLayerError>,
-  "eventLayer"
-> & {
-  readonly eventLayer: Layer.Layer<REvent, EventLayerError, WorkerBaseContext<RRuntime>>;
-};
+type FetchWorkerOptionsWithEventLayer<RRuntime, REvent, EventLayerError> =
+  & Omit<
+    FetchWorkerOptions<RRuntime, REvent, EventLayerError>,
+    'eventLayer'
+  >
+  & {
+    readonly eventLayer: Layer.Layer<REvent, EventLayerError, WorkerBaseContext<RRuntime>>
+  }
 
 /**
  * Cloudflare `WorkerEntrypoint` constructor produced by {@link make}.
  */
-export type WorkerClass<Rpc extends WorkerRpc<ROut>, ROut> = new (
+export type WorkerClass<Rpc extends WorkerRpc<ROut>, ROut> = new(
   ctx: globalThis.ExecutionContext,
   env: WorkerEnv,
 ) => CloudflareWorkerEntrypoint<WorkerEnv> & {
-  fetch(request: Request): Promise<Response>;
-  queue(batch: globalThis.MessageBatch): Promise<void>;
+  fetch(request: Request): Promise<Response>
+  queue(batch: globalThis.MessageBatch): Promise<void>
   [RunSymbol]<A, E>(
     effect: Effect.Effect<A, E, WorkerRpcContext<ROut>>,
     options?: RunOptions,
-  ): Promise<A>;
-  [FetchSymbol](request: Request, requestContext: globalThis.ExecutionContext): Promise<Response>;
-} & WorkerRpcContract<Rpc, ROut>;
+  ): Promise<A>
+  [FetchSymbol](request: Request, requestContext: globalThis.ExecutionContext): Promise<Response>
+} & WorkerRpcContract<Rpc, ROut>
 
 /**
  * `ExportedHandler`-compatible fetch object produced by {@link makeFetchHandler}.
@@ -250,7 +247,7 @@ export interface FetchHandler<Env extends WorkerEnv = WorkerEnv> {
     request: Request,
     env: Env,
     ctx: globalThis.ExecutionContext,
-  ) => Promise<Response>;
+  ) => Promise<Response>
 }
 
 const renderFetchSuccess = <E, R, REvent, EventLayerError, EventLayerRequirements>(
@@ -267,18 +264,18 @@ const renderFetchSuccess = <E, R, REvent, EventLayerError, EventLayerRequirement
     // upgrade responses and app-level `HttpEffect.toHandled` results pass
     // through untouched. Pre-response handlers still run against a placeholder
     // response, but their output is discarded for native `Response` results.
-    let nativeResponse: Response | undefined;
-    let webResponse: Response | undefined;
+    let nativeResponse: Response | undefined
+    let webResponse: Response | undefined
 
     const httpApp = Effect.flatMap(effect, (response) => {
       if (response instanceof Response) {
-        nativeResponse = response;
+        nativeResponse = response
 
-        return Effect.succeed(HttpServerResponse.empty());
+        return Effect.succeed(HttpServerResponse.empty())
       }
 
-      return Effect.succeed(response);
-    });
+      return Effect.succeed(response)
+    })
     const handleResponse = (
       request: HttpServerRequest.HttpServerRequest,
       response: HttpServerResponse.HttpServerResponse,
@@ -286,87 +283,83 @@ const renderFetchSuccess = <E, R, REvent, EventLayerError, EventLayerRequirement
       nativeResponse !== undefined
         ? Effect.void
         : Effect.map(Effect.context<never>(), (context) => {
-            const withoutBody = request.method === "HEAD";
+          const withoutBody = request.method === 'HEAD'
 
-            webResponse = HttpServerResponse.toWeb(
-              HttpServerResponse.omitsBody(response, withoutBody)
-                ? response
-                : HttpEffect.scopeTransferToStream(response),
-              {
-                withoutBody,
-                context,
-                signal,
-              },
-            );
-          });
+          webResponse = HttpServerResponse.toWeb(
+            HttpServerResponse.omitsBody(response, withoutBody)
+              ? response
+              : HttpEffect.scopeTransferToStream(response),
+            {
+              withoutBody,
+              context,
+              signal,
+            },
+          )
+        })
     const telemetryMiddleware = HttpMiddleware.make((self) =>
       RpcTargets.withScope(
-        Effect.gen(function* () {
-          yield* Effect.addFinalizer(() => scheduleFetchTelemetryFlush);
+        Effect.gen(function*() {
+          yield* Effect.addFinalizer(() => scheduleFetchTelemetryFlush)
 
-          return yield* self;
+          return yield* self
         }),
-      ),
-    );
-    const handled =
-      eventLayer === undefined
-        ? HttpEffect.toHandled(httpApp, handleResponse, telemetryMiddleware)
-        : Effect.flatMap(References.TracerEnabled, (tracerEnabled) =>
-            HttpEffect.toHandled(
-              httpApp,
-              handleResponse,
-              HttpMiddleware.make((self) =>
-                RpcTargets.withScope(
-                  Effect.provideService(
-                    Effect.gen(function* () {
-                      const context = yield* Layer.build(Layer.fresh(eventLayer));
+      )
+    )
+    const handled = eventLayer === undefined
+      ? HttpEffect.toHandled(httpApp, handleResponse, telemetryMiddleware)
+      : Effect.flatMap(References.TracerEnabled, (tracerEnabled) =>
+        HttpEffect.toHandled(
+          httpApp,
+          handleResponse,
+          HttpMiddleware.make((self) =>
+            RpcTargets.withScope(
+              Effect.provideService(
+                Effect.gen(function*() {
+                  const context = yield* Layer.build(Layer.fresh(eventLayer))
 
-                      yield* Effect.addFinalizer(() =>
-                        Effect.provideContext(scheduleTelemetryFlush, context),
-                      );
+                  yield* Effect.addFinalizer(() => Effect.provideContext(scheduleTelemetryFlush, context))
 
-                      return yield* HttpMiddleware.tracer(self).pipe(
-                        // The tracer schedules span completion. Let it publish on
-                        // every exit with event references still installed, before
-                        // the exporter scope finalizes.
-                        Effect.onExit(() => Effect.yieldNow),
-                        Effect.provideContext(context),
-                      );
-                    }),
-                    References.TracerEnabled,
-                    tracerEnabled,
-                  ),
-                ),
+                  return yield* HttpMiddleware.tracer(self).pipe(
+                    // The tracer schedules span completion. Let it publish on
+                    // every exit with event references still installed, before
+                    // the exporter scope finalizes.
+                    Effect.onExit(() => Effect.yieldNow),
+                    Effect.provideContext(context),
+                  )
+                }),
+                References.TracerEnabled,
+                tracerEnabled,
               ),
-            ).pipe(Effect.withTracerEnabled(false)),
-          );
+            )
+          ),
+        ).pipe(Effect.withTracerEnabled(false)))
 
     // `toHandled` re-fails with the original cause after rendering the error
     // response, so both branches return the response captured above.
-    const captured = () => nativeResponse ?? webResponse ?? new Response(null, { status: 500 });
+    const captured = () => nativeResponse ?? webResponse ?? new Response(null, { status: 500 })
 
     return Effect.acquireUseRelease(
       Effect.withFiber((fiber) =>
         Effect.sync(() => {
-          const onAbort = () => fiber.interruptUnsafe(undefined, ClientAbort.annotation);
+          const onAbort = () => fiber.interruptUnsafe(undefined, ClientAbort.annotation)
 
           if (signal.aborted) {
-            onAbort();
+            onAbort()
           } else {
-            signal.addEventListener("abort", onAbort, { once: true });
+            signal.addEventListener('abort', onAbort, { once: true })
           }
 
-          return onAbort;
-        }),
+          return onAbort
+        })
       ),
       () => Effect.matchCause(handled, { onFailure: captured, onSuccess: captured }),
-      (onAbort) => Effect.sync(() => signal.removeEventListener("abort", onAbort)),
-    );
-  });
+      (onAbort) => Effect.sync(() => signal.removeEventListener('abort', onAbort)),
+    )
+  })
 
 const isWorkerOptions = <ROut, REvent, EventLayerError, Rpc extends WorkerRpc<ROut | REvent>>(
   options: WorkerOptions<ROut, REvent, EventLayerError, Rpc> | WorkerHandler<ROut>,
-): options is WorkerOptions<ROut, REvent, EventLayerError, Rpc> => !Effect.isEffect(options);
+): options is WorkerOptions<ROut, REvent, EventLayerError, Rpc> => !Effect.isEffect(options)
 
 /**
  * Drains buffered OTLP telemetry when the fetch Effect scope closes. Effect
@@ -377,19 +370,19 @@ const isWorkerOptions = <ROut, REvent, EventLayerError, Rpc extends WorkerRpc<RO
  * handler. It is a no-op when the context does not contain an
  * `OtlpExporter.Flusher`, and silently settles within two seconds.
  */
-const scheduleTelemetryFlush: Effect.Effect<void, never, WorkerContext> =
-  Telemetry.scheduleTelemetryFlush((flush) =>
-    Effect.flatMap(WorkerContext, (workerContext) => workerContext.waitUntil(flush)),
-  );
+const scheduleTelemetryFlush: Effect.Effect<void, never, WorkerContext> = Telemetry.scheduleTelemetryFlush((flush) =>
+  Effect.flatMap(WorkerContext, (workerContext) => workerContext.waitUntil(flush))
+)
 
-const scheduleFetchTelemetryFlush: Effect.Effect<void, never, WorkerContext> =
-  Telemetry.scheduleTelemetryFlush((flush) =>
-    // The outer HTTP tracer queues span completion before the request scope closes.
-    Effect.andThen(
-      Effect.yieldNow,
-      Effect.flatMap(WorkerContext, (workerContext) => workerContext.waitUntil(flush)),
-    ),
-  );
+const scheduleFetchTelemetryFlush: Effect.Effect<void, never, WorkerContext> = Telemetry.scheduleTelemetryFlush((
+  flush,
+) =>
+  // The outer HTTP tracer queues span completion before the request scope closes.
+  Effect.andThen(
+    Effect.yieldNow,
+    Effect.flatMap(WorkerContext, (workerContext) => workerContext.waitUntil(flush)),
+  )
+)
 
 /**
  * Cloudflare creates a new `WorkerEntrypoint` instance for each native
@@ -400,7 +393,7 @@ const scheduleFetchTelemetryFlush: Effect.Effect<void, never, WorkerContext> =
 export function make<ROut, LayerError>(
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<never>>,
   fetch: WorkerHandler<ROut>,
-): WorkerClass<Record<never, never>, ROut>;
+): WorkerClass<Record<never, never>, ROut>
 export function make<
   ROut,
   LayerError,
@@ -410,7 +403,7 @@ export function make<
 >(
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<never>>,
   options: WorkerOptionsWithEventLayer<ROut, REvent, EventLayerError, Rpc>,
-): WorkerClass<Rpc, ROut | REvent>;
+): WorkerClass<Rpc, ROut | REvent>
 export function make<
   ROut,
   LayerError,
@@ -420,7 +413,7 @@ export function make<
 >(
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<never>>,
   options: WorkerOptions<ROut, REvent, EventLayerError, Rpc>,
-): WorkerClass<Rpc, ROut | REvent>;
+): WorkerClass<Rpc, ROut | REvent>
 export function make<
   ROut,
   LayerError,
@@ -433,13 +426,13 @@ export function make<
 ): WorkerClass<Rpc, ROut | REvent> {
   const options: WorkerOptions<ROut, REvent, EventLayerError, Rpc> = isWorkerOptions(optionsOrFetch)
     ? optionsOrFetch
-    : { fetch: optionsOrFetch };
+    : { fetch: optionsOrFetch }
 
   class EffectWorker extends CloudflareWorkerEntrypoint<WorkerEnv> {
-    readonly runtime: ManagedRuntime.ManagedRuntime<RuntimeContext<ROut>, LayerError>;
+    readonly runtime: ManagedRuntime.ManagedRuntime<RuntimeContext<ROut>, LayerError>
 
     constructor(ctx: globalThis.ExecutionContext, env: WorkerEnv) {
-      super(ctx, env);
+      super(ctx, env)
 
       this.runtime = Runtime.makeEntrypointRuntime<
         ROut,
@@ -453,7 +446,7 @@ export function make<
             Context.add(WorkerContext, fromExecutionContext(ctx)),
           ),
         ),
-      );
+      )
     }
 
     [RunSymbol]<A, E>(
@@ -461,9 +454,9 @@ export function make<
       runOptions: RunOptions = {},
     ): Promise<A> {
       // Fetch builds its event layer in the HTTP scope transferred to the body.
-      const eventLayer = runOptions.event === "fetch" ? undefined : options.eventLayer;
-      const parent = runOptions.rpc?.parent;
-      const parentSpan = parent === undefined ? undefined : Tracer.externalSpan(parent);
+      const eventLayer = runOptions.event === 'fetch' ? undefined : options.eventLayer
+      const parent = runOptions.rpc?.parent
+      const parentSpan = parent === undefined ? undefined : Tracer.externalSpan(parent)
 
       if (eventLayer === undefined) {
         // SAFETY: fetch provides REvent inside its HTTP middleware; otherwise the
@@ -475,7 +468,7 @@ export function make<
           undefined,
           parentSpan,
           runOptions.onFailure,
-        );
+        )
       }
 
       return Runtime.runEventPromise<
@@ -485,29 +478,29 @@ export function make<
         REvent,
         EventLayerError,
         LayerError
-      >(this.runtime, effect, eventLayer, parentSpan, runOptions.onFailure);
+      >(this.runtime, effect, eventLayer, parentSpan, runOptions.onFailure)
     }
 
     fetch(request: Request): Promise<Response> {
-      return this[FetchSymbol](request);
+      return this[FetchSymbol](request)
     }
 
     [FetchSymbol](
       request: Request,
       requestContext?: globalThis.ExecutionContext,
     ): Promise<Response> {
-      const fetchHandler = options.fetch;
+      const fetchHandler = options.fetch
 
       if (fetchHandler === undefined) {
-        return Promise.resolve(new Response("Not Found", { status: 404 }));
+        return Promise.resolve(new Response('Not Found', { status: 404 }))
       }
 
-      const ctx = requestContext ?? this.ctx;
+      const ctx = requestContext ?? this.ctx
       const requestServices = Context.make(NativeRequest, request).pipe(
         Context.add(HttpServerRequest.HttpServerRequest, HttpServerRequest.fromWeb(request)),
         Context.add(ExecutionContext, ctx),
         Context.add(WorkerContext, fromExecutionContext(ctx)),
-      );
+      )
 
       // The request services wrap eventLayer construction so cached object handlers
       // never build an event layer against a previous request's ExecutionContext.
@@ -516,43 +509,43 @@ export function make<
         renderFetchSuccess(fetchHandler, options.eventLayer, request.signal).pipe(
           Effect.provideContext(requestServices),
         ),
-        { event: "fetch" },
-      );
+        { event: 'fetch' },
+      )
     }
 
     queue(batch: globalThis.MessageBatch): Promise<void> {
-      const queueHandler = options.queue;
+      const queueHandler = options.queue
 
       if (queueHandler === undefined) {
-        return Promise.resolve();
+        return Promise.resolve()
       }
 
-      const messages = batch.messages.map((message) => fromMessage(message, message.body));
+      const messages = batch.messages.map((message) => fromMessage(message, message.body))
 
       return this[RunSymbol](
         queueHandler(fromMessageBatch(batch, messages)).pipe(
           Effect.onExit(() => scheduleTelemetryFlush),
         ),
-        { event: "queue" },
-      );
+        { event: 'queue' },
+      )
     }
   }
 
   Entrypoint.defineEntrypointRpcMethods<EffectWorker>(
-    "Worker",
+    'Worker',
     EffectWorker.prototype,
     options.rpc,
     reservedMethodNames,
-    (self, effect, rpc) => self[RunSymbol](effect, { event: "rpc", rpc }),
+    (self, effect, rpc) => self[RunSymbol](effect, { event: 'rpc', rpc }),
     () => scheduleTelemetryFlush,
     options.rpcTracing,
-  );
+  )
 
-  return Entrypoint.assumeEntrypointClass<WorkerClass<Rpc, ROut | REvent>>(EffectWorker);
+  return Entrypoint.assumeEntrypointClass<WorkerClass<Rpc, ROut | REvent>>(EffectWorker)
 }
 
 interface FetchCapableInstance {
-  [FetchSymbol](request: Request, requestContext: globalThis.ExecutionContext): Promise<Response>;
+  [FetchSymbol](request: Request, requestContext: globalThis.ExecutionContext): Promise<Response>
 }
 
 /**
@@ -576,7 +569,7 @@ export function makeFetchHandler<
 >(
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<never>>,
   options: FetchWorkerOptionsWithEventLayer<ROut, REvent, EventLayerError>,
-): FetchHandler<Env>;
+): FetchHandler<Env>
 export function makeFetchHandler<
   ROut,
   LayerError,
@@ -586,7 +579,7 @@ export function makeFetchHandler<
 >(
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<never>>,
   options: FetchWorkerOptions<ROut, REvent, EventLayerError>,
-): FetchHandler<Env>;
+): FetchHandler<Env>
 export function makeFetchHandler<
   ROut,
   LayerError,
@@ -597,32 +590,31 @@ export function makeFetchHandler<
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<never>>,
   options: FetchWorkerOptions<ROut, REvent, EventLayerError>,
 ): FetchHandler<Env> {
-  const WorkerClass =
-    options.eventLayer === undefined
-      ? make(
-          layer,
-          // SAFETY: the no-event public overload is the only one that permits an absent eventLayer.
-          options as FetchWorkerOptions<ROut, never, EventLayerError>,
-        )
-      : make(
-          layer,
-          // SAFETY: this branch has the eventLayer required by the event-dependent public overload.
-          options as FetchWorkerOptionsWithEventLayer<ROut, REvent, EventLayerError>,
-        );
-  const instances = new WeakMap<WorkerEnv, FetchCapableInstance>();
+  const WorkerClass = options.eventLayer === undefined
+    ? make(
+      layer,
+      // SAFETY: the no-event public overload is the only one that permits an absent eventLayer.
+      options as FetchWorkerOptions<ROut, never, EventLayerError>,
+    )
+    : make(
+      layer,
+      // SAFETY: this branch has the eventLayer required by the event-dependent public overload.
+      options as FetchWorkerOptionsWithEventLayer<ROut, REvent, EventLayerError>,
+    )
+  const instances = new WeakMap<WorkerEnv, FetchCapableInstance>()
 
   return {
     fetch: (request, env, ctx) => {
-      let instance = instances.get(env);
+      let instance = instances.get(env)
 
       if (instance === undefined) {
-        instance = new WorkerClass(ctx, env);
-        instances.set(env, instance);
+        instance = new WorkerClass(ctx, env)
+        instances.set(env, instance)
       }
 
-      return instance[FetchSymbol](request, ctx);
+      return instance[FetchSymbol](request, ctx)
     },
-  };
+  }
 }
 
 export type {
@@ -640,9 +632,9 @@ export type {
   ServerApi,
   ServiceFreeSchema,
   TagClass,
-} from "./WorkerDefinition";
+} from './WorkerDefinition'
 
-export { implement, method, native, Tag } from "./WorkerDefinition";
+export { implement, method, native, Tag } from './WorkerDefinition'
 
 /** @deprecated Use {@link WorkerRpcContract}. */
-export { type WorkerRpcContract as "WorkerRpcShape" };
+export { type WorkerRpcContract as 'WorkerRpcShape' }

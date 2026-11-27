@@ -1,46 +1,46 @@
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as S from "effect/Schema";
-import type { Layer } from "effect";
+import type { Layer } from 'effect'
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as S from 'effect/Schema'
 
-import * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import { isWorkersAiBinding, type WorkersAiBinding } from "./WorkersAi";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
+import { isWorkersAiBinding, type WorkersAiBinding } from './WorkersAi'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
-const expectedAiGatewayBinding = "Workers AI binding with gateway()";
+const expectedAiGatewayBinding = 'Workers AI binding with gateway()'
 
-export class AiGatewayOperationError extends Data.TaggedError("AiGatewayOperationError")<{
-  readonly binding: string;
-  readonly operation: string;
-  readonly cause: unknown;
+export class AiGatewayOperationError extends Data.TaggedError('AiGatewayOperationError')<{
+  readonly binding: string
+  readonly operation: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `AI Gateway ${this.operation} failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`;
+    return `AI Gateway ${this.operation} failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
 export interface AiGatewayDefinition {
-  readonly binding: string;
-  readonly gatewayId: string;
-  readonly accountId?: string;
+  readonly binding: string
+  readonly gatewayId: string
+  readonly accountId?: string
 }
 
-export type AiGatewayBinding = AiGateway;
-type AiGatewayRunData = Parameters<AiGatewayBinding["run"]>[0];
-export type AiGatewayPatchLog = Parameters<AiGatewayBinding["patchLog"]>[1];
-export type AiGatewayLog = Awaited<ReturnType<AiGatewayBinding["getLog"]>>;
-export type AiGatewayProvider = NonNullable<Parameters<AiGatewayBinding["getUrl"]>[0]>;
-export type AiGatewayUniversalRequest = Exclude<AiGatewayRunData, ReadonlyArray<unknown>>;
-export type AiGatewayHeaders = NonNullable<AiGatewayUniversalRequest["headers"]>;
-export type AiGatewayRunOptions = Parameters<AiGatewayBinding["run"]>[1];
-type AiGatewayBindingCandidate = Parameters<typeof isWorkersAiBinding>[0];
+export type AiGatewayBinding = AiGateway
+type AiGatewayRunData = Parameters<AiGatewayBinding['run']>[0]
+export type AiGatewayPatchLog = Parameters<AiGatewayBinding['patchLog']>[1]
+export type AiGatewayLog = Awaited<ReturnType<AiGatewayBinding['getLog']>>
+export type AiGatewayProvider = NonNullable<Parameters<AiGatewayBinding['getUrl']>[0]>
+export type AiGatewayUniversalRequest = Exclude<AiGatewayRunData, ReadonlyArray<unknown>>
+export type AiGatewayHeaders = NonNullable<AiGatewayUniversalRequest['headers']>
+export type AiGatewayRunOptions = Parameters<AiGatewayBinding['run']>[1]
+type AiGatewayBindingCandidate = Parameters<typeof isWorkersAiBinding>[0]
 
-const AiGatewayMetadata = S.Record(S.String, S.Union([S.String, S.Finite, S.Boolean, S.Null]));
-const AiGatewayHttpMetadata = S.Union([AiGatewayMetadata, S.fromJsonString(AiGatewayMetadata)]);
+const AiGatewayMetadata = S.Record(S.String, S.Union([S.String, S.Finite, S.Boolean, S.Null]))
+const AiGatewayHttpMetadata = S.Union([AiGatewayMetadata, S.fromJsonString(AiGatewayMetadata)])
 const AiGatewayLogResponse = S.Struct({
   success: S.Literal(true),
   result: S.Struct({
@@ -70,69 +70,71 @@ const AiGatewayLogResponse = S.Struct({
     response_head_complete: S.Boolean,
     created_at: S.DateFromString,
   }),
-});
+})
 const AiGatewayPatchLogResponse = S.Struct({
   success: S.Literal(true),
   result: S.Unknown,
-});
-const decodeAiGatewayLogResponse = S.decodeUnknownPromise(AiGatewayLogResponse);
-const decodeAiGatewayPatchLogResponse = S.decodeUnknownPromise(AiGatewayPatchLogResponse);
+})
+const decodeAiGatewayLogResponse = S.decodeUnknownPromise(AiGatewayLogResponse)
+const decodeAiGatewayPatchLogResponse = S.decodeUnknownPromise(AiGatewayPatchLogResponse)
 
 export interface AiGatewayFetchOptions {
-  readonly provider?: AiGatewayProvider;
-  readonly path?: string;
-  readonly init?: RequestInit;
+  readonly provider?: AiGatewayProvider
+  readonly path?: string
+  readonly init?: RequestInit
 }
 
 export interface AiGatewayClient {
   readonly run: (
     data: AiGatewayUniversalRequest | ReadonlyArray<AiGatewayUniversalRequest>,
     options?: AiGatewayRunOptions,
-  ) => Effect.Effect<Response, AiGatewayOperationError>;
-  readonly getUrl: (provider?: AiGatewayProvider) => Effect.Effect<string, AiGatewayOperationError>;
+  ) => Effect.Effect<Response, AiGatewayOperationError>
+  readonly getUrl: (provider?: AiGatewayProvider) => Effect.Effect<string, AiGatewayOperationError>
   readonly fetch: (
     options: AiGatewayFetchOptions,
-  ) => Effect.Effect<Response, AiGatewayOperationError>;
+  ) => Effect.Effect<Response, AiGatewayOperationError>
   readonly patchLog: (
     logId: string,
     data: AiGatewayPatchLog,
-  ) => Effect.Effect<void, AiGatewayOperationError>;
-  readonly getLog: (logId: string) => Effect.Effect<AiGatewayLog, AiGatewayOperationError>;
-  readonly rawUnsafe: Effect.Effect<AiGatewayBinding, AiGatewayOperationError>;
-  readonly definition: AiGatewayDefinition;
+  ) => Effect.Effect<void, AiGatewayOperationError>
+  readonly getLog: (logId: string) => Effect.Effect<AiGatewayLog, AiGatewayOperationError>
+  readonly rawUnsafe: Effect.Effect<AiGatewayBinding, AiGatewayOperationError>
+  readonly definition: AiGatewayDefinition
 }
 
-declare const AiGatewayServiceTypeId: unique symbol;
+declare const AiGatewayServiceTypeId: unique symbol
 
 export interface AiGatewayService<Id extends string> {
   readonly [AiGatewayServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-  readonly gatewayId: string;
-  readonly accountId?: string;
-};
+  readonly binding: string
+  readonly gatewayId: string
+  readonly accountId?: string
+}
 
-export interface TagClass<Self, Id extends string> extends Context.ServiceClass<
-  Self,
-  Id,
-  AiGatewayClient
-> {
-  readonly id: Id;
+export interface TagClass<Self, Id extends string> extends
+  Context.ServiceClass<
+    Self,
+    Id,
+    AiGatewayClient
+  >
+{
+  readonly id: Id
   readonly layer: (
     options: LayerOptions,
   ) => Layer.Layer<
     Self,
     Binding.BindingNotFoundError | Binding.BindingValidationError | AiGatewayOperationError,
     WorkerEnvironment
-  >;
+  >
 }
 
 const aiGatewayError = (binding: string, operation: string, cause: unknown) =>
-  new AiGatewayOperationError({ binding, operation, cause });
+  new AiGatewayOperationError({ binding, operation, cause })
 
 const tryAiGatewayPromise = <A>(
   binding: string,
@@ -142,13 +144,12 @@ const tryAiGatewayPromise = <A>(
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => aiGatewayError(binding, operation, cause),
-  });
+  })
 
 const mergeAbortSignals = (
   userSignal: AbortSignal | null | undefined,
   signal: AbortSignal,
-): AbortSignal =>
-  userSignal === null || userSignal === undefined ? signal : AbortSignal.any([userSignal, signal]);
+): AbortSignal => userSignal === null || userSignal === undefined ? signal : AbortSignal.any([userSignal, signal])
 
 const tryAiGatewaySync = <A>(
   binding: string,
@@ -158,113 +159,108 @@ const tryAiGatewaySync = <A>(
   Effect.try({
     try: evaluate,
     catch: (cause) => aiGatewayError(binding, operation, cause),
-  });
+  })
 
-const providerUrl = (baseUrl: string, path = "") => {
-  const url = new URL(baseUrl.endsWith("/") ? baseUrl : `${baseUrl}/`);
-  const normalizedPath = path.replace(/^\/+/, "");
+const providerUrl = (baseUrl: string, path = '') => {
+  const url = new URL(baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`)
+  const normalizedPath = path.replace(/^\/+/, '')
 
-  return normalizedPath === "" ? url : new URL(normalizedPath, url);
-};
+  return normalizedPath === '' ? url : new URL(normalizedPath, url)
+}
 
 const gatewayUrl = (definition: { readonly accountId: string; readonly gatewayId: string }) =>
-  `https://gateway.ai.cloudflare.com/v1/${definition.accountId}/${definition.gatewayId}/`;
+  `https://gateway.ai.cloudflare.com/v1/${definition.accountId}/${definition.gatewayId}/`
 
 const ensureSuccessfulResponse = (response: Response): void => {
   if (!response.ok) {
-    throw new Error(`AI Gateway HTTP request failed with status ${response.status}`);
+    throw new Error(`AI Gateway HTTP request failed with status ${response.status}`)
   }
-};
+}
 
 export const isAiGatewayBinding = (value: AiGatewayBindingCandidate): value is WorkersAiBinding =>
-  isWorkersAiBinding(value);
+  isWorkersAiBinding(value)
 
 export const makeClient = (definition: AiGatewayDefinition, gateway: AiGatewayBinding) =>
   ({
     definition,
-    run: Effect.fn("AiGateway.run")(
+    run: Effect.fn('AiGateway.run')(
       (
         data: AiGatewayUniversalRequest | ReadonlyArray<AiGatewayUniversalRequest>,
         options?: AiGatewayRunOptions,
       ) =>
-        tryAiGatewayPromise(definition.binding, "run", () =>
+        tryAiGatewayPromise(definition.binding, 'run', () =>
           gateway.run(
             // SAFETY: spreading the readonly batch produces the mutable array accepted by the binding.
             (Array.isArray(data) ? [...data] : data) as
               | AiGatewayUniversalRequest
               | Array<AiGatewayUniversalRequest>,
             options,
-          ),
-        ),
+          )),
     ),
-    getUrl: Effect.fn("AiGateway.getUrl")((provider?: AiGatewayProvider) =>
-      tryAiGatewayPromise(definition.binding, "getUrl", () => gateway.getUrl(provider)),
+    getUrl: Effect.fn('AiGateway.getUrl')((provider?: AiGatewayProvider) =>
+      tryAiGatewayPromise(definition.binding, 'getUrl', () => gateway.getUrl(provider))
     ),
-    fetch: Effect.fn("AiGateway.fetch")(function* (options: AiGatewayFetchOptions) {
-      const baseUrl = yield* tryAiGatewayPromise(definition.binding, "getUrl", () =>
-        gateway.getUrl(options.provider),
-      );
+    fetch: Effect.fn('AiGateway.fetch')(function*(options: AiGatewayFetchOptions) {
+      const baseUrl = yield* tryAiGatewayPromise(definition.binding, 'getUrl', () => gateway.getUrl(options.provider))
 
-      return yield* tryAiGatewayPromise(definition.binding, "fetch", (signal) =>
+      return yield* tryAiGatewayPromise(definition.binding, 'fetch', (signal) =>
         fetch(providerUrl(baseUrl, options.path).href, {
           ...options.init,
           signal: mergeAbortSignals(options.init?.signal, signal),
-        }),
-      );
+        }))
     }),
-    patchLog: Effect.fn("AiGateway.patchLog")((logId: string, data: AiGatewayPatchLog) =>
-      tryAiGatewayPromise(definition.binding, "patchLog", () => gateway.patchLog(logId, data)),
+    patchLog: Effect.fn('AiGateway.patchLog')((logId: string, data: AiGatewayPatchLog) =>
+      tryAiGatewayPromise(definition.binding, 'patchLog', () =>
+        gateway.patchLog(logId, data))
     ),
-    getLog: Effect.fn("AiGateway.getLog")((logId: string) =>
-      tryAiGatewayPromise(definition.binding, "getLog", () => gateway.getLog(logId)),
+    getLog: Effect.fn('AiGateway.getLog')((logId: string) =>
+      tryAiGatewayPromise(definition.binding, 'getLog', () =>
+        gateway.getLog(logId))
     ),
     rawUnsafe: Effect.succeed(gateway),
-  }) satisfies AiGatewayClient;
+  }) satisfies AiGatewayClient
 
 export const makeClientFromAi = (
   definition: AiGatewayDefinition,
   ai: WorkersAiBinding,
 ): AiGatewayClient => {
-  const gateway = tryAiGatewaySync(definition.binding, "gateway", () =>
-    ai.gateway(definition.gatewayId),
-  );
+  const gateway = tryAiGatewaySync(definition.binding, 'gateway', () => ai.gateway(definition.gatewayId))
 
   const withGateway = <A>(
     operation: (gateway: AiGatewayBinding) => Effect.Effect<A, AiGatewayOperationError>,
-  ) => gateway.pipe(Effect.flatMap(operation));
+  ) => gateway.pipe(Effect.flatMap(operation))
 
   return {
     definition,
     run: (data, options) => withGateway((raw) => makeClient(definition, raw).run(data, options)),
     getUrl: (provider) => withGateway((raw) => makeClient(definition, raw).getUrl(provider)),
     fetch: (options) => withGateway((raw) => makeClient(definition, raw).fetch(options)),
-    patchLog: (logId, data) =>
-      withGateway((raw) => makeClient(definition, raw).patchLog(logId, data)),
+    patchLog: (logId, data) => withGateway((raw) => makeClient(definition, raw).patchLog(logId, data)),
     getLog: (logId) => withGateway((raw) => makeClient(definition, raw).getLog(logId)),
     rawUnsafe: gateway,
-  };
-};
+  }
+}
 
 export const makeHttpClient = (
-  definition: Omit<AiGatewayDefinition, "binding"> & {
-    readonly accountId: string;
-    readonly binding?: string;
+  definition: Omit<AiGatewayDefinition, 'binding'> & {
+    readonly accountId: string
+    readonly binding?: string
   },
   request: typeof fetch = fetch,
 ): AiGatewayClient => {
-  const binding = definition.binding ?? "AI_GATEWAY";
+  const binding = definition.binding ?? 'AI_GATEWAY'
   const clientDefinition: AiGatewayDefinition = {
     binding,
     gatewayId: definition.gatewayId,
     accountId: definition.accountId,
-  };
+  }
 
   const getUrl = (provider?: AiGatewayProvider) =>
     Effect.succeed(
       provider === undefined
         ? gatewayUrl(definition)
-        : providerUrl(gatewayUrl(definition), provider).href.replace(/\/$/, ""),
-    );
+        : providerUrl(gatewayUrl(definition), provider).href.replace(/\/$/, ''),
+    )
   const extraHeaders = (options?: AiGatewayRunOptions): HeadersInit | undefined => {
     if (
       options?.extraHeaders === undefined ||
@@ -272,80 +268,78 @@ export const makeHttpClient = (
       options.extraHeaders instanceof Headers
     ) {
       // SAFETY: the preceding branches retain only HeadersInit-compatible header containers.
-      return options?.extraHeaders as HeadersInit | undefined;
+      return options?.extraHeaders as HeadersInit | undefined
     }
 
     return Object.fromEntries(
       Object.entries(options.extraHeaders).map(([key, value]) => [key, String(value)]),
-    );
-  };
+    )
+  }
 
   return {
     definition: clientDefinition,
-    run: Effect.fn("AiGateway.run")(
+    run: Effect.fn('AiGateway.run')(
       (
         data: AiGatewayUniversalRequest | ReadonlyArray<AiGatewayUniversalRequest>,
         options?: AiGatewayRunOptions,
       ) =>
-        tryAiGatewayPromise(binding, "run", (signal) =>
+        tryAiGatewayPromise(binding, 'run', (signal) =>
           request(gatewayUrl(definition), {
-            method: "POST",
+            method: 'POST',
             body: JSON.stringify(data),
             headers: new Headers({
-              "content-type": "application/json",
+              'content-type': 'application/json',
               ...Object.fromEntries(new Headers(extraHeaders(options)).entries()),
             }),
             signal: mergeAbortSignals(options?.signal, signal),
-          }),
-        ),
+          })),
     ),
     getUrl,
-    fetch: Effect.fn("AiGateway.fetch")((options: AiGatewayFetchOptions) =>
+    fetch: Effect.fn('AiGateway.fetch')((options: AiGatewayFetchOptions) =>
       getUrl(options.provider).pipe(
         Effect.flatMap((baseUrl) =>
-          tryAiGatewayPromise(binding, "fetch", (signal) =>
+          tryAiGatewayPromise(binding, 'fetch', (signal) =>
             request(providerUrl(baseUrl, options.path).href, {
               ...options.init,
               signal: mergeAbortSignals(options.init?.signal, signal),
-            }),
-          ),
+            }))
         ),
-      ),
+      )
     ),
-    patchLog: Effect.fn("AiGateway.patchLog")((logId: string, data: AiGatewayPatchLog) =>
-      tryAiGatewayPromise(binding, "patchLog", async (signal) => {
+    patchLog: Effect.fn('AiGateway.patchLog')((logId: string, data: AiGatewayPatchLog) =>
+      tryAiGatewayPromise(binding, 'patchLog', async (signal) => {
         const response = await request(providerUrl(gatewayUrl(definition), `logs/${logId}`).href, {
-          method: "PATCH",
+          method: 'PATCH',
           body: JSON.stringify(data),
-          headers: { "content-type": "application/json" },
+          headers: { 'content-type': 'application/json' },
           signal,
-        });
+        })
 
-        ensureSuccessfulResponse(response);
-        await decodeAiGatewayPatchLogResponse(await response.json());
-      }),
+        ensureSuccessfulResponse(response)
+        await decodeAiGatewayPatchLogResponse(await response.json())
+      })
     ),
-    getLog: Effect.fn("AiGateway.getLog")((logId: string) =>
-      tryAiGatewayPromise(binding, "getLog", async (signal) => {
+    getLog: Effect.fn('AiGateway.getLog')((logId: string) =>
+      tryAiGatewayPromise(binding, 'getLog', async (signal) => {
         const response = await request(providerUrl(gatewayUrl(definition), `logs/${logId}`).href, {
           signal,
-        });
+        })
 
-        ensureSuccessfulResponse(response);
-        const payload = await decodeAiGatewayLogResponse(await response.json());
+        ensureSuccessfulResponse(response)
+        const payload = await decodeAiGatewayLogResponse(await response.json())
 
-        return payload.result;
-      }),
+        return payload.result
+      })
     ),
     rawUnsafe: Effect.fail(
       aiGatewayError(
         binding,
-        "rawUnsafe",
-        new TypeError("HTTP AI Gateway clients have no raw binding"),
+        'rawUnsafe',
+        new TypeError('HTTP AI Gateway clients have no raw binding'),
       ),
     ),
-  };
-};
+  }
+}
 
 export const layer = <Self>(
   tag: Context.Service<Self, AiGatewayClient>,
@@ -357,20 +351,18 @@ export const layer = <Self>(
     isAiGatewayBinding,
     (ai) => makeClientFromAi(definition, ai),
     { expected: expectedAiGatewayBinding },
-  );
+  )
 
-export const make = <Id extends string>(id: Id) => Tag<AiGatewayService<Id>>()<Id>(id);
+export const make = <Id extends string>(id: Id) => Tag<AiGatewayService<Id>>()<Id>(id)
 
-export const Tag =
-  <Self>() =>
-  <Id extends string>(id: Id) => {
-    const tag = Context.Service<Self, AiGatewayClient>()(id);
+export const Tag = <Self>() => <Id extends string>(id: Id) => {
+  const tag = Context.Service<Self, AiGatewayClient>()(id)
 
-    const makeLayer = (definition: LayerOptions) => layer(tag, definition);
+  const makeLayer = (definition: LayerOptions) => layer(tag, definition)
 
-    // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
-    return Object.assign(tag, {
-      id,
-      layer: makeLayer,
-    }) as TagClass<Self, Id>;
-  };
+  // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
+  return Object.assign(tag, {
+    id,
+    layer: makeLayer,
+  }) as TagClass<Self, Id>
+}

@@ -1,14 +1,14 @@
-import type { Plugin } from "rolldown";
+import type { Plugin } from 'rolldown'
 
 export const bundleGraph = (): Plugin => ({
-  name: "effect-cf:bundle-report-graph",
+  name: 'effect-cf:bundle-report-graph',
   generateBundle(_options, bundle) {
     this.emitFile({
-      type: "asset",
-      fileName: "graph.json",
+      type: 'asset',
+      fileName: 'graph.json',
       source: JSON.stringify({
         chunks: Object.values(bundle)
-          .filter((output) => output.type === "chunk")
+          .filter((output) => output.type === 'chunk')
           .map((chunk) => ({
             file: chunk.fileName,
             entry: chunk.isEntry,
@@ -16,6 +16,6 @@ export const bundleGraph = (): Plugin => ({
           })),
         loadedModules: [...this.getModuleIds()],
       }),
-    });
+    })
   },
-});
+})

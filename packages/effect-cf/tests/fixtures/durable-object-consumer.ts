@@ -1,16 +1,16 @@
-import { Effect, Layer, Schema } from "effect";
-import { DurableObject, RpcTracing, Worker } from "effect-cf";
+import { DurableObject, RpcTracing, Worker } from '@systemfsoftware/effect-cf'
+import { Effect, Layer, Schema } from 'effect'
 
-class Counter extends DurableObject.Tag<Counter>()("Counter", {
+class Counter extends DurableObject.Tag<Counter>()('Counter', {
   read: DurableObject.method({ success: Schema.Finite }),
 }) {}
 
-export const CounterLive = Counter.layer({ binding: "COUNTERS", rpcTracing: true });
+export const CounterLive = Counter.layer({ binding: 'COUNTERS', rpcTracing: true })
 
 const CounterBase = Counter.make(Layer.empty, {
-  rpcTracing: { service: "COUNTERS" },
+  rpcTracing: { service: 'COUNTERS' },
   rpc: { read: () => Effect.succeed(42) },
-});
+})
 
 export class ExampleDurableObject extends CounterBase {
   override [DurableObject.RunSymbol]<A, E>(
@@ -20,18 +20,18 @@ export class ExampleDurableObject extends CounterBase {
     return super[DurableObject.RunSymbol](
       options.rpc === undefined ? effect : RpcTracing.withRpcServerSpan(effect, options.rpc),
       options,
-    );
+    )
   }
 }
 
-class Api extends Worker.Tag<Api>()("Api", {
+class Api extends Worker.Tag<Api>()('Api', {
   read: Worker.method({ success: Schema.Finite }),
 }) {}
 
 const WorkerBase = Api.make(CounterLive, {
-  rpcTracing: { service: "API" },
-  rpc: { read: () => Counter.byName("default").read() },
-});
+  rpcTracing: { service: 'API' },
+  rpc: { read: () => Counter.byName('default').read() },
+})
 
 export class ExampleWorker extends WorkerBase {
   override [Worker.RunSymbol]<A, E>(
@@ -41,6 +41,6 @@ export class ExampleWorker extends WorkerBase {
     return super[Worker.RunSymbol](
       options.rpc === undefined ? effect : RpcTracing.withRpcServerSpan(effect, options.rpc),
       options,
-    );
+    )
   }
 }

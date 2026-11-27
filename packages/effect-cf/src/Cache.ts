@@ -1,56 +1,56 @@
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Layer from 'effect/Layer'
+import * as Option from 'effect/Option'
 
-import * as ErrorMessage from "./internal/ErrorMessage";
+import * as ErrorMessage from './internal/ErrorMessage'
 
-export type CacheRequest = RequestInfo | URL;
+export type CacheRequest = RequestInfo | URL
 
-export type CacheQueryOptions = globalThis.CacheQueryOptions;
+export type CacheQueryOptions = globalThis.CacheQueryOptions
 
-export type CacheOperation = "open" | "match" | "put" | "delete";
+export type CacheOperation = 'open' | 'match' | 'put' | 'delete'
 
-export class CacheOperationError extends Data.TaggedError("CacheOperationError")<{
-  readonly cache: string;
-  readonly operation: CacheOperation;
-  readonly cause: unknown;
+export class CacheOperationError extends Data.TaggedError('CacheOperationError')<{
+  readonly cache: string
+  readonly operation: CacheOperation
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Cache ${this.operation} failed for cache "${this.cache}": ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Cache ${this.operation} failed for cache "${this.cache}": ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
 export interface CacheClient {
-  readonly name: string;
+  readonly name: string
   readonly match: (
     request: CacheRequest,
     options?: CacheQueryOptions,
-  ) => Effect.Effect<Option.Option<Response>, CacheOperationError>;
+  ) => Effect.Effect<Option.Option<Response>, CacheOperationError>
   readonly put: (
     request: CacheRequest,
     response: Response,
-  ) => Effect.Effect<void, CacheOperationError>;
+  ) => Effect.Effect<void, CacheOperationError>
   readonly delete: (
     request: CacheRequest,
     options?: CacheQueryOptions,
-  ) => Effect.Effect<boolean, CacheOperationError>;
-  readonly rawUnsafe: Effect.Effect<Cache>;
+  ) => Effect.Effect<boolean, CacheOperationError>
+  readonly rawUnsafe: Effect.Effect<Cache>
 }
 
 export interface CacheStorageClient {
-  readonly default: CacheClient;
-  readonly open: (name: string) => Effect.Effect<CacheClient, CacheOperationError>;
-  readonly rawUnsafe: Effect.Effect<globalThis.CacheStorage>;
+  readonly default: CacheClient
+  readonly open: (name: string) => Effect.Effect<CacheClient, CacheOperationError>
+  readonly rawUnsafe: Effect.Effect<globalThis.CacheStorage>
 }
 
 export class CacheStorage extends Context.Service<CacheStorage, CacheStorageClient>()(
-  "effect-cf/CacheStorage",
+  'effect-cf/CacheStorage',
 ) {}
 
 const cacheError = (cache: string, operation: CacheOperation, cause: unknown) =>
-  new CacheOperationError({ cache, operation, cause });
+  new CacheOperationError({ cache, operation, cause })
 
 const tryCachePromise = <A>(
   cache: string,
@@ -60,48 +60,46 @@ const tryCachePromise = <A>(
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => cacheError(cache, operation, cause),
-  });
+  })
 
 const spanOptions = (cache: string, operation: CacheOperation) => ({
   attributes: { cache, operation },
-});
+})
 
-export const makeCacheClient = (cache: Cache, name = "default"): CacheClient => ({
+export const makeCacheClient = (cache: Cache, name = 'default'): CacheClient => ({
   name,
   match: Effect.fn(
-    "Cache.match",
-    spanOptions(name, "match"),
+    'Cache.match',
+    spanOptions(name, 'match'),
   )((request: CacheRequest, options?: CacheQueryOptions) =>
-    tryCachePromise(name, "match", () => cache.match(request, options)).pipe(
+    tryCachePromise(name, 'match', () => cache.match(request, options)).pipe(
       Effect.map(Option.fromUndefinedOr),
-    ),
+    )
   ),
   put: Effect.fn(
-    "Cache.put",
-    spanOptions(name, "put"),
-  )((request: CacheRequest, response: Response) =>
-    tryCachePromise(name, "put", () => cache.put(request, response)),
-  ),
+    'Cache.put',
+    spanOptions(name, 'put'),
+  )((request: CacheRequest, response: Response) => tryCachePromise(name, 'put', () => cache.put(request, response))),
   delete: Effect.fn(
-    "Cache.delete",
-    spanOptions(name, "delete"),
+    'Cache.delete',
+    spanOptions(name, 'delete'),
   )((request: CacheRequest, options?: CacheQueryOptions) =>
-    tryCachePromise(name, "delete", () => cache.delete(request, options)),
+    tryCachePromise(name, 'delete', () => cache.delete(request, options))
   ),
   rawUnsafe: Effect.succeed(cache),
-});
+})
 
 export const makeClient = (storage: globalThis.CacheStorage): CacheStorageClient => ({
   default: makeCacheClient(storage.default),
   open: (name) =>
-    tryCachePromise(name, "open", () => storage.open(name)).pipe(
+    tryCachePromise(name, 'open', () => storage.open(name)).pipe(
       Effect.map((cache) => makeCacheClient(cache, name)),
-      Effect.withSpan("Cache.open", spanOptions(name, "open")),
+      Effect.withSpan('Cache.open', spanOptions(name, 'open')),
     ),
   rawUnsafe: Effect.succeed(storage),
-});
+})
 
 export const layerFrom = (storage: globalThis.CacheStorage): Layer.Layer<CacheStorage> =>
-  Layer.succeed(CacheStorage, makeClient(storage));
+  Layer.succeed(CacheStorage, makeClient(storage))
 
-export const layer: Layer.Layer<CacheStorage> = Layer.sync(CacheStorage, () => makeClient(caches));
+export const layer: Layer.Layer<CacheStorage> = Layer.sync(CacheStorage, () => makeClient(caches))

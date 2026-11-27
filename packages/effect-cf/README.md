@@ -23,12 +23,12 @@ Durable Object alarms bound unchanged retries and self-rearms, and hibernating s
 ## Worker
 
 ```ts
-import { Effect, Layer } from "effect";
-import { Worker } from "effect-cf";
+import { Worker } from '@systemfsoftware/effect-cf'
+import { Effect, Layer } from 'effect'
 
 export default Worker.make(Layer.empty, {
-  fetch: Effect.sync(() => new Response("Hello")),
-});
+  fetch: Effect.sync(() => new Response('Hello')),
+})
 ```
 
 `Worker.make` owns the Effect runtime. Pass application services as its layer; use `Worker.NativeRequest` inside the handler to read the request.
@@ -38,14 +38,14 @@ export default Worker.make(Layer.empty, {
 Tagged Worker and Durable Object methods encode declared schemas through their canonical JSON codec by default. Wrap a method argument or success schema with `Worker.native(schema)` or `DurableObject.native(schema)` when its encoded value must instead pass directly through Cloudflare RPC.
 
 ```ts
-import { Effect, Layer, Schema } from "effect";
-import { Worker } from "effect-cf";
+import { Worker } from '@systemfsoftware/effect-cf'
+import { Effect, Layer, Schema } from 'effect'
 
 const ByteStream = Schema.declare(
   (value): value is ReadableStream<Uint8Array> => value instanceof ReadableStream,
-);
+)
 
-class Documents extends Worker.Tag<Documents>()("Documents", {
+class Documents extends Worker.Tag<Documents>()('Documents', {
   upload: Worker.method({
     args: [Worker.native(ByteStream)],
     success: Schema.Void,
@@ -56,7 +56,7 @@ export default Documents.make(Layer.empty, {
   rpc: {
     upload: (body) => Effect.tryPromise(() => new Response(body).arrayBuffer()).pipe(Effect.asVoid),
   },
-});
+})
 ```
 
 The wrapped schema still validates and transforms values, but its encoded form must be supported by Cloudflare RPC. Native byte streams must be byte-oriented (`type: "bytes"`). Cloudflare transfers stream ownership to the recipient; use `ReadableStream.tee()` first if the sender must retain a copy.
@@ -66,21 +66,21 @@ The wrapped schema still validates and transforms values, but its encoded form m
 Define a service, connect it to a Wrangler binding, then yield it in your program.
 
 ```ts
-import { Effect, Schema } from "effect";
-import { Kv } from "effect-cf";
+import { Kv } from '@systemfsoftware/effect-cf'
+import { Effect, Schema } from 'effect'
 
-class Settings extends Kv.Tag<Settings>()("Settings", {
+class Settings extends Kv.Tag<Settings>()('Settings', {
   key: Schema.String,
   value: Schema.String,
 }) {}
 
-const SettingsLive = Settings.layer({ binding: "SETTINGS" });
+const SettingsLive = Settings.layer({ binding: 'SETTINGS' })
 
-const greeting = Effect.gen(function* () {
-  const settings = yield* Settings;
+const greeting = Effect.gen(function*() {
+  const settings = yield* Settings
 
-  return yield* settings.get("greeting");
-});
+  return yield* settings.get('greeting')
+})
 ```
 
 Declare `SETTINGS` in `wrangler.jsonc` and pass `SettingsLive` to `Worker.make`. Other bindings use the same tag/layer pattern.
@@ -103,13 +103,13 @@ Unknown stored tags produce `StoredAlarmDecodeError` and follow the configured d
 
 ```ts
 const build = DurableObject.mount(AppLayer, {
-  slot: { _tag: "Exclusive" },
+  slot: { _tag: 'Exclusive' },
   rpc: {
-    ping: () => Effect.succeed("pong"),
+    ping: () => Effect.succeed('pong'),
   },
-});
+})
 
-const record = yield * build({ state: nativeState, env });
+const record = yield * build({ state: nativeState, env })
 ```
 
 An object has one physical alarm slot. `Exclusive` keeps `make`'s `getAlarm`/`setAlarm`/`deleteAlarm`. `Delegated` hands the slot to a host dispatcher: the scheduler records the deadline it hands off and calls the delegate inside its own storage transaction, and never touches the native alarm. A `Delegated` record omits `alarm` and instead exposes a `runAlarms` Effect your host callback runs; it always succeeds, so the host's own retry policy never applies to library work. See the [hosted object guide](https://github.com/danieljvdm/effect-cf/blob/main/docs/hosted-durable-objects.md).
@@ -120,13 +120,13 @@ An object has one physical alarm slot. `Exclusive` keeps `make`'s `getAlarm`/`se
 spans to Cloudflare's trace waterfall, alongside automatic platform spans.
 
 ```ts
-import { Effect, Layer } from "effect";
-import { CloudflareTracer, Worker } from "effect-cf";
+import { CloudflareTracer, Worker } from '@systemfsoftware/effect-cf'
+import { Effect, Layer } from 'effect'
 
 export default Worker.make(Layer.empty, {
   eventLayer: CloudflareTracer.layer,
-  fetch: Effect.sync(() => new Response("Hello")).pipe(Effect.withSpan("greet")),
-});
+  fetch: Effect.sync(() => new Response('Hello')).pipe(Effect.withSpan('greet')),
+})
 ```
 
 Enable tracing in `wrangler.jsonc`:
@@ -135,8 +135,8 @@ Enable tracing in `wrangler.jsonc`:
 {
   "compatibility_date": "2026-10-26",
   "observability": {
-    "traces": { "enabled": true },
-  },
+    "traces": { "enabled": true }
+  }
 }
 ```
 
@@ -187,16 +187,16 @@ sanitizing formatter:
 ```ts
 const tracing = CloudflareTracer.layerWith({
   formatError: () => ({
-    type: "OperationFailed",
-    message: "The operation could not complete",
+    type: 'OperationFailed',
+    message: 'The operation could not complete',
   }),
   spanEvents: true,
-});
+})
 
 export default Worker.make(Layer.empty, {
   eventLayer: tracing,
-  fetch: Effect.sync(() => new Response("Hello")).pipe(Effect.withSpan("greet")),
-});
+  fetch: Effect.sync(() => new Response('Hello')).pipe(Effect.withSpan('greet')),
+})
 ```
 
 `formatError` receives the failed span's Cause, including interruption, and may

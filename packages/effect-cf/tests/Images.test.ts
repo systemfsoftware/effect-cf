@@ -1,48 +1,48 @@
-import { assert, expect, layer, test } from "@effect/vitest";
-import { Effect, Layer, Option } from "effect";
+import { assert, expect, layer, test } from '@effect/vitest'
+import { Effect, Layer, Option } from 'effect'
 
-import { Binding, Images, WorkerEnvironment } from "../src/index";
-import { makePartialTestDouble } from "./TestDoubles";
+import { Binding, Images, WorkerEnvironment } from '../src/index'
+import { makePartialTestDouble } from './TestDoubles'
 
-class TestImages extends Images.Tag<TestImages>()("test/TestImages") {}
+class TestImages extends Images.Tag<TestImages>()('test/TestImages') {}
 
-const stream = () => new ReadableStream<Uint8Array>();
+const stream = () => new ReadableStream<Uint8Array>()
 
 const metadata = (id: string): ImageMetadata => ({
   id,
   requireSignedURLs: false,
   variants: [],
-});
+})
 
 interface FakeTransformerState {
-  readonly transforms: Array<ImageTransform>;
-  readonly draws: Array<ImageDrawOptions | undefined>;
+  readonly transforms: Array<ImageTransform>
+  readonly draws: Array<ImageDrawOptions | undefined>
 }
 
-const makeResult = (contentType = "image/webp") =>
+const makeResult = (contentType = 'image/webp') =>
   makePartialTestDouble<ImageTransformationResult>({
-    response: () => new Response("image", { headers: { "content-type": contentType } }),
+    response: () => new Response('image', { headers: { 'content-type': contentType } }),
     contentType: () => contentType,
     image: () => stream(),
-  });
+  })
 
 const makeTransformer = (state: FakeTransformerState): ImageTransformer =>
   makePartialTestDouble<ImageTransformer>({
-    transform: (transform: Parameters<ImageTransformer["transform"]>[0]) => {
-      state.transforms.push(transform);
+    transform: (transform: Parameters<ImageTransformer['transform']>[0]) => {
+      state.transforms.push(transform)
 
-      return makeTransformer(state);
+      return makeTransformer(state)
     },
     draw: (
-      _image: Parameters<ImageTransformer["draw"]>[0],
-      options: Parameters<ImageTransformer["draw"]>[1],
+      _image: Parameters<ImageTransformer['draw']>[0],
+      options: Parameters<ImageTransformer['draw']>[1],
     ) => {
-      state.draws.push(options);
+      state.draws.push(options)
 
-      return makeTransformer(state);
+      return makeTransformer(state)
     },
     output: async () => makeResult(),
-  });
+  })
 
 const makeHandle = (id: string) =>
   makePartialTestDouble<ImageHandle>({
@@ -55,161 +55,157 @@ const makeHandle = (id: string) =>
       meta: options.metadata,
     }),
     delete: async () => true,
-  });
+  })
 
 interface FakeImagesOptions {
-  readonly state?: FakeTransformerState;
+  readonly state?: FakeTransformerState
   readonly info?: (
     image: Images.ImageInputValue,
     options: ImageInputOptions | undefined,
-  ) => Promise<ImageInfoResponse>;
-  readonly input?: (image: Images.ImageInputValue, options: ImageInputOptions | undefined) => void;
-  readonly text?: (content: string, options: TextOptions) => void;
-  readonly image?: (imageId: string) => ImageHandle;
-  readonly hosted?: HostedImagesBinding;
-  readonly includeHosted?: boolean;
+  ) => Promise<ImageInfoResponse>
+  readonly input?: (image: Images.ImageInputValue, options: ImageInputOptions | undefined) => void
+  readonly text?: (content: string, options: TextOptions) => void
+  readonly image?: (imageId: string) => ImageHandle
+  readonly hosted?: HostedImagesBinding
+  readonly includeHosted?: boolean
 }
 
 const makeFakeImages = (options: FakeImagesOptions = {}) => {
-  const state = options.state ?? { transforms: [], draws: [] };
+  const state = options.state ?? { transforms: [], draws: [] }
 
   const binding = {
-    info: options.info ?? (async () => ({ format: "image/png", fileSize: 4, width: 1, height: 1 })),
+    info: options.info ?? (async () => ({ format: 'image/png', fileSize: 4, width: 1, height: 1 })),
     input: (image: Images.ImageInputValue, inputOptions: ImageInputOptions | undefined) => {
-      options.input?.(image, inputOptions);
+      options.input?.(image, inputOptions)
 
-      return makeTransformer(state);
+      return makeTransformer(state)
     },
     text: (content: string, textOptions: TextOptions) => {
-      options.text?.(content, textOptions);
+      options.text?.(content, textOptions)
 
-      return makeTransformer(state);
+      return makeTransformer(state)
     },
-  };
+  }
 
   if (options.includeHosted !== false) {
     Object.assign(binding, {
-      hosted:
-        options.hosted ??
+      hosted: options.hosted ??
         ({
           image: options.image ?? ((imageId) => makeHandle(imageId)),
           upload: async (_image, uploadOptions) => ({
-            ...metadata(uploadOptions?.id ?? "uploaded"),
+            ...metadata(uploadOptions?.id ?? 'uploaded'),
             filename: uploadOptions?.filename,
           }),
           list: async () => ({
-            images: [metadata("image-1")],
+            images: [metadata('image-1')],
             listComplete: true,
           }),
           createDirectUpload: async () => ({
-            id: "direct-1",
-            uploadURL: "https://upload.imagedelivery.test/direct-1",
+            id: 'direct-1',
+            uploadURL: 'https://upload.imagedelivery.test/direct-1',
           }),
         } satisfies HostedImagesBinding),
-    });
+    })
   }
 
-  return makePartialTestDouble<ImagesBinding>(binding);
-};
+  return makePartialTestDouble<ImagesBinding>(binding)
+}
 
 const imagesLayer = (images: ImagesBinding) =>
-  TestImages.layer({ binding: "IMAGES" }).pipe(
+  TestImages.layer({ binding: 'IMAGES' }).pipe(
     Layer.provide(Layer.succeed(WorkerEnvironment, { IMAGES: images })),
-  );
+  )
 
 {
-  const seen: Array<Images.ImageInputValue> = [];
+  const seen: Array<Images.ImageInputValue> = []
   const images = makeFakeImages({
     info: async (image) => {
-      seen.push(image);
+      seen.push(image)
 
-      return { format: "image/png", fileSize: 4, width: 1, height: 1 };
+      return { format: 'image/png', fileSize: 4, width: 1, height: 1 }
     },
-  });
+  })
 
-  layer(imagesLayer(images))("Images metadata", (it) => {
-    it.effect("wraps info", () =>
-      Effect.gen(function* () {
-        const images = yield* TestImages;
-        const bytes = new ArrayBuffer(4);
-        const info = yield* images.info(bytes);
+  layer(imagesLayer(images))('Images metadata', (it) => {
+    it.effect('wraps info', () =>
+      Effect.gen(function*() {
+        const images = yield* TestImages
+        const bytes = new ArrayBuffer(4)
+        const info = yield* images.info(bytes)
 
         assert.deepStrictEqual(info, {
-          format: "image/png",
+          format: 'image/png',
           fileSize: 4,
           width: 1,
           height: 1,
-        });
-        assert.strictEqual(seen[0], bytes);
-      }),
-    );
-  });
+        })
+        assert.strictEqual(seen[0], bytes)
+      }))
+  })
 }
 
 {
-  const state: FakeTransformerState = { transforms: [], draws: [] };
-  const seen: Array<Images.ImageInputValue> = [];
-  const images = makeFakeImages({ state, input: (image) => seen.push(image) });
+  const state: FakeTransformerState = { transforms: [], draws: [] }
+  const seen: Array<Images.ImageInputValue> = []
+  const images = makeFakeImages({ state, input: (image) => seen.push(image) })
 
-  layer(imagesLayer(images))("Images transformations", (it) => {
-    it.effect("runs transform and draw steps before output", () =>
-      Effect.gen(function* () {
-        const images = yield* TestImages;
+  layer(imagesLayer(images))('Images transformations', (it) => {
+    it.effect('runs transform and draw steps before output', () =>
+      Effect.gen(function*() {
+        const images = yield* TestImages
         const steps = Images.draw(Images.transform(Images.empty, { width: 128 }), {
           image: stream(),
           options: { opacity: 0.5 },
-        });
-        const bytes = new ArrayBuffer(4);
+        })
+        const bytes = new ArrayBuffer(4)
 
         const result = yield* images.process(steps, {
           stream: bytes,
-          outputOptions: { format: "image/webp" },
-        });
-        const contentType = yield* result.contentType;
-        const response = yield* result.response();
+          outputOptions: { format: 'image/webp' },
+        })
+        const contentType = yield* result.contentType
+        const response = yield* result.response()
 
-        assert.strictEqual(seen[0], bytes);
-        assert.deepStrictEqual(state.transforms, [{ width: 128 }]);
-        assert.deepStrictEqual(state.draws, [{ opacity: 0.5 }]);
-        assert.strictEqual(contentType, "image/webp");
-        assert.strictEqual(response.headers.get("content-type"), "image/webp");
-      }),
-    );
-  });
+        assert.strictEqual(seen[0], bytes)
+        assert.deepStrictEqual(state.transforms, [{ width: 128 }])
+        assert.deepStrictEqual(state.draws, [{ opacity: 0.5 }])
+        assert.strictEqual(contentType, 'image/webp')
+        assert.strictEqual(response.headers.get('content-type'), 'image/webp')
+      }))
+  })
 }
 
 {
-  const state: FakeTransformerState = { transforms: [], draws: [] };
-  const seenText: Array<{ content: string; options: TextOptions }> = [];
+  const state: FakeTransformerState = { transforms: [], draws: [] }
+  const seenText: Array<{ content: string; options: TextOptions }> = []
   const images = makeFakeImages({
     state,
     text: (content, options) => {
-      seenText.push({ content, options });
+      seenText.push({ content, options })
     },
-  });
+  })
 
-  layer(imagesLayer(images))("Images text rasterization", (it) => {
-    it.effect("runs process from text rasterization input", () =>
-      Effect.gen(function* () {
-        const images = yield* TestImages;
+  layer(imagesLayer(images))('Images text rasterization', (it) => {
+    it.effect('runs process from text rasterization input', () =>
+      Effect.gen(function*() {
+        const images = yield* TestImages
         const result = yield* images.process(Images.transform(Images.empty, { width: 256 }), {
-          text: "hello",
-          textOptions: { font: { url: "https://fonts.test/Inter.ttf" }, size: 32 },
-          outputOptions: { format: "image/png" },
-        });
-        const contentType = yield* result.contentType;
+          text: 'hello',
+          textOptions: { font: { url: 'https://fonts.test/Inter.ttf' }, size: 32 },
+          outputOptions: { format: 'image/png' },
+        })
+        const contentType = yield* result.contentType
 
-        assert.strictEqual(contentType, "image/webp");
+        assert.strictEqual(contentType, 'image/webp')
         assert.deepStrictEqual(seenText, [
           {
-            content: "hello",
-            options: { font: { url: "https://fonts.test/Inter.ttf" }, size: 32 },
+            content: 'hello',
+            options: { font: { url: 'https://fonts.test/Inter.ttf' }, size: 32 },
           },
-        ]);
-        assert.deepStrictEqual(state.transforms, [{ width: 256 }]);
-      }),
-    );
-  });
+        ])
+        assert.deepStrictEqual(state.transforms, [{ width: 256 }])
+      }))
+  })
 }
 
 {
@@ -220,61 +216,59 @@ const imagesLayer = (images: ImagesBinding) =>
         details: async () => null,
         bytes: async () => null,
       }),
-  });
+  })
 
-  layer(imagesLayer(images))("Hosted Images", (it) => {
-    it.effect("wraps hosted image operations", () =>
-      Effect.gen(function* () {
-        const images = yield* TestImages;
-        const hosted = Option.getOrThrow(images.hosted);
-        const uploaded = yield* hosted.upload(new ArrayBuffer(0), { id: "avatar-1" });
-        const listed = yield* hosted.list();
-        const direct = yield* hosted.createDirectUpload({ expiresIn: 60 });
-        const handle = hosted.image("missing");
-        const details = yield* handle.details;
-        const bytes = yield* handle.bytes;
-        const signedUrl = yield* handle.signedUrl({ variant: "public" });
-        const deleted = yield* handle.delete;
+  layer(imagesLayer(images))('Hosted Images', (it) => {
+    it.effect('wraps hosted image operations', () =>
+      Effect.gen(function*() {
+        const images = yield* TestImages
+        const hosted = Option.getOrThrow(images.hosted)
+        const uploaded = yield* hosted.upload(new ArrayBuffer(0), { id: 'avatar-1' })
+        const listed = yield* hosted.list()
+        const direct = yield* hosted.createDirectUpload({ expiresIn: 60 })
+        const handle = hosted.image('missing')
+        const details = yield* handle.details
+        const bytes = yield* handle.bytes
+        const signedUrl = yield* handle.signedUrl({ variant: 'public' })
+        const deleted = yield* handle.delete
 
-        assert.strictEqual(uploaded.id, "avatar-1");
-        assert.strictEqual(listed.images[0]?.id, "image-1");
-        assert.strictEqual(direct.id, "direct-1");
-        assert.strictEqual(direct.uploadURL, "https://upload.imagedelivery.test/direct-1");
-        assert.strictEqual(Option.isNone(details), true);
-        assert.strictEqual(Option.isNone(bytes), true);
-        assert.strictEqual(signedUrl, "https://imagedelivery.test/missing");
-        assert.strictEqual(deleted, true);
-      }),
-    );
-  });
+        assert.strictEqual(uploaded.id, 'avatar-1')
+        assert.strictEqual(listed.images[0]?.id, 'image-1')
+        assert.strictEqual(direct.id, 'direct-1')
+        assert.strictEqual(direct.uploadURL, 'https://upload.imagedelivery.test/direct-1')
+        assert.strictEqual(Option.isNone(details), true)
+        assert.strictEqual(Option.isNone(bytes), true)
+        assert.strictEqual(signedUrl, 'https://imagedelivery.test/missing')
+        assert.strictEqual(deleted, true)
+      }))
+  })
 }
 
 {
-  const images = makeFakeImages({ includeHosted: false });
+  const images = makeFakeImages({ includeHosted: false })
 
-  layer(imagesLayer(images))("Images validation", (it) => {
-    it.effect("accepts transformation bindings without hosted image operations", () =>
-      Effect.gen(function* () {
-        const images = yield* TestImages;
-        const info = yield* images.info(stream());
+  layer(imagesLayer(images))('Images validation', (it) => {
+    it.effect('accepts transformation bindings without hosted image operations', () =>
+      Effect.gen(function*() {
+        const images = yield* TestImages
+        const info = yield* images.info(stream())
 
-        assert.strictEqual(info.format, "image/png");
-        assert.strictEqual(Option.isNone(images.hosted), true);
-      }),
-    );
-  });
+        assert.strictEqual(info.format, 'image/png')
+        assert.strictEqual(Option.isNone(images.hosted), true)
+      }))
+  })
 }
 
-test("Images layer validates the binding shape", async () => {
+test('Images layer validates the binding shape', async () => {
   await expect(
     Effect.runPromise(
-      Effect.gen(function* () {
-        const images = yield* TestImages;
+      Effect.gen(function*() {
+        const images = yield* TestImages
 
-        yield* images.info(stream());
+        yield* images.info(stream())
       }).pipe(
         Effect.provide(
-          TestImages.layer({ binding: "IMAGES" }).pipe(
+          TestImages.layer({ binding: 'IMAGES' }).pipe(
             Layer.provide(
               Layer.succeed(WorkerEnvironment, {
                 IMAGES: makePartialTestDouble<ImagesBinding>({}),
@@ -284,5 +278,5 @@ test("Images layer validates the binding shape", async () => {
         ),
       ),
     ),
-  ).rejects.toBeInstanceOf(Binding.BindingValidationError);
-});
+  ).rejects.toBeInstanceOf(Binding.BindingValidationError)
+})

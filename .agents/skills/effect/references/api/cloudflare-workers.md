@@ -9,7 +9,7 @@ Assemble application services, `HttpApiBuilder` routes, the Effect HTTP platform
 ```ts
 import { Effect, Layer } from "effect";
 import { HttpRouter } from "effect/http";
-import { Worker } from "effect-cf";
+import { Worker } from "@systemfsoftware/effect-cf";
 
 const WorkerLive = Layer.mergeAll(ApplicationServicesLive, ApiRoutesLive);
 

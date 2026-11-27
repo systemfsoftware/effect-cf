@@ -1,20 +1,11 @@
-import {
-  Context,
-  Effect,
-  Layer,
-  Option,
-  Predicate,
-  PubSub,
-  Schema as S,
-  Semaphore,
-  Stream,
-} from "effect";
-import * as Rpc from "effect/rpc/Rpc";
-import * as RpcGroup from "effect/rpc/RpcGroup";
-import * as RpcSerialization from "effect/rpc/RpcSerialization";
-import * as RpcServer from "effect/rpc/RpcServer";
+import { Context, Effect, Layer, Option, Predicate, PubSub, Schema as S, Semaphore, Stream } from 'effect'
+import * as Rpc from 'effect/rpc/Rpc'
+import * as RpcGroup from 'effect/rpc/RpcGroup'
+import * as RpcSerialization from 'effect/rpc/RpcSerialization'
+import * as RpcServer from 'effect/rpc/RpcServer'
 
-import * as ComputerWorkspace from "../src/ComputerWorkspace";
+import * as ComputerWorkspace from '../src/ComputerWorkspace'
+import { withComputerWorkspace } from '../src/ComputerWorkspaceHost'
 import {
   DurableObject,
   DurableObjectDefinition,
@@ -24,27 +15,23 @@ import {
   Worker,
   WorkerDefinition,
   Workflow,
-} from "../src/index";
-import { withComputerWorkspace } from "../src/ComputerWorkspaceHost";
+} from '../src/index'
 
-export { TestTracingDurableObject, TestTracingWorker } from "./rpc-tracing-fixture";
-export {
-  TestInitializationControl,
-  TestInitializationDurableObject,
-} from "./initialization-fixture";
+export { TestInitializationControl, TestInitializationDurableObject } from './initialization-fixture'
+export { TestTracingDurableObject, TestTracingWorker } from './rpc-tracing-fixture'
 
-export const TestWorkerDefinition = WorkerDefinition.make("TestWorker", {
+export const TestWorkerDefinition = WorkerDefinition.make('TestWorker', {
   parseNumber: WorkerDefinition.method({
     args: [S.FiniteFromString] as const,
     success: S.FiniteFromString,
   }),
-});
+})
 
 const ByteReadableStream = S.declare(
   (value): value is ReadableStream<Uint8Array> => value instanceof ReadableStream,
-);
+)
 
-export const TestCounterDefinition = DurableObjectDefinition.make("TestCounter", {
+export const TestCounterDefinition = DurableObjectDefinition.make('TestCounter', {
   increment: DurableObjectDefinition.method({
     args: [S.FiniteFromString] as const,
     success: S.FiniteFromString,
@@ -60,7 +47,7 @@ export const TestCounterDefinition = DurableObjectDefinition.make("TestCounter",
     args: [S.FiniteFromString] as const,
     success: DurableObjectDefinition.native(ByteReadableStream),
   }),
-});
+})
 
 const ComputerWorkspaceResult = S.Struct({
   text: S.String,
@@ -83,60 +70,60 @@ const ComputerWorkspaceResult = S.Struct({
   statusPaths: S.Array(S.String),
   diffContainsUpdate: S.Boolean,
   configValue: S.String,
-});
+})
 
 export const TestComputerWorkspaceDefinition = DurableObjectDefinition.make(
-  "TestComputerWorkspace",
+  'TestComputerWorkspace',
   {
     exercise: DurableObjectDefinition.method({ success: ComputerWorkspaceResult }),
   },
-);
+)
 
-const CounterValue = S.Struct({ count: S.Finite });
+const CounterValue = S.Struct({ count: S.Finite })
 
 const TestWorkerLive = TestWorkerDefinition.make(Layer.empty, {
-  fetch: Effect.sync(() => new Response("Test WorkerEntrypoint", { status: 404 })),
+  fetch: Effect.sync(() => new Response('Test WorkerEntrypoint', { status: 404 })),
   rpc: {
     parseNumber: (value) => Effect.succeed(value + 1),
   },
-});
+})
 
 export class TestWorkerEntrypoint extends TestWorkerLive {}
 
 const TestCounterLive = TestCounterDefinition.make(Layer.empty, {
   webSocketMessage: (socket, message) =>
-    Effect.gen(function* () {
-      const state = yield* DurableObjectState.DurableObjectState;
-      const count = (yield* state.storage.get<number>("socket-invocations")) ?? 0;
+    Effect.gen(function*() {
+      const state = yield* DurableObjectState.DurableObjectState
+      const count = (yield* state.storage.get<number>('socket-invocations')) ?? 0
 
-      yield* state.storage.put("socket-invocations", count + 1);
-      yield* socket.send(message);
+      yield* state.storage.put('socket-invocations', count + 1)
+      yield* socket.send(message)
     }),
   rpc: {
     increment: (amount) =>
-      Effect.gen(function* () {
-        const state = yield* DurableObjectState.DurableObjectState;
+      Effect.gen(function*() {
+        const state = yield* DurableObjectState.DurableObjectState
         const counters = state.storage.kv.schema({
           key: S.String,
           value: CounterValue,
-        });
-        const current = yield* counters.get("counter");
-        const next = (Option.isSome(current) ? current.value.count : 0) + amount;
+        })
+        const current = yield* counters.get('counter')
+        const next = (Option.isSome(current) ? current.value.count : 0) + amount
 
-        yield* counters.put("counter", { count: next });
+        yield* counters.put('counter', { count: next })
 
-        return next;
+        return next
       }),
     get: () =>
-      Effect.gen(function* () {
-        const state = yield* DurableObjectState.DurableObjectState;
+      Effect.gen(function*() {
+        const state = yield* DurableObjectState.DurableObjectState
         const counters = state.storage.kv.schema({
           key: S.String,
           value: CounterValue,
-        });
-        const current = yield* counters.get("counter");
+        })
+        const current = yield* counters.get('counter')
 
-        return Option.isSome(current) ? current.value.count : 0;
+        return Option.isSome(current) ? current.value.count : 0
       }),
     consumeBytes: (offset, stream) =>
       Effect.tryPromise(() => new Response(stream).arrayBuffer()).pipe(
@@ -145,104 +132,104 @@ const TestCounterLive = TestCounterDefinition.make(Layer.empty, {
     produceBytes: (length) =>
       Effect.succeed(
         new ReadableStream({
-          type: "bytes",
+          type: 'bytes',
           start(controller) {
-            controller.enqueue(new Uint8Array(length));
-            controller.close();
+            controller.enqueue(new Uint8Array(length))
+            controller.close()
           },
         }),
       ),
   },
-  fetch: Effect.gen(function* () {
-    const request = yield* Worker.NativeRequest;
+  fetch: Effect.gen(function*() {
+    const request = yield* Worker.NativeRequest
 
     if (Worker.isWebSocketUpgrade(request)) {
-      yield* DurableObjectWebSocket.installKeepalive();
+      yield* DurableObjectWebSocket.installKeepalive()
 
-      return (yield* DurableObjectWebSocket.acceptUpgrade()).response;
+      return (yield* DurableObjectWebSocket.acceptUpgrade()).response
     }
-    const url = new URL(request.url);
-    const amount = url.searchParams.get("amount") ?? "1";
-    const state = yield* DurableObjectState.DurableObjectState;
+    const url = new URL(request.url)
+    const amount = url.searchParams.get('amount') ?? '1'
+    const state = yield* DurableObjectState.DurableObjectState
     const counters = state.storage.kv.schema({
       key: S.String,
       value: CounterValue,
-    });
-    const current = yield* counters.get("counter");
-    const next = (Option.isSome(current) ? current.value.count : 0) + Number(amount);
+    })
+    const current = yield* counters.get('counter')
+    const next = (Option.isSome(current) ? current.value.count : 0) + Number(amount)
 
-    yield* counters.put("counter", { count: next });
+    yield* counters.put('counter', { count: next })
 
-    return Response.json({ count: next });
+    return Response.json({ count: next })
   }),
   alarm: () =>
-    Effect.gen(function* () {
-      const state = yield* DurableObjectState.DurableObjectState;
+    Effect.gen(function*() {
+      const state = yield* DurableObjectState.DurableObjectState
 
-      yield* state.storage.put("count", { count: 0 });
+      yield* state.storage.put('count', { count: 0 })
     }),
-});
+})
 
 export class TestLegacyAlarmDurableObject extends DurableObject.make(Layer.empty, {
   alarm: () =>
-    Effect.gen(function* () {
-      const state = yield* DurableObjectState.DurableObjectState;
-      const count = (yield* state.storage.get<number>("raw-alarm-invocations")) ?? 0;
-      const next = yield* state.storage.get<number>("raw-alarm-next");
+    Effect.gen(function*() {
+      const state = yield* DurableObjectState.DurableObjectState
+      const count = (yield* state.storage.get<number>('raw-alarm-invocations')) ?? 0
+      const next = yield* state.storage.get<number>('raw-alarm-next')
 
-      yield* state.storage.put("raw-alarm-invocations", count + 1);
-      if (next !== undefined) yield* Effect.promise(() => state.raw.storage.setAlarm(next));
+      yield* state.storage.put('raw-alarm-invocations', count + 1)
+      if (next !== undefined) yield* Effect.promise(() => state.raw.storage.setAlarm(next))
     }),
 }) {}
 
 export class TestCounterDurableObject extends TestCounterLive {
-  readonly instanceId = crypto.randomUUID();
+  readonly instanceId = crypto.randomUUID()
 }
 
-export class HibernationPingResult extends S.Class<HibernationPingResult>("HibernationPingResult")({
+export class HibernationPingResult extends S.Class<HibernationPingResult>('HibernationPingResult')({
   nonce: S.String,
 }) {}
 
-export class HibernationPing extends Rpc.make("HibernationPing", {
+export class HibernationPing extends Rpc.make('HibernationPing', {
   payload: { nonce: S.String },
   success: HibernationPingResult,
 }) {}
 
-export class HibernationNever extends Rpc.make("HibernationNever", {
+export class HibernationNever extends Rpc.make('HibernationNever', {
   payload: { nonce: S.String },
   success: S.Void,
 }) {}
 
-export class HibernationIncrement extends Rpc.make("HibernationIncrement", {
+export class HibernationIncrement extends Rpc.make('HibernationIncrement', {
   payload: { value: S.BigInt },
   success: S.BigInt,
 }) {}
 
-export class HibernationEvent extends S.Class<HibernationEvent>("HibernationEvent")({
+export class HibernationEvent extends S.Class<HibernationEvent>('HibernationEvent')({
   cursor: S.Finite,
   value: S.String,
 }) {}
 
-export class HibernationAppendEvent extends Rpc.make("HibernationAppendEvent", {
+export class HibernationAppendEvent extends Rpc.make('HibernationAppendEvent', {
   payload: { value: S.String },
   success: HibernationEvent,
 }) {}
 
-export class HibernationEvents extends Rpc.make("HibernationEvents", {
+export class HibernationEvents extends Rpc.make('HibernationEvents', {
   payload: { subscriptionKey: S.String, after: S.Finite, until: S.Finite },
   success: HibernationEvent,
   stream: true,
 }) {}
 
 export class HibernationCheckpointSubscription extends Rpc.make(
-  "HibernationCheckpointSubscription",
+  'HibernationCheckpointSubscription',
   {
     payload: { subscriptionKey: S.String, checkpoint: S.Finite },
     success: S.Boolean,
   },
 ) {}
 
-export class HibernationNonResumableEvents extends Rpc.make("HibernationNonResumableEvents", {
+export class HibernationNonResumableEvents extends Rpc.make('HibernationNonResumableEvents', {
   success: HibernationEvent,
   stream: true,
 }) {}
@@ -261,17 +248,17 @@ const HibernationEventsPayload = S.Struct({
   subscriptionKey: S.String,
   after: S.Finite,
   until: S.Finite,
-});
+})
 const HibernationEventsResumeDescriptor = S.Struct({
   subscriptionKey: S.String,
   until: S.Finite,
-});
-const decodeHibernationEventsPayload = S.decodeUnknownOption(HibernationEventsPayload);
-const decodeHibernationEvent = S.decodeUnknownOption(HibernationEvent);
+})
+const decodeHibernationEventsPayload = S.decodeUnknownOption(HibernationEventsPayload)
+const decodeHibernationEvent = S.decodeUnknownOption(HibernationEvent)
 
 export const HibernationEventsResume = DurableObjectRpcWebSocket.resumableStream({
-  id: "workerd-hibernation-events/v1",
-  rpcTag: "HibernationEvents",
+  id: 'workerd-hibernation-events/v1',
+  rpcTag: 'HibernationEvents',
   resumeDescriptorSchema: HibernationEventsResumeDescriptor,
   checkpointSchema: S.Finite,
   identify: (request) =>
@@ -291,79 +278,78 @@ export const HibernationEventsResume = DurableObjectRpcWebSocket.resumableStream
     },
     headers: [],
   }),
-  checkpointFromValue: (value) =>
-    Option.map(decodeHibernationEvent(value), (event) => event.cursor),
+  checkpointFromValue: (value) => Option.map(decodeHibernationEvent(value), (event) => event.cursor),
   checkpointToken: String,
-});
+})
 
 interface HibernationEventLogService {
-  readonly events: PubSub.PubSub<HibernationEvent>;
-  readonly lock: Semaphore.Semaphore;
+  readonly events: PubSub.PubSub<HibernationEvent>
+  readonly lock: Semaphore.Semaphore
 }
 
 class HibernationEventLog extends Context.Service<
   HibernationEventLog,
   HibernationEventLogService
->()("effect-cf/tests/HibernationEventLog") {}
+>()('effect-cf/tests/HibernationEventLog') {}
 
 const HibernationEventLogLive = Layer.effect(
   HibernationEventLog,
-  Effect.gen(function* () {
-    const events = yield* PubSub.unbounded<HibernationEvent>();
-    const lock = yield* Semaphore.make(1);
+  Effect.gen(function*() {
+    const events = yield* PubSub.unbounded<HibernationEvent>()
+    const lock = yield* Semaphore.make(1)
 
-    return { events, lock };
+    return { events, lock }
   }),
-);
+)
 
-const hibernationEventLogStorageKey = "hibernation-events";
+const hibernationEventLogStorageKey = 'hibernation-events'
 
-const readHibernationEvents = Effect.gen(function* () {
-  const state = yield* DurableObjectState.DurableObjectState;
+const readHibernationEvents = Effect.gen(function*() {
+  const state = yield* DurableObjectState.DurableObjectState
   const events = yield* state.storage.get<
     Array<{ readonly cursor: number; readonly value: string }>
-  >(hibernationEventLogStorageKey);
+  >(hibernationEventLogStorageKey)
 
-  return (events ?? []).map((event) => HibernationEvent.make(event));
-}).pipe(Effect.orDie);
+  return (events ?? []).map((event) => HibernationEvent.make(event))
+}).pipe(Effect.orDie)
 
 const HibernationRpcHandlers = HibernationRpcs.toLayer(
-  Effect.gen(function* () {
-    const eventLog = yield* HibernationEventLog;
-    const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket;
+  Effect.gen(function*() {
+    const eventLog = yield* HibernationEventLog
+    const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket
 
     return HibernationRpcs.of({
       HibernationAppendEvent: ({ value }) =>
         eventLog.lock.withPermit(
-          Effect.gen(function* () {
-            const state = yield* DurableObjectState.DurableObjectState;
-            const events = yield* readHibernationEvents;
+          Effect.gen(function*() {
+            const state = yield* DurableObjectState.DurableObjectState
+            const events = yield* readHibernationEvents
             const event = HibernationEvent.make({
               cursor: (events.at(-1)?.cursor ?? 0) + 1,
               value,
-            });
+            })
 
             yield* state.storage
               .put(hibernationEventLogStorageKey, [...events, event])
-              .pipe(Effect.orDie);
-            yield* PubSub.publish(eventLog.events, event);
+              .pipe(Effect.orDie)
+            yield* PubSub.publish(eventLog.events, event)
 
-            return event;
+            return event
           }),
         ),
       HibernationEvents: ({ after, until }) =>
         Stream.unwrap(
           eventLog.lock.withPermit(
-            Effect.gen(function* () {
-              const subscription = yield* PubSub.subscribe(eventLog.events);
-              const replay = yield* readHibernationEvents;
+            Effect.gen(function*() {
+              const subscription = yield* PubSub.subscribe(eventLog.events)
+              const replay = yield* readHibernationEvents
 
               return Stream.fromIterable(replay).pipe(
                 Stream.concat(Stream.fromSubscription(subscription)),
                 Stream.filter((event) => event.cursor > after),
                 Stream.takeUntil((event) => event.cursor >= until),
                 Stream.rechunk(1),
-              );
+              )
             }),
           ),
         ),
@@ -376,88 +362,86 @@ const HibernationRpcHandlers = HibernationRpcs.toLayer(
           })
           .pipe(Effect.orDie),
       HibernationNonResumableEvents: () =>
-        Stream.make(HibernationEvent.make({ cursor: 0, value: "non-resumable" })).pipe(
+        Stream.make(HibernationEvent.make({ cursor: 0, value: 'non-resumable' })).pipe(
           Stream.concat(Stream.never),
           Stream.rechunk(1),
         ),
       HibernationPing: ({ nonce }) => Effect.succeed(HibernationPingResult.make({ nonce })),
       HibernationIncrement: ({ value }) => Effect.succeed(value + 1n),
       HibernationNever: () =>
-        Effect.gen(function* () {
-          const state = yield* DurableObjectState.DurableObjectState;
-          const starts =
-            (yield* state.storage.get<number>("hibernation-never-starts").pipe(Effect.orDie)) ?? 0;
+        Effect.gen(function*() {
+          const state = yield* DurableObjectState.DurableObjectState
+          const starts = (yield* state.storage.get<number>('hibernation-never-starts').pipe(Effect.orDie)) ?? 0
 
-          yield* state.storage.put("hibernation-never-starts", starts + 1).pipe(Effect.orDie);
+          yield* state.storage.put('hibernation-never-starts', starts + 1).pipe(Effect.orDie)
 
-          return yield* Effect.never;
+          return yield* Effect.never
         }),
-    });
+    })
   }),
-);
+)
 
 const HibernationTransportLive = DurableObjectRpcWebSocket.layer({
-  tag: "hibernation-rpc",
+  tag: 'hibernation-rpc',
   resumableStreams: [HibernationEventsResume],
-});
+})
 
 const HibernationRpcHandlersLive = HibernationRpcHandlers.pipe(
   Layer.provideMerge(HibernationEventLogLive),
   Layer.provideMerge(HibernationTransportLive),
-);
+)
 
 const HibernationRpcLive = RpcServer.layer(HibernationRpcs).pipe(
   Layer.provideMerge(HibernationRpcHandlersLive),
   Layer.provide(HibernationTransportLive),
   Layer.provide(RpcSerialization.layerJson),
-);
+)
 
 const TestHibernationRpcLive = DurableObject.make(HibernationRpcLive, {
-  fetch: Effect.gen(function* () {
-    const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket;
+  fetch: Effect.gen(function*() {
+    const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket
     const upgrade = yield* transport.acceptUpgrade({
       // This application-owned field is deliberately unrelated to adapter metadata.
-      attachment: { application: "survives", applicationMessageCount: 0 },
-      tags: ["application-tag"],
-    });
+      attachment: { application: 'survives', applicationMessageCount: 0 },
+      tags: ['application-tag'],
+    })
 
-    return upgrade.response;
+    return upgrade.response
   }),
   webSocketMessage: (socket, message) =>
-    Effect.gen(function* () {
-      const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket;
-      const attachment = socket.raw.deserializeAttachment();
-      const current = Predicate.isObject(attachment) ? attachment : {};
-      const applicationMessageCount =
-        Predicate.hasProperty(current, "applicationMessageCount") &&
-        Predicate.isNumber(current.applicationMessageCount)
-          ? current.applicationMessageCount
-          : 0;
+    Effect.gen(function*() {
+      const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket
+      const attachment = socket.raw.deserializeAttachment()
+      const current = Predicate.isObject(attachment) ? attachment : {}
+      const applicationMessageCount = Predicate.hasProperty(current, 'applicationMessageCount') &&
+          Predicate.isNumber(current.applicationMessageCount)
+        ? current.applicationMessageCount
+        : 0
 
       socket.raw.serializeAttachment({
         ...current,
         applicationMessageCount: applicationMessageCount + 1,
-      });
+      })
 
-      yield* transport.message(socket, message);
+      yield* transport.message(socket, message)
     }),
   webSocketClose: (socket) =>
-    Effect.gen(function* () {
-      const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket;
+    Effect.gen(function*() {
+      const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket
 
-      yield* transport.close(socket);
+      yield* transport.close(socket)
     }),
   webSocketError: (socket, cause) =>
-    Effect.gen(function* () {
-      const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket;
+    Effect.gen(function*() {
+      const transport = yield* DurableObjectRpcWebSocket.DurableObjectRpcWebSocket
 
-      yield* transport.error(socket, cause);
+      yield* transport.error(socket, cause)
     }),
-});
+})
 
 /** A hibernatable finite-RPC transport fixture used by the worker-pool lifecycle test. */
 export class TestHibernationRpcDurableObject extends TestHibernationRpcLive {
-  readonly instanceId = crypto.randomUUID();
+  readonly instanceId = crypto.randomUUID()
 }
 
 const TestComputerWorkspaceLive = TestComputerWorkspaceDefinition.make(
@@ -465,51 +449,51 @@ const TestComputerWorkspaceLive = TestComputerWorkspaceDefinition.make(
   {
     rpc: {
       exercise: () =>
-        Effect.gen(function* () {
-          const workspace = yield* ComputerWorkspace.ComputerWorkspace;
+        Effect.gen(function*() {
+          const workspace = yield* ComputerWorkspace.ComputerWorkspace
 
-          yield* workspace.mkdir("/notes", { recursive: true });
-          yield* workspace.writeFile("/notes/todo.tmp", "Ship it\nTODO verify\n");
-          yield* workspace.rename("/notes/todo.tmp", "/notes/todo.md");
-          yield* workspace.writeFile("/blob.bin", new Uint8Array([1, 2, 3]));
-          yield* workspace.symlink("/notes/todo.md", "/todo-link");
-          yield* workspace.chmod("/notes/todo.md", 0o640);
+          yield* workspace.mkdir('/notes', { recursive: true })
+          yield* workspace.writeFile('/notes/todo.tmp', 'Ship it\nTODO verify\n')
+          yield* workspace.rename('/notes/todo.tmp', '/notes/todo.md')
+          yield* workspace.writeFile('/blob.bin', new Uint8Array([1, 2, 3]))
+          yield* workspace.symlink('/notes/todo.md', '/todo-link')
+          yield* workspace.chmod('/notes/todo.md', 0o640)
 
-          const text = yield* workspace.readFile("/notes/todo.md", { byteLength: 7 });
-          const byteStream = yield* workspace.readFile("/blob.bin", { encoding: "stream" });
+          const text = yield* workspace.readFile('/notes/todo.md', { byteLength: 7 })
+          const byteStream = yield* workspace.readFile('/blob.bin', { encoding: 'stream' })
           const bytes = yield* Effect.promise(async () =>
-            Array.from(new Uint8Array(await new Response(byteStream).arrayBuffer())),
-          );
-          const directory = yield* workspace.readdir("/");
-          const found = yield* workspace.find("/");
-          const grep = yield* workspace.grep("todo", "/", { ignoreCase: true });
-          const linkTarget = yield* workspace.readlink("/todo-link");
-          const missingFile = yield* workspace.statOrNull("/notes/todo.tmp");
-          const missingLink = yield* workspace.lstatOrNull("/notes/todo.tmp");
-          const backends = yield* workspace.runtime.backends;
+            Array.from(new Uint8Array(await new Response(byteStream).arrayBuffer()))
+          )
+          const directory = yield* workspace.readdir('/')
+          const found = yield* workspace.find('/')
+          const grep = yield* workspace.grep('todo', '/', { ignoreCase: true })
+          const linkTarget = yield* workspace.readlink('/todo-link')
+          const missingFile = yield* workspace.statOrNull('/notes/todo.tmp')
+          const missingLink = yield* workspace.lstatOrNull('/notes/todo.tmp')
+          const backends = yield* workspace.runtime.backends
 
-          yield* workspace.git.init({ defaultBranch: "main" });
-          yield* workspace.writeFile("/README.md", "first\n");
-          yield* workspace.git.add({ paths: ["README.md"] });
-          const committed = yield* workspace.git.commit({ message: "initial commit" });
+          yield* workspace.git.init({ defaultBranch: 'main' })
+          yield* workspace.writeFile('/README.md', 'first\n')
+          yield* workspace.git.add({ paths: ['README.md'] })
+          const committed = yield* workspace.git.commit({ message: 'initial commit' })
 
-          yield* workspace.git.branch({ name: "feature" });
-          yield* workspace.git.tag({ name: "v1" });
-          yield* workspace.git.configSet({ path: "effect-cf.test", value: "works" });
+          yield* workspace.git.branch({ name: 'feature' })
+          yield* workspace.git.tag({ name: 'v1' })
+          yield* workspace.git.configSet({ path: 'effect-cf.test', value: 'works' })
 
-          const branch = (yield* workspace.git.currentBranch()) ?? "detached";
-          const branches = yield* workspace.git.branchList();
-          const tags = yield* workspace.git.tagList();
-          const log = yield* workspace.git.log({ maxCount: 1 });
-          const shown = yield* workspace.git.show({ ref: "HEAD" });
-          const files = yield* workspace.git.lsFiles();
-          const tree = yield* workspace.git.lsTree({ ref: "HEAD" });
-          const resolved = yield* workspace.git.revParse("HEAD");
+          const branch = (yield* workspace.git.currentBranch()) ?? 'detached'
+          const branches = yield* workspace.git.branchList()
+          const tags = yield* workspace.git.tagList()
+          const log = yield* workspace.git.log({ maxCount: 1 })
+          const shown = yield* workspace.git.show({ ref: 'HEAD' })
+          const files = yield* workspace.git.lsFiles()
+          const tree = yield* workspace.git.lsTree({ ref: 'HEAD' })
+          const resolved = yield* workspace.git.revParse('HEAD')
 
-          yield* workspace.writeFile("/README.md", "first\nupdated\n");
-          const status = yield* workspace.git.status();
-          const diff = yield* workspace.git.diff();
-          const configValue = yield* workspace.git.configGet({ path: "effect-cf.test" });
+          yield* workspace.writeFile('/README.md', 'first\nupdated\n')
+          const status = yield* workspace.git.status()
+          const diff = yield* workspace.git.diff()
+          const configValue = yield* workspace.git.configGet({ path: 'effect-cf.test' })
 
           return {
             text,
@@ -521,48 +505,48 @@ const TestComputerWorkspaceLive = TestComputerWorkspaceDefinition.make(
             missingFile: missingFile === null,
             missingLink: missingLink === null,
             backendCount: backends.length,
-            commit: resolved === committed.oid ? committed.oid : "mismatch",
+            commit: resolved === committed.oid ? committed.oid : 'mismatch',
             branch,
             branches,
             tags,
-            logMessage: log[0]?.message ?? "",
+            logMessage: log[0]?.message ?? '',
             shownMessage: shown.message,
             files,
             treePaths: tree.map((entry) => entry.path),
             statusPaths: status.map((entry) => entry.path),
-            diffContainsUpdate: diff.includes("updated"),
-            configValue: Array.isArray(configValue) ? configValue.join(",") : (configValue ?? ""),
-          };
+            diffContainsUpdate: diff.includes('updated'),
+            configValue: Array.isArray(configValue) ? configValue.join(',') : (configValue ?? ''),
+          }
         }),
     },
   },
-);
+)
 
 const TestComputerWorkspaceHost = withComputerWorkspace(TestComputerWorkspaceLive, (_, state) => {
   return {
     storage: state.storage,
     sessionId: state.id.toString(),
-    gitIdentity: { name: "effect-cf", email: "tests@effect-cf.example" },
-  };
-});
+    gitIdentity: { name: '@systemfsoftware/effect-cf', email: 'tests@effect-cf.example' },
+  }
+})
 
 export class TestComputerWorkspaceDurableObject extends TestComputerWorkspaceHost {}
 
 export interface TestWorkflowPayload {
-  readonly value: string;
+  readonly value: string
 }
 
 export const TestWorkflowEntrypoint = Workflow.make(Layer.empty, {
   run: (payload: TestWorkflowPayload) =>
-    Effect.gen(function* () {
-      const value = yield* Workflow.step("produce-value", Effect.succeed(payload.value));
+    Effect.gen(function*() {
+      const value = yield* Workflow.step('produce-value', Effect.succeed(payload.value))
 
-      yield* Workflow.sleep("pause", "1 hour");
+      yield* Workflow.sleep('pause', '1 hour')
 
-      return { value };
+      return { value }
     }),
-});
+})
 
 export default Worker.make(Layer.empty, {
-  fetch: Effect.sync(() => new Response("effect-cf test fixture", { status: 200 })),
-});
+  fetch: Effect.sync(() => new Response('effect-cf test fixture', { status: 200 })),
+})

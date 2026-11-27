@@ -18,7 +18,7 @@ permissions:
 jobs:
   release:
     if: github.ref == 'refs/heads/main'
-    uses: systemfsoftware/pnpm-release-management/.github/workflows/release.yml@a7c8ca88d2ace4fb62bfeff20f594d11cffe3780
+    uses: systemfsoftware/pnpm-release-management/.github/workflows/release.yml@292288250ae39b491c79ce6818267972df71be7a
     with:
       # The release PR changes only version surfaces, so its own tree is proved by the merge-queue draft's full CI.
       # `release-checks.yml` reuses main's verdict for the base commit and lints the squash message instead of

@@ -1,4 +1,4 @@
-import { Worker } from "effect-cf";
-import { applicationLayer, fetch } from "./http";
+import { Worker } from '@systemfsoftware/effect-cf'
+import { applicationLayer, fetch } from './http'
 
-export default Worker.makeFetchHandler(applicationLayer, { fetch });
+export default Worker.makeFetchHandler(applicationLayer, { fetch })

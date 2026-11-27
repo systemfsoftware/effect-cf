@@ -1,10 +1,10 @@
-import * as Data from "effect/Data";
+import * as Data from 'effect/Data'
 
-export class NonRetryableError extends Data.TaggedError("NonRetryableError")<{
-  readonly message: string;
+export class NonRetryableError extends Data.TaggedError('NonRetryableError')<{
+  readonly message: string
 }> {
-  constructor(message: string, name = "NonRetryableError") {
-    super({ message });
-    this.name = name;
+  constructor(message: string, name = 'NonRetryableError') {
+    super({ message })
+    this.name = name
   }
 }

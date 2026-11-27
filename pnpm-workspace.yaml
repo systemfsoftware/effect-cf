@@ -1,4 +1,5 @@
 allowBuilds:
+  dprint: true
   "@mongodb-js/zstd": true
   esbuild: false
   node-liblzma: true

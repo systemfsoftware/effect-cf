@@ -1,24 +1,24 @@
-import { Context, Effect, Layer, Schema } from "effect";
-import { Rpc, RpcClient, RpcGroup } from "effect/rpc";
-import type { RpcClientError } from "effect/rpc/RpcClientError";
-import * as Socket from "effect/socket/Socket";
-import * as RpcWebSocketClient from "effect-cf/rpc-websocket-client";
+import * as RpcWebSocketClient from '@systemfsoftware/effect-cf/rpc-websocket-client'
+import { Context, Effect, Layer, Schema } from 'effect'
+import { Rpc, RpcClient, RpcGroup } from 'effect/rpc'
+import type { RpcClientError } from 'effect/rpc/RpcClientError'
+import * as Socket from 'effect/socket/Socket'
 
-export class CounterRpcs extends RpcGroup.make(Rpc.make("increment", { success: Schema.Finite })) {}
+export class CounterRpcs extends RpcGroup.make(Rpc.make('increment', { success: Schema.Finite })) {}
 
 export class CounterClient extends Context.Service<
   CounterClient,
   RpcClient.FromGroup<typeof CounterRpcs, RpcClientError>
->()("CounterClient") {
+>()('CounterClient') {
   static readonly layer = RpcWebSocketClient.layer(
     CounterClient,
     CounterRpcs,
-    "wss://example.com/counter",
-  ).pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal));
+    'wss://example.com/counter',
+  ).pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal))
 }
 
-export const increment: Effect.Effect<number, RpcClientError> = Effect.gen(function* () {
-  const client = yield* CounterClient;
+export const increment: Effect.Effect<number, RpcClientError> = Effect.gen(function*() {
+  const client = yield* CounterClient
 
-  return yield* client.increment();
-}).pipe(Effect.provide(CounterClient.layer));
+  return yield* client.increment()
+}).pipe(Effect.provide(CounterClient.layer))

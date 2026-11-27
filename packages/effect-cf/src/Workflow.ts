@@ -1,4 +1,3 @@
-import * as RpcTargets from "./RpcTargets";
 import {
   WorkflowEntrypoint as CloudflareWorkflowEntrypoint,
   type WorkflowEvent as CloudflareWorkflowEvent,
@@ -8,55 +7,56 @@ import {
   type WorkflowStepContext as CloudflareWorkflowStepContext,
   type WorkflowStepEvent,
   type WorkflowTimeoutDuration,
-} from "cloudflare:workers";
-import { NonRetryableError as CloudflareNonRetryableError } from "cloudflare:workflows";
-import * as Cause from "effect/Cause";
-import type { Digest, SecureRandom } from "effect/crypto";
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as FiberSet from "effect/FiberSet";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import type { ManagedRuntime, Scope } from "effect";
+} from 'cloudflare:workers'
+import { NonRetryableError as CloudflareNonRetryableError } from 'cloudflare:workflows'
+import type { ManagedRuntime, Scope } from 'effect'
+import * as Cause from 'effect/Cause'
+import * as Context from 'effect/Context'
+import type { Digest, SecureRandom } from 'effect/crypto'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as FiberSet from 'effect/FiberSet'
+import * as Layer from 'effect/Layer'
+import * as Option from 'effect/Option'
+import * as RpcTargets from './RpcTargets'
 
-import { WorkerEnvironment, type WorkerEnv } from "./Environment";
-import { ExecutionContext, WorkerContext } from "./Worker";
-import type * as WorkflowDefinition from "./WorkflowDefinition";
-import * as Entrypoint from "./internal/Entrypoint";
-import * as ErrorMessage from "./internal/ErrorMessage";
-import * as Runtime from "./internal/Runtime";
-import { fromExecutionContext } from "./internal/WorkerContext";
+import { type WorkerEnv, WorkerEnvironment } from './Environment'
+import * as Entrypoint from './internal/Entrypoint'
+import * as ErrorMessage from './internal/ErrorMessage'
+import * as Runtime from './internal/Runtime'
+import { fromExecutionContext } from './internal/WorkerContext'
+import { ExecutionContext, WorkerContext } from './Worker'
+import type * as WorkflowDefinition from './WorkflowDefinition'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 export type {
   WorkflowInstance,
-  WorkflowInstanceCreateOptions,
   WorkflowInstanceCreateBatchOptions,
+  WorkflowInstanceCreateOptions,
   WorkflowOperationError,
-} from "./WorkflowBinding";
+} from './WorkflowBinding'
 
 export interface WorkflowEventService<Payload = unknown> {
-  readonly raw: CloudflareWorkflowEvent<unknown>;
-  readonly payload: Payload;
-  readonly timestamp: Date;
-  readonly instanceId: string;
-  readonly workflowName: string;
+  readonly raw: CloudflareWorkflowEvent<unknown>
+  readonly payload: Payload
+  readonly timestamp: Date
+  readonly instanceId: string
+  readonly workflowName: string
 }
 
 export class WorkflowEvent extends Context.Service<WorkflowEvent, WorkflowEventService>()(
-  "effect-cf/WorkflowEvent",
+  'effect-cf/WorkflowEvent',
 ) {}
 
-export class WorkflowStepError extends Data.TaggedError("WorkflowStepError")<{
-  readonly step?: string;
-  readonly operation: string;
-  readonly cause: unknown;
+export class WorkflowStepError extends Data.TaggedError('WorkflowStepError')<{
+  readonly step?: string
+  readonly operation: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    const step = this.step === undefined ? "" : ` in step "${this.step}"`;
+    const step = this.step === undefined ? '' : ` in step "${this.step}"`
 
-    return `Workflow ${this.operation} failed${step}: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Workflow ${this.operation} failed${step}: ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
@@ -67,47 +67,47 @@ export class WorkflowStepError extends Data.TaggedError("WorkflowStepError")<{
  * `NonRetryableError` while preserving the original cause and its message.
  */
 export class WorkflowStepNonRetryableError extends Data.TaggedError(
-  "WorkflowStepNonRetryableError",
+  'WorkflowStepNonRetryableError',
 )<{
-  readonly cause: unknown;
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Workflow step failed without retry: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Workflow step failed without retry: ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
 export interface WorkflowStepService {
-  readonly raw: CloudflareWorkflowStep;
+  readonly raw: CloudflareWorkflowStep
   do<A, E, R>(
     name: string,
     effect: Effect.Effect<A, E, R>,
     config?: WorkflowStepConfig,
-  ): Effect.Effect<A, WorkflowStepError, Exclude<R, WorkflowStepContext>>;
+  ): Effect.Effect<A, WorkflowStepError, Exclude<R, WorkflowStepContext>>
   readonly sleep: (
     name: string,
     duration: WorkflowSleepDuration,
-  ) => Effect.Effect<void, WorkflowStepError>;
+  ) => Effect.Effect<void, WorkflowStepError>
   readonly sleepUntil: (
     name: string,
     timestamp: Date | number,
-  ) => Effect.Effect<void, WorkflowStepError>;
+  ) => Effect.Effect<void, WorkflowStepError>
   readonly waitForEvent: <Payload>(
     name: string,
     options: {
-      readonly type: string;
-      readonly timeout?: WorkflowTimeoutDuration | number;
+      readonly type: string
+      readonly timeout?: WorkflowTimeoutDuration | number
     },
-  ) => Effect.Effect<WorkflowStepEvent<Payload>, WorkflowStepError>;
+  ) => Effect.Effect<WorkflowStepEvent<Payload>, WorkflowStepError>
 }
 
 export class WorkflowStep extends Context.Service<WorkflowStep, WorkflowStepService>()(
-  "effect-cf/WorkflowStep",
+  'effect-cf/WorkflowStep',
 ) {}
 
 export class WorkflowStepContext extends Context.Service<
   WorkflowStepContext,
   CloudflareWorkflowStepContext
->()("effect-cf/WorkflowStepContext") {}
+>()('effect-cf/WorkflowStepContext') {}
 
 const fromWorkflowEvent = <Payload>(
   event: CloudflareWorkflowEvent<Payload>,
@@ -118,41 +118,41 @@ const fromWorkflowEvent = <Payload>(
   timestamp: event.timestamp,
   instanceId: event.instanceId,
   workflowName: event.workflowName,
-});
+})
 
 const toCloudflareNonRetryableError = (
   error: WorkflowStepNonRetryableError,
 ): CloudflareNonRetryableError => {
-  const cloudflareError = new CloudflareNonRetryableError(error.message);
+  const cloudflareError = new CloudflareNonRetryableError(error.message)
 
-  cloudflareError.cause = error.cause;
+  cloudflareError.cause = error.cause
 
-  return cloudflareError;
-};
+  return cloudflareError
+}
 
 const exposeCloudflareNonRetryableError = <A, E, R>(
   effect: Effect.Effect<A, E, R>,
 ): Effect.Effect<A, E, R> =>
   Effect.catchCause(effect, (cause) => {
-    const error = Cause.findErrorOption(cause);
+    const error = Cause.findErrorOption(cause)
 
     return Option.isSome(error) && error.value instanceof WorkflowStepNonRetryableError
       ? Effect.die(toCloudflareNonRetryableError(error.value))
-      : Effect.failCause(cause);
-  });
+      : Effect.failCause(cause)
+  })
 
 const fromWorkflowStep = (step: CloudflareWorkflowStep): WorkflowStepService => ({
   raw: step,
   do: <A, E, R>(name: string, effect: Effect.Effect<A, E, R>, config?: WorkflowStepConfig) =>
-    Effect.gen(function* () {
-      const context = yield* Effect.context<Exclude<R, WorkflowStepContext>>();
+    Effect.gen(function*() {
+      const context = yield* Effect.context<Exclude<R, WorkflowStepContext>>()
 
       return yield* Effect.scoped(
-        Effect.gen(function* () {
+        Effect.gen(function*() {
           // Cloudflare owns retry timing and exposes no step cancellation API.
           // Join the current callback on interruption and prevent later retry
           // callbacks from starting, without waiting for native retry delays.
-          const runPromise = yield* FiberSet.makeRuntimePromise<never, A, E>();
+          const runPromise = yield* FiberSet.makeRuntimePromise<never, A, E>()
 
           return yield* Effect.tryPromise({
             try: () => {
@@ -165,57 +165,57 @@ const fromWorkflowStep = (step: CloudflareWorkflowStep): WorkflowStepService => 
                   RpcTargets.withScope(
                     Effect.provideService(effect, WorkflowStepContext, stepContext),
                   ),
-                );
+                )
 
                 return runPromise(
                   exposeCloudflareNonRetryableError(Effect.provideContext(stepEffect, context)),
-                );
-              };
+                )
+              }
               // SAFETY: these overloads reproduce the Cloudflare WorkflowStep.do runtime signatures used here.
               const rawStep = step as {
                 do(
                   name: string,
                   callback: (context: CloudflareWorkflowStepContext) => Promise<A>,
-                ): Promise<A>;
+                ): Promise<A>
                 do(
                   name: string,
                   config: WorkflowStepConfig,
                   callback: (context: CloudflareWorkflowStepContext) => Promise<A>,
-                ): Promise<A>;
-              };
+                ): Promise<A>
+              }
 
-              return config === undefined ? rawStep.do(name, run) : rawStep.do(name, config, run);
+              return config === undefined ? rawStep.do(name, run) : rawStep.do(name, config, run)
             },
-            catch: (cause) => new WorkflowStepError({ step: name, operation: "do", cause }),
-          });
+            catch: (cause) => new WorkflowStepError({ step: name, operation: 'do', cause }),
+          })
         }),
-      );
+      )
     }),
   sleep: (name, duration) =>
     Effect.tryPromise({
       try: () => step.sleep(name, duration),
-      catch: (cause) => new WorkflowStepError({ step: name, operation: "sleep", cause }),
+      catch: (cause) => new WorkflowStepError({ step: name, operation: 'sleep', cause }),
     }),
   sleepUntil: (name, timestamp) =>
     Effect.tryPromise({
       try: () => step.sleepUntil(name, timestamp),
-      catch: (cause) => new WorkflowStepError({ step: name, operation: "sleepUntil", cause }),
+      catch: (cause) => new WorkflowStepError({ step: name, operation: 'sleepUntil', cause }),
     }),
   waitForEvent: <Payload>(
     name: string,
     options: {
-      readonly type: string;
-      readonly timeout?: WorkflowTimeoutDuration | number;
+      readonly type: string
+      readonly timeout?: WorkflowTimeoutDuration | number
     },
   ) =>
     Effect.tryPromise({
       try: () => {
         // SAFETY: Cloudflare returns an event whose payload is determined by the caller's event contract.
-        return step.waitForEvent(name, options) as Promise<WorkflowStepEvent<Payload>>;
+        return step.waitForEvent(name, options) as Promise<WorkflowStepEvent<Payload>>
       },
-      catch: (cause) => new WorkflowStepError({ step: name, operation: "waitForEvent", cause }),
+      catch: (cause) => new WorkflowStepError({ step: name, operation: 'waitForEvent', cause }),
     }),
-});
+})
 
 type RuntimeContext<ROut> =
   | Digest.Digest
@@ -223,10 +223,10 @@ type RuntimeContext<ROut> =
   | ExecutionContext
   | WorkerContext
   | WorkerEnvironment
-  | ROut;
+  | ROut
 
 /** Override to instrument the whole workflow run, then call super[RunSymbol]. */
-export const RunSymbol = Symbol.for("effect-cf/Workflow/run");
+export const RunSymbol = Symbol.for('effect-cf/Workflow/run')
 
 export interface RunOptions extends Runtime.RunOptions {}
 
@@ -234,39 +234,39 @@ export type WorkflowRunContext<ROut> =
   | RuntimeContext<ROut>
   | WorkflowEvent
   | WorkflowStep
-  | Scope.Scope;
+  | Scope.Scope
 
 export type WorkflowHandler<ROut, Payload = unknown, Result = unknown> = (
   payload: Payload,
-) => Effect.Effect<Result, unknown, WorkflowRunContext<ROut>>;
+) => Effect.Effect<Result, unknown, WorkflowRunContext<ROut>>
 
 export interface WorkflowOptions<ROut, Payload = unknown, Result = unknown> {
-  readonly run: WorkflowHandler<ROut, Payload, Result>;
+  readonly run: WorkflowHandler<ROut, Payload, Result>
 }
 
-export type WorkflowClass<Payload, Result, ROut> = new (
+export type WorkflowClass<Payload, Result, ROut> = new(
   ctx: globalThis.ExecutionContext,
   env: WorkerEnv,
 ) => CloudflareWorkflowEntrypoint<WorkerEnv, Payload> & {
   [RunSymbol]<A, E>(
     effect: Effect.Effect<A, E, RuntimeContext<ROut> | Scope.Scope>,
     options?: RunOptions,
-  ): Promise<A>;
+  ): Promise<A>
   run(
     event: Readonly<CloudflareWorkflowEvent<Payload>>,
     step: CloudflareWorkflowStep,
-  ): Promise<Result>;
-};
+  ): Promise<Result>
+}
 
 export const make = <ROut, LayerError, Payload = unknown, Result = unknown>(
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<never>>,
   options: WorkflowOptions<ROut, Payload, Result>,
 ): WorkflowClass<Payload, Result, ROut> => {
   class EffectWorkflow extends CloudflareWorkflowEntrypoint<WorkerEnv, Payload> {
-    readonly runtime: ManagedRuntime.ManagedRuntime<RuntimeContext<ROut>, LayerError>;
+    readonly runtime: ManagedRuntime.ManagedRuntime<RuntimeContext<ROut>, LayerError>
 
     constructor(ctx: globalThis.ExecutionContext, env: WorkerEnv) {
-      super(ctx, env);
+      super(ctx, env)
 
       this.runtime = Runtime.makeEntrypointRuntime<
         ROut,
@@ -280,7 +280,7 @@ export const make = <ROut, LayerError, Payload = unknown, Result = unknown>(
             Context.add(WorkerContext, fromExecutionContext(ctx)),
           ),
         ),
-      );
+      )
     }
 
     run(
@@ -289,11 +289,11 @@ export const make = <ROut, LayerError, Payload = unknown, Result = unknown>(
     ): Promise<Result> {
       const workflowServices = Context.make(WorkflowEvent, fromWorkflowEvent(event)).pipe(
         Context.add(WorkflowStep, fromWorkflowStep(step)),
-      );
+      )
 
       return this[RunSymbol](
         options.run(event.payload).pipe(Effect.provideContext(workflowServices)),
-      );
+      )
     }
 
     [RunSymbol]<A, E>(
@@ -306,63 +306,61 @@ export const make = <ROut, LayerError, Payload = unknown, Result = unknown>(
         undefined,
         undefined,
         runOptions.onFailure,
-      );
+      )
     }
   }
 
-  return Entrypoint.assumeEntrypointClass<WorkflowClass<Payload, Result, ROut>>(EffectWorkflow);
-};
+  return Entrypoint.assumeEntrypointClass<WorkflowClass<Payload, Result, ROut>>(EffectWorkflow)
+}
 
 export const step = <A, E, R>(
   name: string,
   effect: Effect.Effect<A, E, R>,
   config?: WorkflowStepConfig,
 ): Effect.Effect<A, WorkflowStepError, WorkflowStep | Exclude<R, WorkflowStepContext>> =>
-  Effect.flatMap(WorkflowStep, (workflowStep) => workflowStep.do(name, effect, config));
+  Effect.flatMap(WorkflowStep, (workflowStep) => workflowStep.do(name, effect, config))
 
 export const sleep = (
   name: string,
   duration: WorkflowSleepDuration,
 ): Effect.Effect<void, WorkflowStepError, WorkflowStep> =>
-  Effect.flatMap(WorkflowStep, (workflowStep) => workflowStep.sleep(name, duration));
+  Effect.flatMap(WorkflowStep, (workflowStep) => workflowStep.sleep(name, duration))
 
 export const sleepUntil = (
   name: string,
   timestamp: Date | number,
 ): Effect.Effect<void, WorkflowStepError, WorkflowStep> =>
-  Effect.flatMap(WorkflowStep, (workflowStep) => workflowStep.sleepUntil(name, timestamp));
+  Effect.flatMap(WorkflowStep, (workflowStep) => workflowStep.sleepUntil(name, timestamp))
 
 export const waitForEvent = <Payload>(
   name: string,
   options: {
-    readonly type: string;
-    readonly timeout?: WorkflowTimeoutDuration | number;
+    readonly type: string
+    readonly timeout?: WorkflowTimeoutDuration | number
   },
 ): Effect.Effect<WorkflowStepEvent<Payload>, WorkflowStepError, WorkflowStep> =>
-  Effect.flatMap(WorkflowStep, (workflowStep) => workflowStep.waitForEvent<Payload>(name, options));
+  Effect.flatMap(WorkflowStep, (workflowStep) => workflowStep.waitForEvent<Payload>(name, options))
 
 export type Definition<
   Id extends string = string,
-  Payload extends WorkflowDefinition.Definition.Any["payload"] =
-    WorkflowDefinition.Definition.Any["payload"],
-  Result extends WorkflowDefinition.Definition.Any["result"] =
-    WorkflowDefinition.Definition.Any["result"],
-> = WorkflowDefinition.Definition<Id, Payload, Result>;
+  Payload extends WorkflowDefinition.Definition.Any['payload'] = WorkflowDefinition.Definition.Any['payload'],
+  Result extends WorkflowDefinition.Definition.Any['result'] = WorkflowDefinition.Definition.Any['result'],
+> = WorkflowDefinition.Definition<Id, Payload, Result>
 
 export namespace Definition {
-  export type Any = WorkflowDefinition.Definition.Any;
+  export type Any = WorkflowDefinition.Definition.Any
 }
 
-export type LayerOptions = WorkflowDefinition.LayerOptions;
+export type LayerOptions = WorkflowDefinition.LayerOptions
 
-export { implement, Tag, type TagClass } from "./WorkflowDefinition";
+export { implement, Tag, type TagClass } from './WorkflowDefinition'
 
 export type Handler<
   ROut,
   Self extends WorkflowDefinition.Definition.Any,
-> = WorkflowDefinition.Handler<ROut, Self>;
+> = WorkflowDefinition.Handler<ROut, Self>
 
 export type Options<
   ROut,
   Self extends WorkflowDefinition.Definition.Any,
-> = WorkflowDefinition.Options<ROut, Self>;
+> = WorkflowDefinition.Options<ROut, Self>
