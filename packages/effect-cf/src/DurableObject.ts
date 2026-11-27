@@ -427,7 +427,9 @@ export function mount<
       >;
       const record: Record<
         string,
-        ((...args: Array<unknown>) => Effect.Effect<unknown, unknown>) | Effect.Effect<void, never>
+        | ((...args: Array<unknown>) => Effect.Effect<unknown, unknown>)
+        | ((alarmInfo?: globalThis.AlarmInvocationInfo) => Effect.Effect<void, unknown>)
+        | Effect.Effect<void, never>
       > = {};
 
       for (const [key, handler] of Object.entries(handlers)) {
