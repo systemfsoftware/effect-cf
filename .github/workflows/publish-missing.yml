@@ -26,10 +26,6 @@ jobs:
           persist-credentials: false
 
       - uses: cachix/install-nix-action@bb0495a1086c46893eee56f32fd192dfe4a15bb9 # v32.0.0
-        with:
-          extra_nix_config: |
-            extra-substituters = https://nix.systemfsoftware.com
-            extra-trusted-public-keys = nix-cache-1:wXA8I4DayNW9q6enUyQA/P/nT38pGSTLt374t3gsn7M=
 
       - name: Put Node.js on the PATH
         run: echo "$(nix build --no-link --print-out-paths nixpkgs#nodejs_26)/bin" >> "$GITHUB_PATH"

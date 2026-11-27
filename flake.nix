@@ -1,10 +1,6 @@
 {
   description = "Effect-native primitives for Cloudflare Workers and Durable Objects, published as the effect-cf and effect-webtransport packages.";
 
-  nixConfig = {
-    extra-substituters = "https://nix.systemfsoftware.com";
-    extra-trusted-public-keys = "nix-cache-1:wXA8I4DayNW9q6enUyQA/P/nT38pGSTLt374t3gsn7M=";
-  };
 
   inputs = {
     core.url = "github:systemfsoftware/systemfsoftware/15b4d2ab1e2af0a154fad2b9af7bd1f6449b3606";
