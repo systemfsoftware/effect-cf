@@ -83,6 +83,41 @@ export const ScheduleConfiguration = Context.Reference<ScheduleConfiguration>(
   { defaultValue: () => ({}) },
 );
 
+/** A delegate's handoff failed; the scheduler surfaces it as a storage operation error. */
+export class AlarmSlotError extends Data.TaggedError("AlarmSlotError")<{
+  readonly cause: unknown;
+}> {}
+
+/**
+ * A host-owned physical alarm slot. The scheduler never touches the native
+ * alarm while delegated; it asks the host to arm or clear it instead.
+ */
+export interface AlarmSlotDelegate {
+  readonly schedule: (at: number) => Effect.Effect<void, AlarmSlotError>;
+  readonly cancel: Effect.Effect<void, AlarmSlotError>;
+}
+
+/**
+ * Which side owns the physical alarm slot. `Exclusive` keeps today's
+ * `getAlarm`/`setAlarm`/`deleteAlarm`; `Delegated` hands the slot to a host
+ * dispatcher that multiplexes the library's deadline with its own.
+ */
+export type AlarmSlot =
+  | { readonly _tag: "Exclusive" }
+  | { readonly _tag: "Delegated"; readonly delegate: AlarmSlotDelegate };
+
+/** Defaults to `Exclusive`; provide a `Delegated` value to hand the slot to a host. */
+export const AlarmSlot = Context.Reference<AlarmSlot>("effect-cf/DurableObjectAlarm/AlarmSlot", {
+  defaultValue: () => ({ _tag: "Exclusive" }),
+});
+
+const ALARM_SLOT_TABLE_SQL = `
+CREATE TABLE IF NOT EXISTS effect_cf_alarm_slot (
+  id INTEGER PRIMARY KEY CHECK (id = 0),
+  handed_off INTEGER
+);
+`;
+
 const safeIntegerAtLeast = (minimum: number) =>
   S.Int.check(S.isGreaterThanOrEqualTo(minimum), S.isLessThanOrEqualTo(Number.MAX_SAFE_INTEGER));
 
@@ -1170,7 +1205,9 @@ export class DurableObjectAlarm extends Context.Service<DurableObjectAlarm, Alar
     DurableObjectAlarm,
     Effect.gen(function* () {
       const state = yield* DurableObjectState;
+      const slot = yield* AlarmSlot;
       const configurationDefaults = { ...(yield* ScheduleConfiguration) };
+      let slotSchemaReady = false;
       let wakeDeferrals = 0;
       let wakesReady: Deferred.Deferred<void> | undefined;
       let guardReady: Deferred.Deferred<void, StorageOperationError> | undefined;
@@ -1326,6 +1363,37 @@ export class DurableObjectAlarm extends Context.Service<DurableObjectAlarm, Alar
 
         return cache?.schema === true || (yield* hasSchedulerTables(state));
       });
+      const ensureSlotSchema = Effect.suspend(() => {
+        if (slotSchemaReady) return Effect.void;
+
+        return state.storage.sql.exec(ALARM_SLOT_TABLE_SQL).pipe(
+          Effect.ensuring(
+            Effect.sync(() => {
+              slotSchemaReady = true;
+            }),
+          ),
+          Effect.asVoid,
+        );
+      });
+      const readHandedOff = Effect.gen(function* () {
+        yield* ensureSlotSchema;
+        const cursor = yield* state.storage.sql.exec<{ handed_off: number | null }>(
+          "SELECT handed_off FROM effect_cf_alarm_slot WHERE id = 0",
+        );
+        const row = (yield* cursor.toArray)[0];
+
+        return row?.handed_off ?? null;
+      });
+      const writeHandedOff = (at: number | null) =>
+        Effect.gen(function* () {
+          yield* ensureSlotSchema;
+          yield* state.storage.sql.exec(
+            `INSERT INTO effect_cf_alarm_slot (id, handed_off) VALUES (0, ?)
+             ON CONFLICT(id) DO UPDATE SET handed_off = excluded.handed_off`,
+            at,
+          );
+        });
+
       const readNativeAlarm = Effect.gen(function* () {
         const cache = yield* currentCache;
 
@@ -1333,7 +1401,8 @@ export class DurableObjectAlarm extends Context.Service<DurableObjectAlarm, Alar
         // Raw/manual callers retain the native observation at their interop boundary.
         if (dispatchActive && cache?.native?.delivery === cacheStateForObject.nativeDelivery)
           return cache.native.at;
-        const at = yield* state.storage.getAlarm();
+        const at =
+          slot._tag === "Delegated" ? yield* readHandedOff : yield* state.storage.getAlarm();
 
         if (cache !== undefined)
           cache.native = { at, delivery: cacheStateForObject.nativeDelivery };
@@ -1360,15 +1429,28 @@ export class DurableObjectAlarm extends Context.Service<DurableObjectAlarm, Alar
 
       // The scheduler is the sole alarm writer. Raw storage is confined to this boundary.
       const writeNativeAlarm = Effect.fnUntraced(function* (runAt: number | null) {
-        yield* Effect.tryPromise({
-          try: () =>
-            runAt === null ? state.raw.storage.deleteAlarm() : state.raw.storage.setAlarm(runAt),
-          catch: (cause) =>
-            new StorageOperationError({
-              operation: runAt === null ? "deleteAlarm" : "setAlarm",
-              cause,
-            }),
-        });
+        if (slot._tag === "Delegated") {
+          yield* writeHandedOff(runAt);
+          yield* (runAt === null ? slot.delegate.cancel : slot.delegate.schedule(runAt)).pipe(
+            Effect.mapError(
+              (cause) =>
+                new StorageOperationError({
+                  operation: runAt === null ? "deleteAlarm" : "setAlarm",
+                  cause,
+                }),
+            ),
+          );
+        } else {
+          yield* Effect.tryPromise({
+            try: () =>
+              runAt === null ? state.raw.storage.deleteAlarm() : state.raw.storage.setAlarm(runAt),
+            catch: (cause) =>
+              new StorageOperationError({
+                operation: runAt === null ? "deleteAlarm" : "setAlarm",
+                cause,
+              }),
+          });
+        }
         const cache = yield* currentCache;
 
         if (cache !== undefined)
