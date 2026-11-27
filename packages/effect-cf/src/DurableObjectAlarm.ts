@@ -1363,10 +1363,10 @@ export class DurableObjectAlarm extends Context.Service<DurableObjectAlarm, Alar
         if (slotSchemaReady) return Effect.void
 
         return state.storage.sql.exec(ALARM_SLOT_TABLE_SQL).pipe(
-          Effect.ensuring(
+          Effect.tap(() =>
             Effect.sync(() => {
               slotSchemaReady = true
-            }),
+            })
           ),
           Effect.asVoid,
         )

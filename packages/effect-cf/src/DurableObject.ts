@@ -372,14 +372,12 @@ export type MountedMethod<Handler> = Handler extends (
 ) => Effect.Effect<infer A, infer _E, infer _R> ? (...args: Args) => Effect.Effect<A, unknown>
   : never
 
-export type MountedRecord<Rpc> =
+export type MountedRecord<Rpc, Slot extends AlarmSlot = AlarmSlot> =
   & {
     readonly [K in keyof Rpc]: MountedMethod<Rpc[K]>
   }
-  & {
-    readonly alarm?: (alarmInfo?: globalThis.AlarmInvocationInfo) => Effect.Effect<void, unknown>
-    readonly runAlarms?: Effect.Effect<void, never>
-  }
+  & (Slot extends { readonly _tag: 'Delegated' } ? { readonly runAlarms: Effect.Effect<void, never> }
+    : { readonly alarm: (alarmInfo?: globalThis.AlarmInvocationInfo) => Effect.Effect<void, unknown> })
 
 const MOUNT_SERVICE = 'Durable Object'
 
@@ -393,12 +391,25 @@ export function mount<
     never
   >,
   RAlarm = never,
+  const Slot extends AlarmSlot = AlarmSlot,
 >(
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<NoInfer<RAlarm>>>,
   options: DurableObjectOptionsBase<ROut, REvent, EventLayerError, Rpc, RAlarm> & {
-    readonly slot: AlarmSlot
+    readonly slot: Slot
   },
-): (host: MountHost) => Effect.Effect<MountedRecord<Rpc>, unknown> {
+): (host: MountHost) => Effect.Effect<MountedRecord<Rpc, Slot>, unknown> {
+  // SAFETY: the options' `rpc` record was already validated by `make`'s typing; here it is read structurally as handler effects.
+  const handlers = (options.rpc ?? {}) as Record<
+    string,
+    (...args: Array<any>) => Effect.Effect<any, any, any>
+  >
+
+  for (const key of Object.keys(handlers)) {
+    if (reservedMountKeys.has(key)) {
+      throw new Error(`Cannot mount a Durable Object method named "${key}"`)
+    }
+  }
+
   return (host) =>
     Effect.gen(function*() {
       const instance = makeInstance(
@@ -409,16 +420,11 @@ export function mount<
       )
 
       if (instance.hasInitialize) {
-        yield* Effect.promise(() => instance.prepareContext())
-        yield* Effect.promise(() => instance.runInitialize())
+        yield* Effect.tryPromise(() => instance.prepareContext())
+        yield* Effect.tryPromise(() => instance.runInitialize())
       }
 
       const rpcTracing = options.rpcTracing
-      // SAFETY: the options' `rpc` record was already validated by `make`'s typing; here it is read structurally as handler effects.
-      const handlers = (options.rpc ?? {}) as Record<
-        string,
-        (...args: Array<any>) => Effect.Effect<any, any, any>
-      >
       const record: Record<
         string,
         | ((...args: Array<unknown>) => Effect.Effect<unknown, unknown>)
@@ -427,9 +433,6 @@ export function mount<
       > = {}
 
       for (const [key, handler] of Object.entries(handlers)) {
-        if (reservedMountKeys.has(key)) {
-          throw new Error(`Cannot mount a Durable Object method named "${key}"`)
-        }
         record[key] = (...args: Array<unknown>) =>
           Effect.withFiber((fiber) => {
             const prepared = Entrypoint.prepareEntrypointRpcHandler(
@@ -496,7 +499,7 @@ export function mount<
       }
 
       // SAFETY: `record` holds one mounted method per rpc key plus the slot's alarm entry, matching `MountedRecord`.
-      return record as MountedRecord<Rpc>
+      return record as MountedRecord<Rpc, Slot>
     })
 }
 
