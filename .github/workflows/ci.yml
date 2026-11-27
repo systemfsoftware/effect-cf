@@ -51,8 +51,10 @@ jobs:
             out=$(mktemp -d)
             pnpm --dir "$dir" pack --pack-destination "$out" >/dev/null
             tgz=$(ls "$out"/*.tgz)
-            tar -tzf "$tgz" | grep -q '^package/package.json$'
-            tar -tzf "$tgz" | grep -q '^package/dist/index.mjs$'
+            listing="$out/contents.txt"
+            tar -tzf "$tgz" > "$listing"
+            grep -qx 'package/package.json' "$listing"
+            grep -qx 'package/dist/index.mjs' "$listing"
             echo "$name packs"
           done
   changeset:
