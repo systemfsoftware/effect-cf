@@ -13,16 +13,18 @@ export type EntrypointRpc = Record<string, EntrypointRpcMethod>
 
 const isRpcTraceContext = Schema.is(RpcTraceContext)
 
-const invokeEntrypointRpcMethod = <Self>(
-  self: Self,
+export interface PreparedEntrypointRpc {
+  readonly invocation: CurrentInvocation['Service']
+  readonly handler: Effect.Effect<any, any, any>
+}
+
+export const prepareEntrypointRpcHandler = (
   method: EntrypointRpcMethod,
   args: AnyArgs,
-  run: (self: Self, effect: Effect.Effect<any, any, any>, rpc: RpcInvocationInfo) => Promise<any>,
-  onExit: ((self: Self) => Effect.Effect<void, never, any>) | undefined,
   service: string,
   key: string,
   rpcTracing: ReceiverOptions | undefined,
-): Promise<any> => {
+): PreparedEntrypointRpc => {
   const last = args.at(-1)
   const parent = rpcTracing !== undefined && isRpcTraceContext(last) ? last : undefined
   const handlerArgs = parent === undefined ? args : args.slice(0, -1)
@@ -35,6 +37,27 @@ const invokeEntrypointRpcMethod = <Self>(
   const handler = Effect.suspend(() => method(...handlerArgs)).pipe(
     Effect.provideService(CurrentInvocation, invocation),
     Effect.mapError(RpcDefinition.encodeWireError),
+  )
+
+  return { invocation, handler }
+}
+
+const invokeEntrypointRpcMethod = <Self>(
+  self: Self,
+  method: EntrypointRpcMethod,
+  args: AnyArgs,
+  run: (self: Self, effect: Effect.Effect<any, any, any>, rpc: RpcInvocationInfo) => Promise<any>,
+  onExit: ((self: Self) => Effect.Effect<void, never, any>) | undefined,
+  service: string,
+  key: string,
+  rpcTracing: ReceiverOptions | undefined,
+): Promise<any> => {
+  const { invocation, handler } = prepareEntrypointRpcHandler(
+    method,
+    args,
+    service,
+    key,
+    rpcTracing,
   )
 
   return run(
