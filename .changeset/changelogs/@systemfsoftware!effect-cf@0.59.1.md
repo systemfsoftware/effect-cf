@@ -1,7 +1,4 @@
----
-"@systemfsoftware/effect-cf": patch
-"@systemfsoftware/effect-webtransport": patch
----
+# @systemfsoftware/effect-cf@0.59.1
 
 Republish from the systemfsoftware fork with updated repository metadata and the pnpm and Nix build and release pipeline.
 
