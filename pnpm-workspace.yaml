@@ -1,0 +1,36 @@
+allowBuilds:
+  dprint: true
+  "@mongodb-js/zstd": true
+  esbuild: false
+  node-liblzma: true
+  workerd: true
+packages:
+  - packages/*
+  - examples/*
+  - tools/*
+catalog:
+  "@cloudflare/containers": "0.3.7"
+  "@cloudflare/workers-types": "5.20261026.1"
+  "@cloudflare/vitest-plugin": "1.4.8"
+  "@effect/platform-browser": "4.1.0"
+  "@effect/platform-node": "4.1.0"
+  "@effect/sql-d1": "4.1.0"
+  "@effect/sql-pg": "4.1.0"
+  "@effect/sql-sqlite-do": "4.1.0"
+  "@effect/vitest": "4.1.0"
+  "effect": "4.1.0"
+  "miniflare": "5.20261023.0-beta"
+  "vite": "npm:@voidzero-dev/vite-plus-core@1.4.0"
+  "vitest": "5.0.5"
+  "vite-plus": "1.4.0"
+  "wrangler": "4.153.0"
+  "workerd": "1.20261026.1"
+overrides:
+  "@cloudflare/workers-types": "catalog:"
+  "@effect/platform-node-shared": "4.1.0"
+  "miniflare": "catalog:"
+  "typescript": "7.0.2"
+  "vite": "catalog:"
+  "vitest": "catalog:"
+  "workerd": "catalog:"
+  "wrangler": "catalog:"

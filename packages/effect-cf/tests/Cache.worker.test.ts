@@ -1,19 +1,19 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 
-import { Effect } from "effect";
-import { expect, test } from "vite-plus/test";
+import { Effect } from 'effect'
+import { expect, test } from 'vite-plus/test'
 
-import { Cache } from "../src/index";
+import { Cache } from '../src/index'
 
-test("Cache.layer reads the Workers runtime CacheStorage global", async () => {
+test('Cache.layer reads the Workers runtime CacheStorage global', async () => {
   const [storage, defaultCache] = await Effect.runPromise(
-    Effect.gen(function* () {
-      const service = yield* Cache.CacheStorage;
+    Effect.gen(function*() {
+      const service = yield* Cache.CacheStorage
 
-      return yield* Effect.all([service.rawUnsafe, service.default.rawUnsafe]);
+      return yield* Effect.all([service.rawUnsafe, service.default.rawUnsafe])
     }).pipe(Effect.provide(Cache.layer)),
-  );
+  )
 
-  expect(storage).toBe(caches);
-  expect(defaultCache).toBe(caches.default);
-});
+  expect(storage).toBe(caches)
+  expect(defaultCache).toBe(caches.default)
+})

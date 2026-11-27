@@ -1,7 +1,7 @@
-import { WorkersAi } from "effect-cf";
+import { WorkersAi } from '@systemfsoftware/effect-cf'
 
-export class Ai extends WorkersAi.Tag<Ai>()("Ai") {}
+export class Ai extends WorkersAi.Tag<Ai>()('Ai') {}
 
-export const bindingLayer = Ai.layer({ binding: "AI" });
+export const bindingLayer = Ai.layer({ binding: 'AI' })
 
-export type RuntimeAiModels = AiModels;
+export type RuntimeAiModels = AiModels

@@ -1,4 +1,4 @@
-import * as Schema from "effect/Schema";
+import * as Schema from 'effect/Schema'
 
 // A native collector keeps its own Effect runtime out of the transport control.
 // It accepts only the minimal JSON OTLP shape needed to verify this workload.
@@ -9,8 +9,8 @@ const Resource = Schema.Struct({
       value: Schema.Struct({ stringValue: Schema.optional(Schema.String) }),
     }),
   ),
-});
-const PointSeries = Schema.Struct({ dataPoints: Schema.Array(Schema.Unknown) });
+})
+const PointSeries = Schema.Struct({ dataPoints: Schema.Array(Schema.Unknown) })
 const Metric = Schema.Struct({
   name: Schema.String,
   sum: Schema.optional(PointSeries),
@@ -18,7 +18,7 @@ const Metric = Schema.Struct({
   histogram: Schema.optional(PointSeries),
   summary: Schema.optional(PointSeries),
   exponentialHistogram: Schema.optional(PointSeries),
-});
+})
 const Payload = Schema.Struct({
   resourceLogs: Schema.optional(
     Schema.Array(
@@ -44,64 +44,64 @@ const Payload = Schema.Struct({
       }),
     ),
   ),
-});
-const decode = Schema.decodeUnknownSync(Schema.fromJsonString(Payload));
-let isolateId: string | undefined;
-let invocation = 0;
+})
+const decode = Schema.decodeUnknownSync(Schema.fromJsonString(Payload))
+let isolateId: string | undefined
+let invocation = 0
 
 export default {
   async fetch(request: Request): Promise<Response> {
-    const path = new URL(request.url).pathname;
+    const path = new URL(request.url).pathname
 
-    if (request.method !== "POST" || !["/v1/logs", "/v1/traces", "/v1/metrics"].includes(path))
-      return new Response("Not Found", { status: 404 });
-    const text = await request.text();
-    const payload = decode(text);
+    if (request.method !== 'POST' || !['/v1/logs', '/v1/traces', '/v1/metrics'].includes(path)) {
+      return new Response('Not Found', { status: 404 })
+    }
+    const text = await request.text()
+    const payload = decode(text)
     const resources = [
       ...(payload.resourceLogs ?? []),
       ...(payload.resourceSpans ?? []),
       ...(payload.resourceMetrics ?? []),
-    ];
+    ]
     const benchIds = [
       ...new Set(
         resources.flatMap((entry) =>
           entry.resource.attributes
-            .filter((attribute) => attribute.key === "bench.id")
-            .map((attribute) => attribute.value.stringValue ?? "missing"),
+            .filter((attribute) => attribute.key === 'bench.id')
+            .map((attribute) => attribute.value.stringValue ?? 'missing')
         ),
       ),
-    ];
+    ]
     const metrics = (payload.resourceMetrics ?? []).flatMap((entry) =>
-      entry.scopeMetrics.flatMap((scope) => scope.metrics),
-    );
+      entry.scopeMetrics.flatMap((scope) => scope.metrics)
+    )
     const metricDataPoints = metrics.reduce(
       (sum, metric) =>
         sum +
         ((
           metric.sum ??
-          metric.gauge ??
-          metric.histogram ??
-          metric.summary ??
-          metric.exponentialHistogram
+            metric.gauge ??
+            metric.histogram ??
+            metric.summary ??
+            metric.exponentialHistogram
         )?.dataPoints.length ?? 0),
       0,
-    );
+    )
     const logRecords = (payload.resourceLogs ?? []).reduce(
-      (sum, entry) =>
-        sum + entry.scopeLogs.reduce((sum, scope) => sum + scope.logRecords.length, 0),
+      (sum, entry) => sum + entry.scopeLogs.reduce((sum, scope) => sum + scope.logRecords.length, 0),
       0,
-    );
+    )
     const spans = (payload.resourceSpans ?? []).reduce(
       (sum, entry) => sum + entry.scopeSpans.reduce((sum, scope) => sum + scope.spans.length, 0),
       0,
-    );
+    )
 
-    isolateId ??= crypto.randomUUID();
+    isolateId ??= crypto.randomUUID()
     console.log(
       JSON.stringify({
-        kind: "effect-cf-hot-benchmark",
-        role: "collector",
-        benchId: benchIds[0] ?? "missing",
+        kind: 'effect-cf-hot-benchmark',
+        role: 'collector',
+        benchId: benchIds[0] ?? 'missing',
         benchIds,
         isolateId,
         invocation: ++invocation,
@@ -112,8 +112,8 @@ export default {
         logRecords,
         spans,
       }),
-    );
+    )
 
-    return Response.json({});
+    return Response.json({})
   },
-};
+}

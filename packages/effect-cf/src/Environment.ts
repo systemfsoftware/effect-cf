@@ -1,51 +1,50 @@
-import * as Config from "effect/Config";
-import * as ConfigProvider from "effect/ConfigProvider";
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Predicate from "effect/Predicate";
-import type { Layer } from "effect";
+import type { Layer } from 'effect'
+import * as Config from 'effect/Config'
+import * as ConfigProvider from 'effect/ConfigProvider'
+import * as Context from 'effect/Context'
+import * as Effect from 'effect/Effect'
+import * as Predicate from 'effect/Predicate'
 
-export type WorkerEnv = Cloudflare.Env;
+export type WorkerEnv = Cloudflare.Env
 
 /**
  * Context service for reading worker bindings from the current `env` object.
  */
 export class WorkerEnvironment extends Context.Service<WorkerEnvironment, WorkerEnv>()(
-  "effect-cf/WorkerEnvironment",
+  'effect-cf/WorkerEnvironment',
 ) {}
 
-type ScalarConfigValue = string | number | boolean;
+type ScalarConfigValue = string | number | boolean
 
 type ScalarConfigKey = Extract<
   {
     readonly [Key in keyof Cloudflare.Env]-?: NonNullable<
       Cloudflare.Env[Key]
-    > extends ScalarConfigValue
-      ? Key
-      : never;
+    > extends ScalarConfigValue ? Key
+      : never
   }[keyof Cloudflare.Env],
   string
->;
+>
 
 export namespace WorkerConfig {
-  export type Scalar = ScalarConfigValue;
+  export type Scalar = ScalarConfigValue
 
-  export type Key = ScalarConfigKey;
+  export type Key = ScalarConfigKey
 
   /** Read a scalar Cloudflare var or secret as a string. */
-  export const string = <const Name extends Key>(name: Name) => Config.String(name);
+  export const string = <const Name extends Key>(name: Name) => Config.String(name)
 
   /** Read a scalar Cloudflare secret as a redacted string. */
-  export const redacted = <const Name extends Key>(name: Name) => Config.Redacted(name);
+  export const redacted = <const Name extends Key>(name: Name) => Config.Redacted(name)
 
   /** Read a scalar Cloudflare var or secret as a number. */
-  export const number = <const Name extends Key>(name: Name) => Config.Number(name);
+  export const number = <const Name extends Key>(name: Name) => Config.Number(name)
 
   /** Read a scalar Cloudflare var or secret as an integer. */
-  export const integer = <const Name extends Key>(name: Name) => Config.Int(name);
+  export const integer = <const Name extends Key>(name: Name) => Config.Int(name)
 
   /** Read a scalar Cloudflare var or secret as a boolean. */
-  export const boolean = <const Name extends Key>(name: Name) => Config.Boolean(name);
+  export const boolean = <const Name extends Key>(name: Name) => Config.Boolean(name)
 
   export interface ProviderOptions {
     /**
@@ -54,7 +53,7 @@ export namespace WorkerConfig {
      * By default (absent or `false`), empty strings are treated as missing
      * config, matching `ConfigProvider.fromEnvRecord`.
      */
-    readonly preserveEmptyStrings?: boolean;
+    readonly preserveEmptyStrings?: boolean
   }
 
   /**
@@ -67,43 +66,42 @@ export namespace WorkerConfig {
    * `{ preserveEmptyStrings: true }` to keep them as explicit values.
    */
   export const providerFromEnv = (env: WorkerEnv, options?: ProviderOptions) => {
-    const record: Record<string, string> = {};
+    const record: Record<string, string> = {}
 
     for (const key of Object.getOwnPropertyNames(env)) {
-      const descriptor = Object.getOwnPropertyDescriptor(env, key);
+      const descriptor = Object.getOwnPropertyDescriptor(env, key)
 
       // Ignore data-property bindings without triggering instrumentation on env.get.
       if (
         !descriptor?.enumerable ||
-        ("value" in descriptor && Predicate.isObjectKeyword(descriptor.value))
-      )
-        continue;
+        ('value' in descriptor && Predicate.isObjectKeyword(descriptor.value))
+      ) {
+        continue
+      }
 
       // SAFETY: The key belongs to the current env's own enumerable properties.
-      const value = env[key as keyof WorkerEnv];
+      const value = env[key as keyof WorkerEnv]
 
       if (Predicate.isString(value) || Predicate.isNumber(value) || Predicate.isBoolean(value)) {
-        record[key] = String(value);
+        record[key] = String(value)
       }
     }
 
-    return ConfigProvider.fromEnvRecord(record, options);
-  };
+    return ConfigProvider.fromEnvRecord(record, options)
+  }
 
   export const providerWith = (makeProvider: (env: WorkerEnv) => ConfigProvider.ConfigProvider) =>
-    Effect.map(WorkerEnvironment, makeProvider);
+    Effect.map(WorkerEnvironment, makeProvider)
 
-  export const provider = providerWith(providerFromEnv);
+  export const provider = providerWith(providerFromEnv)
 
   /**
    * Replace the active Effect `ConfigProvider` with one backed by the current
    * Cloudflare worker `env` object.
    */
-  export const providerLayer: Layer.Layer<never, never, WorkerEnvironment> =
-    ConfigProvider.layer(provider);
+  export const providerLayer: Layer.Layer<never, never, WorkerEnvironment> = ConfigProvider.layer(provider)
 
   export const layerWith = (
     makeProvider: (env: WorkerEnv) => ConfigProvider.ConfigProvider,
-  ): Layer.Layer<never, never, WorkerEnvironment> =>
-    ConfigProvider.layer(providerWith(makeProvider));
+  ): Layer.Layer<never, never, WorkerEnvironment> => ConfigProvider.layer(providerWith(makeProvider))
 }

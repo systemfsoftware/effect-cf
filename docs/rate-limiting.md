@@ -14,9 +14,9 @@ For example, in `wrangler.jsonc`:
     {
       "name": "MY_RATE_LIMITER",
       "namespace_id": "1001",
-      "simple": { "limit": 100, "period": 60 },
-    },
-  ],
+      "simple": { "limit": 100, "period": 60 }
+    }
+  ]
 }
 ```
 
@@ -26,30 +26,30 @@ Generate your Worker types with `vp exec wrangler types` and include
 `worker-configuration.d.ts` in your TypeScript project.
 
 ```ts
-import { Effect } from "effect";
-import { RateLimit, WorkerEnvironment } from "effect-cf";
+import { RateLimit, WorkerEnvironment } from '@systemfsoftware/effect-cf'
+import { Effect } from 'effect'
 
-class Requests extends RateLimit.Tag<Requests>()("Requests") {}
+class Requests extends RateLimit.Tag<Requests>()('Requests') {}
 
 export default {
   async fetch(request, env): Promise<Response> {
     return Effect.runPromise(
-      Effect.gen(function* () {
-        const requests = yield* Requests;
+      Effect.gen(function*() {
+        const requests = yield* Requests
         const { success } = yield* requests.limit({
           key: new URL(request.url).pathname,
-        });
+        })
 
-        return new Response(success ? "Allowed" : "Too many requests", {
+        return new Response(success ? 'Allowed' : 'Too many requests', {
           status: success ? 200 : 429,
-        });
+        })
       }).pipe(
-        Effect.provide(Requests.layer({ binding: "MY_RATE_LIMITER" })),
+        Effect.provide(Requests.layer({ binding: 'MY_RATE_LIMITER' })),
         Effect.provideService(WorkerEnvironment, env),
       ),
-    );
+    )
   },
-} satisfies ExportedHandler<Env>;
+} satisfies ExportedHandler<Env>
 ```
 
 Use `RateLimit.make("Requests")` for a service without a class, or

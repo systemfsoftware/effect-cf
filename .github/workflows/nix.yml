@@ -1,0 +1,20 @@
+name: Nix
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref == 'refs/heads/main' && github.sha || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+jobs:
+  nix:
+    name: nix
+    uses: systemfsoftware/systemfsoftware/.github/workflows/reusable-nix.yml@15b4d2ab1e2af0a154fad2b9af7bd1f6449b3606
+    with:
+      systems: '[{"system": "x86_64-linux", "runner": "ubuntu-latest"}]'

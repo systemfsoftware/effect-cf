@@ -12,36 +12,36 @@
  * A WebSocket candidate acquires lazily (the socket connects per reader), so it
  * is best placed last as the assumed-available fallback.
  */
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Schema from "effect/Schema";
-import * as Scope from "effect/Scope";
-import type { Array as Arr, Duration } from "effect";
-import * as Socket from "effect/socket/Socket";
+import type { Array as Arr, Duration } from 'effect'
+import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
+import * as Layer from 'effect/Layer'
+import * as Option from 'effect/Option'
+import * as Schema from 'effect/Schema'
+import * as Scope from 'effect/Scope'
+import * as Socket from 'effect/socket/Socket'
 
-import * as WebTransport from "./WebTransport";
-import * as WebTransportSocket from "./WebTransportSocket";
+import * as WebTransport from './WebTransport'
+import * as WebTransportSocket from './WebTransportSocket'
 
 export interface Candidate<E = unknown, R = never> {
-  readonly name: string;
-  readonly socket: Effect.Effect<Socket.Socket, E, R>;
+  readonly name: string
+  readonly socket: Effect.Effect<Socket.Socket, E, R>
 }
 
 export interface SelectedTransport {
-  readonly name: string;
-  readonly socket: Socket.Socket;
+  readonly name: string
+  readonly socket: Socket.Socket
 }
 
 export class TransportSelectionError extends Schema.TaggedError<TransportSelectionError>()(
-  "TransportSelectionError",
+  'TransportSelectionError',
   {
     failures: Schema.Array(Schema.Struct({ name: Schema.String, cause: Schema.Defect() })),
   },
 ) {
   override get message(): string {
-    return `no transport candidate succeeded (tried: ${this.failures.map((failure) => failure.name).join(", ")})`;
+    return `no transport candidate succeeded (tried: ${this.failures.map((failure) => failure.name).join(', ')})`
   }
 }
 
@@ -57,11 +57,13 @@ export class TransportSelectionError extends Schema.TaggedError<TransportSelecti
  */
 export const webTransport = (
   url: string | Effect.Effect<string>,
-  options?: WebTransport.ConnectOptions &
-    WebTransportSocket.MakeSocketOptions & { readonly name?: string | undefined },
+  options?:
+    & WebTransport.ConnectOptions
+    & WebTransportSocket.MakeSocketOptions
+    & { readonly name?: string | undefined },
 ): Candidate<WebTransport.WebTransportError, Scope.Scope> => ({
-  name: options?.name ?? "webtransport",
-  socket: Effect.gen(function* () {
+  name: options?.name ?? 'webtransport',
+  socket: Effect.gen(function*() {
     const makeNative = yield* Effect.serviceOption(WebTransport.WebTransportConstructor).pipe(
       Effect.flatMap(
         Option.match({
@@ -69,16 +71,16 @@ export const webTransport = (
           onSome: Effect.succeed,
         }),
       ),
-    );
+    )
     const session = yield* WebTransport.connect(url, options).pipe(
       Effect.provideService(WebTransport.WebTransportConstructor, makeNative),
-    );
+    )
 
     return yield* WebTransportSocket.fromBidirectionalStream(
       session.openBidirectionalStream(options?.sendStream),
-    );
+    )
   }),
-});
+})
 
 /**
  * WebSocket candidate. Acquisition itself cannot fail — the WebSocket
@@ -88,18 +90,17 @@ export const webTransport = (
 export const webSocket = (
   url: string | Effect.Effect<string>,
   options?: {
-    readonly name?: string | undefined;
-    readonly highWaterMark?: number | undefined;
-    readonly openTimeout?: Duration.Input | undefined;
-    readonly protocols?: string | Array<string> | undefined;
+    readonly name?: string | undefined
+    readonly highWaterMark?: number | undefined
+    readonly openTimeout?: Duration.Input | undefined
+    readonly protocols?: string | Array<string> | undefined
   },
 ): Candidate<never, Socket.WebSocketConstructor> => ({
-  name: options?.name ?? "websocket",
+  name: options?.name ?? 'websocket',
   socket: Socket.makeWebSocket(url, options),
-});
+})
 
-export type CandidateContext<C extends Candidate<any, any>> =
-  C extends Candidate<any, infer R> ? R : never;
+export type CandidateContext<C extends Candidate<any, any>> = C extends Candidate<any, infer R> ? R : never
 
 /**
  * Tries candidates in order and pins the first that succeeds. Resources of a
@@ -113,32 +114,30 @@ export const select = <const Candidates extends Arr.NonEmptyReadonlyArray<Candid
   TransportSelectionError,
   Exclude<CandidateContext<Candidates[number]>, Scope.Scope> | Scope.Scope
 > =>
-  Effect.gen(function* () {
-    const outerScope = yield* Effect.scope;
-    const failures: Array<{ name: string; cause: unknown }> = [];
+  Effect.gen(function*() {
+    const outerScope = yield* Effect.scope
+    const failures: Array<{ name: string; cause: unknown }> = []
 
     for (const candidate of candidates) {
-      const candidateScope = yield* Scope.fork(outerScope);
+      const candidateScope = yield* Scope.fork(outerScope)
       const selected = yield* candidate.socket.pipe(
         Scope.provide(candidateScope),
         Effect.map((socket): SelectedTransport => ({ name: candidate.name, socket })),
-        Effect.onExit((exit) =>
-          Exit.isSuccess(exit) ? Effect.void : Scope.close(candidateScope, exit),
-        ),
+        Effect.onExit((exit) => Exit.isSuccess(exit) ? Effect.void : Scope.close(candidateScope, exit)),
         Effect.catch((error) => {
-          failures.push({ name: candidate.name, cause: error });
+          failures.push({ name: candidate.name, cause: error })
 
-          return Effect.void;
+          return Effect.void
         }),
-      );
+      )
 
       if (selected !== undefined) {
-        return selected;
+        return selected
       }
     }
 
-    return yield* TransportSelectionError.make({ failures });
-  });
+    return yield* TransportSelectionError.make({ failures })
+  })
 
 /**
  * Layer that provides a `Socket` from the first viable candidate, pinned for
@@ -152,4 +151,4 @@ export const layerSocket = <
   Socket.Socket,
   TransportSelectionError,
   Exclude<CandidateContext<Candidates[number]>, Scope.Scope>
-> => Layer.effect(Socket.Socket)(Effect.map(select(candidates), (selected) => selected.socket));
+> => Layer.effect(Socket.Socket)(Effect.map(select(candidates), (selected) => selected.socket))

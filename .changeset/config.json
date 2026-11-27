@@ -1,6 +1,6 @@
 {
   "$schema": "https://unpkg.com/@changesets/config@3.1.4/schema.json",
-  "changelog": ["@changesets/changelog-github", { "repo": "danieljvdm/effect-cf" }],
+  "changelog": ["@changesets/changelog-github", { "repo": "systemfsoftware/effect-cf" }],
   "commit": false,
   "fixed": [],
   "linked": [],

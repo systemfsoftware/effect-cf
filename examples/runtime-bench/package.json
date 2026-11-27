@@ -14,7 +14,7 @@
   },
   "dependencies": {
     "effect": "catalog:",
-    "effect-cf": "workspace:*"
+    "@systemfsoftware/effect-cf": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

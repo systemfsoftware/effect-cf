@@ -1,28 +1,21 @@
 /// <reference types="@cloudflare/vitest-plugin/types" />
 
-import { createExecutionContext, env } from "cloudflare:test";
-import { Cause, Effect, Layer, Predicate, Schema as S } from "effect";
-import { expect, test } from "vite-plus/test";
+import { createExecutionContext, env } from 'cloudflare:test'
+import { Cause, Effect, Layer, Predicate, Schema as S } from 'effect'
+import { expect, test } from 'vite-plus/test'
 
-import {
-  DurableObject,
-  DurableObjectNamespace,
-  Rpc,
-  ServiceBinding,
-  Worker,
-  WorkerEnvironment,
-} from "../src/index";
-import { makePartialTestDouble } from "./TestDoubles";
+import { DurableObject, DurableObjectNamespace, Rpc, ServiceBinding, Worker, WorkerEnvironment } from '../src/index'
+import { makePartialTestDouble } from './TestDoubles'
 
-class Counter extends DurableObject.Tag<Counter>()("WorkerPoolCounter", {
+class Counter extends DurableObject.Tag<Counter>()('WorkerPoolCounter', {
   get: DurableObject.method({ success: S.Finite }),
 }) {}
 
 const ByteReadableStream = S.declare(
   (value): value is ReadableStream<Uint8Array> => value instanceof ReadableStream,
-);
+)
 
-class StreamCounter extends DurableObject.Tag<StreamCounter>()("TestCounter", {
+class StreamCounter extends DurableObject.Tag<StreamCounter>()('TestCounter', {
   consumeBytes: DurableObject.method({
     args: [S.FiniteFromString, DurableObject.native(ByteReadableStream)] as const,
     success: S.Finite,
@@ -33,28 +26,28 @@ class StreamCounter extends DurableObject.Tag<StreamCounter>()("TestCounter", {
   }),
 }) {}
 
-class EchoWorker extends Worker.Tag<EchoWorker>()("WorkerPoolEcho", {
+class EchoWorker extends Worker.Tag<EchoWorker>()('WorkerPoolEcho', {
   echo: Worker.method({
     args: [S.String] as const,
     success: S.String,
   }),
 }) {}
 
-const EchoService = EchoWorker;
+const EchoService = EchoWorker
 
-test("RPC observes the complete event cause before rejecting with the original failure", async () => {
-  const handlerFailure = new Error("handler failed");
-  const finalizerDefect = new Error("event cleanup failed");
-  const observed: Array<Cause.Cause<unknown>> = [];
-  const events: Array<string> = [];
+test('RPC observes the complete event cause before rejecting with the original failure', async () => {
+  const handlerFailure = new Error('handler failed')
+  const finalizerDefect = new Error('event cleanup failed')
+  const observed: Array<Cause.Cause<unknown>> = []
+  const events: Array<string> = []
   const Base = EchoWorker.make(Layer.empty, {
     eventLayer: Layer.effectDiscard(
       Effect.addFinalizer(() =>
-        Effect.sync(() => events.push("cleanup")).pipe(Effect.andThen(Effect.die(finalizerDefect))),
+        Effect.sync(() => events.push('cleanup')).pipe(Effect.andThen(Effect.die(finalizerDefect)))
       ),
     ),
     rpc: { echo: () => Effect.fail(handlerFailure) },
-  });
+  })
 
   class ObservedWorker extends Base {
     override [Worker.RunSymbol]<A, E>(
@@ -64,67 +57,67 @@ test("RPC observes the complete event cause before rejecting with the original f
       return super[Worker.RunSymbol](effect, {
         ...options,
         onFailure: async (cause) => {
-          observed.push(cause);
-          await Promise.resolve();
-          events.push("observe");
-          throw new Error("observer failed");
+          observed.push(cause)
+          await Promise.resolve()
+          events.push('observe')
+          throw new Error('observer failed')
         },
-      });
+      })
     }
   }
 
-  const worker = new ObservedWorker(createExecutionContext(), {});
+  const worker = new ObservedWorker(createExecutionContext(), {})
 
-  await expect(worker.echo("input")).rejects.toBe(handlerFailure);
-  events.push("reject");
-  expect(events).toEqual(["cleanup", "observe", "reject"]);
-  expect(observed).toHaveLength(1);
-  expect(observed[0]!.reasons.map((reason) => reason._tag)).toEqual(["Die", "Die"]);
-  const defects = observed[0]!.reasons.filter(Cause.isDieReason);
+  await expect(worker.echo('input')).rejects.toBe(handlerFailure)
+  events.push('reject')
+  expect(events).toEqual(['cleanup', 'observe', 'reject'])
+  expect(observed).toHaveLength(1)
+  expect(observed[0]!.reasons.map((reason) => reason._tag)).toEqual(['Die', 'Die'])
+  const defects = observed[0]!.reasons.filter(Cause.isDieReason)
 
-  expect(defects[0]!.defect).toBe(handlerFailure);
-  expect(defects[1]!.defect).toBe(finalizerDefect);
-});
+  expect(defects[0]!.defect).toBe(handlerFailure)
+  expect(defects[1]!.defect).toBe(finalizerDefect)
+})
 
 interface AuditReceipt {
-  readonly room: string;
-  readonly total: number;
-  readonly sequence: number;
+  readonly room: string
+  readonly total: number
+  readonly sequence: number
 }
 
 const AuditReceipt = S.Struct({
   room: S.String,
   total: S.Finite,
   sequence: S.Finite,
-});
+})
 
-class MathWorker extends Worker.Tag<MathWorker>()("WorkerPoolMath", {
+class MathWorker extends Worker.Tag<MathWorker>()('WorkerPoolMath', {
   double: Worker.method({
     args: [S.Finite] as const,
     success: S.Finite,
   }),
 }) {}
 
-class FormatWorker extends Worker.Tag<FormatWorker>()("WorkerPoolFormat", {
+class FormatWorker extends Worker.Tag<FormatWorker>()('WorkerPoolFormat', {
   summarize: Worker.method({
     args: [AuditReceipt] as const,
     success: S.String,
   }),
 }) {}
 
-class AuditLog extends DurableObject.Tag<AuditLog>()("WorkerPoolAuditLog", {
+class AuditLog extends DurableObject.Tag<AuditLog>()('WorkerPoolAuditLog', {
   append: DurableObject.method({
     args: [S.String, S.Finite] as const,
     success: AuditReceipt,
   }),
 }) {}
 
-const MathService = MathWorker;
-const FormatService = FormatWorker;
+const MathService = MathWorker
+const FormatService = FormatWorker
 
 const durableObjectId = makePartialTestDouble<DurableObjectId>({
-  toString: () => "worker-pool-counter",
-});
+  toString: () => 'worker-pool-counter',
+})
 
 const makeNamespace = <Stub extends object>(stub: Stub) => {
   const namespace = {
@@ -134,20 +127,20 @@ const makeNamespace = <Stub extends object>(stub: Stub) => {
     get: () => stub,
     getByName: () => stub,
     jurisdiction: () => namespace,
-  };
+  }
 
-  return namespace;
-};
+  return namespace
+}
 
-test("namespace bindings resolve RPC calls inside the Workers runtime", async () => {
-  const WorkerClass = Worker.make(Counter.layer({ binding: "COUNTERS" }), {
-    fetch: Effect.gen(function* () {
-      const stub = yield* Counter.getByName("counter");
-      const value = yield* Counter.call(stub, "get");
+test('namespace bindings resolve RPC calls inside the Workers runtime', async () => {
+  const WorkerClass = Worker.make(Counter.layer({ binding: 'COUNTERS' }), {
+    fetch: Effect.gen(function*() {
+      const stub = yield* Counter.getByName('counter')
+      const value = yield* Counter.call(stub, 'get')
 
-      return Response.json({ value });
+      return Response.json({ value })
     }),
-  });
+  })
 
   const instance = new WorkerClass(
     createExecutionContext(),
@@ -158,35 +151,35 @@ test("namespace bindings resolve RPC calls inside the Workers runtime", async ()
         get: () => Promise.resolve(37),
       }),
     }),
-  );
+  )
 
-  const response = await instance.fetch(new Request("https://worker.test/counter"));
+  const response = await instance.fetch(new Request('https://worker.test/counter'))
 
-  expect(response.status).toBe(200);
-  await expect(response.json()).resolves.toEqual({ value: 37 });
-});
+  expect(response.status).toBe(200)
+  await expect(response.json()).resolves.toEqual({ value: 37 })
+})
 
-test("namespace RPC validation fails with package errors inside the Workers runtime", async () => {
-  const WorkerClass = Worker.make(Counter.layer({ binding: "COUNTERS" }), {
-    fetch: Effect.gen(function* () {
-      const stub = yield* Counter.getByName("counter");
+test('namespace RPC validation fails with package errors inside the Workers runtime', async () => {
+  const WorkerClass = Worker.make(Counter.layer({ binding: 'COUNTERS' }), {
+    fetch: Effect.gen(function*() {
+      const stub = yield* Counter.getByName('counter')
 
-      return yield* Counter.call(stub, "get").pipe(
+      return yield* Counter.call(stub, 'get').pipe(
         Effect.match({
           onFailure: (error) =>
             new Response(
               error instanceof DurableObjectNamespace.DurableObjectRpcError
                 ? error._tag
-                : "unknown",
+                : 'unknown',
               {
                 status: 599,
               },
             ),
           onSuccess: (value) => Response.json({ value }),
         }),
-      );
+      )
     }),
-  });
+  })
 
   const instance = new WorkerClass(
     createExecutionContext(),
@@ -197,21 +190,21 @@ test("namespace RPC validation fails with package errors inside the Workers runt
         get: 1,
       }),
     }),
-  );
+  )
 
-  const response = await instance.fetch(new Request("https://worker.test/counter"));
+  const response = await instance.fetch(new Request('https://worker.test/counter'))
 
-  expect(response.status).toBe(599);
-  await expect(response.text()).resolves.toBe("DurableObjectRpcError");
-});
+  expect(response.status).toBe(599)
+  await expect(response.text()).resolves.toBe('DurableObjectRpcError')
+})
 
-test("service binding RPC validation runs inside the Workers runtime", async () => {
-  const WorkerClass = Worker.make(EchoService.layer({ binding: "ECHO" }), {
-    fetch: EchoService.call("echo", "hello").pipe(
+test('service binding RPC validation runs inside the Workers runtime', async () => {
+  const WorkerClass = Worker.make(EchoService.layer({ binding: 'ECHO' }), {
+    fetch: EchoService.call('echo', 'hello').pipe(
       Effect.match({
         onFailure: (error) =>
           new Response(
-            error instanceof ServiceBinding.ServiceBindingRpcError ? error._tag : "unknown",
+            error instanceof ServiceBinding.ServiceBindingRpcError ? error._tag : 'unknown',
             {
               status: 599,
             },
@@ -219,21 +212,21 @@ test("service binding RPC validation runs inside the Workers runtime", async () 
         onSuccess: (value) => new Response(value),
       }),
     ),
-  });
+  })
 
   const invalid = new WorkerClass(
     createExecutionContext(),
     makePartialTestDouble<Cloudflare.Env & { readonly ECHO: object }>({
       ECHO: {
         fetch: () => Promise.resolve(new Response(null, { status: 204 })),
-        echo: "not-callable",
+        echo: 'not-callable',
       },
     }),
-  );
-  const invalidResponse = await invalid.fetch(new Request("https://worker.test/echo"));
+  )
+  const invalidResponse = await invalid.fetch(new Request('https://worker.test/echo'))
 
-  expect(invalidResponse.status).toBe(599);
-  await expect(invalidResponse.text()).resolves.toBe("ServiceBindingRpcError");
+  expect(invalidResponse.status).toBe(599)
+  await expect(invalidResponse.text()).resolves.toBe('ServiceBindingRpcError')
 
   const valid = new WorkerClass(
     createExecutionContext(),
@@ -243,119 +236,118 @@ test("service binding RPC validation runs inside the Workers runtime", async () 
         echo: (value: string) => Promise.resolve(value),
       },
     }),
-  );
-  const validResponse = await valid.fetch(new Request("https://worker.test/echo"));
+  )
+  const validResponse = await valid.fetch(new Request('https://worker.test/echo'))
 
-  expect(validResponse.status).toBe(200);
-  await expect(validResponse.text()).resolves.toBe("hello");
-});
+  expect(validResponse.status).toBe(200)
+  await expect(validResponse.text()).resolves.toBe('hello')
+})
 
-test("rpc decode failures keep their error tag across the Durable Object RPC boundary", async () => {
-  const namespace = env.TEST_COUNTER_DO;
+test('rpc decode failures keep their error tag across the Durable Object RPC boundary', async () => {
+  const namespace = env.TEST_COUNTER_DO
 
   if (namespace === undefined) {
-    throw new Error("TEST_COUNTER_DO binding is missing");
+    throw new Error('TEST_COUNTER_DO binding is missing')
   }
 
-  const stub = namespace.get(namespace.idFromName("rpc-boundary-decode-error"));
-  const cause = await Effect.runPromise(Rpc.resolve(stub.increment(123)).pipe(Effect.flip));
+  const stub = namespace.get(namespace.idFromName('rpc-boundary-decode-error'))
+  const cause = await Effect.runPromise(Rpc.resolve(stub.increment(123)).pipe(Effect.flip))
 
-  expect(Predicate.isTagged(cause, "RpcArgumentDecodeError")).toBe(true);
+  expect(Predicate.isTagged(cause, 'RpcArgumentDecodeError')).toBe(true)
   expect(cause).toMatchObject({
-    definition: "TestCounter",
-    method: "increment",
-  });
-});
+    definition: 'TestCounter',
+    method: 'increment',
+  })
+})
 
-test("native schemas transfer byte streams across the Durable Object RPC boundary", async () => {
+test('native schemas transfer byte streams across the Durable Object RPC boundary', async () => {
   const stream = new ReadableStream({
-    type: "bytes",
+    type: 'bytes',
     start(controller) {
-      controller.enqueue(new Uint8Array([1, 2, 3, 4]));
-      controller.close();
+      controller.enqueue(new Uint8Array([1, 2, 3, 4]))
+      controller.close()
     },
-  });
-  const program = Effect.gen(function* () {
-    const stub = yield* StreamCounter.getByName("native-stream");
+  })
+  const program = Effect.gen(function*() {
+    const stub = yield* StreamCounter.getByName('native-stream')
 
-    return yield* StreamCounter.call(stub, "consumeBytes", 6, stream);
+    return yield* StreamCounter.call(stub, 'consumeBytes', 6, stream)
   }).pipe(
     Effect.provide(
-      StreamCounter.layer({ binding: "TEST_COUNTER_DO" }).pipe(
+      StreamCounter.layer({ binding: 'TEST_COUNTER_DO' }).pipe(
         Layer.provide(Layer.succeed(WorkerEnvironment, env)),
       ),
     ),
-  );
+  )
 
-  await expect(Effect.runPromise(program)).resolves.toBe(10);
-});
+  await expect(Effect.runPromise(program)).resolves.toBe(10)
+})
 
-test("native schemas return byte streams across the Durable Object RPC boundary", async () => {
-  const program = Effect.gen(function* () {
-    const stub = yield* StreamCounter.getByName("native-stream-result");
-    const stream = yield* StreamCounter.call(stub, "produceBytes", 7);
+test('native schemas return byte streams across the Durable Object RPC boundary', async () => {
+  const program = Effect.gen(function*() {
+    const stub = yield* StreamCounter.getByName('native-stream-result')
+    const stream = yield* StreamCounter.call(stub, 'produceBytes', 7)
 
     return yield* Effect.tryPromise(() => new Response(stream).arrayBuffer()).pipe(
       Effect.map((buffer) => buffer.byteLength),
-    );
+    )
   }).pipe(
     Effect.provide(
-      StreamCounter.layer({ binding: "TEST_COUNTER_DO" }).pipe(
+      StreamCounter.layer({ binding: 'TEST_COUNTER_DO' }).pipe(
         Layer.provide(Layer.succeed(WorkerEnvironment, env)),
       ),
     ),
-  );
+  )
 
-  await expect(Effect.runPromise(program)).resolves.toBe(7);
-});
+  await expect(Effect.runPromise(program)).resolves.toBe(7)
+})
 
-test("workers compose service bindings and Durable Object RPC contracts in the Workers runtime", async () => {
-  let sequence = 0;
+test('workers compose service bindings and Durable Object RPC contracts in the Workers runtime', async () => {
+  let sequence = 0
 
   const MathWorkerClass = MathWorker.make(Layer.empty, {
     rpc: {
       double: (value) => Effect.succeed(value * 2),
     },
-  });
+  })
 
   const FormatWorkerClass = FormatWorker.make(Layer.empty, {
     rpc: {
-      summarize: (receipt) =>
-        Effect.succeed(`${receipt.room}:${receipt.total}:${receipt.sequence}`),
+      summarize: (receipt) => Effect.succeed(`${receipt.room}:${receipt.total}:${receipt.sequence}`),
     },
-  });
+  })
 
   const ApiWorkerClass = Worker.make(
     Layer.mergeAll(
-      MathService.layer({ binding: "MATH" }),
-      FormatService.layer({ binding: "FORMAT" }),
-      AuditLog.layer({ binding: "AUDIT_LOGS" }),
+      MathService.layer({ binding: 'MATH' }),
+      FormatService.layer({ binding: 'FORMAT' }),
+      AuditLog.layer({ binding: 'AUDIT_LOGS' }),
     ),
     {
-      fetch: Effect.gen(function* () {
-        const request = yield* Worker.NativeRequest;
-        const value = Number(new URL(request.url).searchParams.get("value") ?? "0");
-        const doubled = yield* MathService.call("double", value);
-        const auditLog = yield* AuditLog.getByName("main");
-        const receipt = yield* AuditLog.call(auditLog, "append", "main", doubled);
-        const summary = yield* FormatService.call("summarize", receipt);
+      fetch: Effect.gen(function*() {
+        const request = yield* Worker.NativeRequest
+        const value = Number(new URL(request.url).searchParams.get('value') ?? '0')
+        const doubled = yield* MathService.call('double', value)
+        const auditLog = yield* AuditLog.getByName('main')
+        const receipt = yield* AuditLog.call(auditLog, 'append', 'main', doubled)
+        const summary = yield* FormatService.call('summarize', receipt)
 
         return Response.json({
           receipt,
           summary,
-        });
+        })
       }),
     },
-  );
+  )
 
-  const context = createExecutionContext();
+  const context = createExecutionContext()
   const instance = new ApiWorkerClass(
     context,
     makePartialTestDouble<
       Cloudflare.Env & {
-        readonly MATH: object;
-        readonly FORMAT: object;
-        readonly AUDIT_LOGS: object;
+        readonly MATH: object
+        readonly FORMAT: object
+        readonly AUDIT_LOGS: object
       }
     >({
       MATH: new MathWorkerClass(context, makePartialTestDouble<Cloudflare.Env>({})),
@@ -371,17 +363,17 @@ test("workers compose service bindings and Durable Object RPC contracts in the W
           }),
       }),
     }),
-  );
+  )
 
-  const response = await instance.fetch(new Request("https://worker.test/run?value=21"));
+  const response = await instance.fetch(new Request('https://worker.test/run?value=21'))
 
-  expect(response.status).toBe(200);
+  expect(response.status).toBe(200)
   await expect(response.json()).resolves.toEqual({
     receipt: {
-      room: "main",
+      room: 'main',
       total: 42,
       sequence: 1,
     },
-    summary: "main:42:1",
-  });
-});
+    summary: 'main:42:1',
+  })
+})

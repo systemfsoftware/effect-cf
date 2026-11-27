@@ -1,9 +1,9 @@
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import { Flusher } from "effect/observability/OtlpExporter";
+import * as Effect from 'effect/Effect'
+import { Flusher } from 'effect/observability/OtlpExporter'
+import * as Option from 'effect/Option'
 
 /** Maximum event lifetime spent on an internally scheduled telemetry flush. */
-const scheduledFlushTimeout = "2 seconds";
+const scheduledFlushTimeout = '2 seconds'
 
 /**
  * Schedules a configured OTLP flusher through the current Cloudflare event.
@@ -15,11 +15,11 @@ const scheduledFlushTimeout = "2 seconds";
 export const scheduleTelemetryFlush = <R>(
   waitUntil: (flush: Effect.Effect<void>) => Effect.Effect<void, never, R>,
 ): Effect.Effect<void, never, R> =>
-  Effect.gen(function* () {
-    const flusher = yield* Effect.serviceOption(Flusher);
+  Effect.gen(function*() {
+    const flusher = yield* Effect.serviceOption(Flusher)
 
     if (Option.isNone(flusher)) {
-      return;
+      return
     }
 
     // Exporters and platform schedulers are foreign boundaries. Do not log
@@ -31,5 +31,5 @@ export const scheduleTelemetryFlush = <R>(
         Effect.ignoreCause,
         Effect.asVoid,
       ),
-    );
-  }).pipe(Effect.ignoreCause);
+    )
+  }).pipe(Effect.ignoreCause)

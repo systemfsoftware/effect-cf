@@ -1,5 +1,5 @@
-import { Vectorize } from "effect-cf";
+import { Vectorize } from '@systemfsoftware/effect-cf'
 
-export class Vectors extends Vectorize.Tag<Vectors>()("Vectors") {}
+export class Vectors extends Vectorize.Tag<Vectors>()('Vectors') {}
 
-export const bindingLayer = Vectors.layer({ binding: "VECTORS" });
+export const bindingLayer = Vectors.layer({ binding: 'VECTORS' })

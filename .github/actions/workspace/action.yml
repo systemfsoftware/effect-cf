@@ -1,0 +1,26 @@
+name: workspace
+description: Install pnpm and Node, restore the pnpm store, and install the workspace from the frozen lockfile.
+inputs:
+  node-version:
+    description: the Node major to run
+    required: true
+  save-store:
+    description: write the pnpm store after the install; the store action itself writes only from a push to main
+    required: false
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115
+    - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+      with:
+        node-version: ${{ inputs.node-version }}
+    - id: pnpm-store
+      uses: ./.github/actions/pnpm-store
+    - shell: bash
+      run: pnpm install --frozen-lockfile
+    - if: inputs.save-store == 'true' && steps.pnpm-store.outputs.hit != 'true'
+      uses: ./.github/actions/pnpm-store
+      with:
+        mode: save
+        key: ${{ steps.pnpm-store.outputs.key }}

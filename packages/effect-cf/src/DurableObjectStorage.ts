@@ -1,76 +1,76 @@
-import * as Cause from "effect/Cause";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import * as Fiber from "effect/Fiber";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import * as Result from "effect/Result";
-import * as S from "effect/Schema";
+import * as Cause from 'effect/Cause'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
+import * as Fiber from 'effect/Fiber'
+import * as Option from 'effect/Option'
+import * as Predicate from 'effect/Predicate'
+import * as Result from 'effect/Result'
+import * as S from 'effect/Schema'
 
-import * as ErrorMessage from "./internal/ErrorMessage";
-import { runNativeCallback } from "./internal/NativeCallback";
+import * as ErrorMessage from './internal/ErrorMessage'
+import { runNativeCallback } from './internal/NativeCallback'
 import {
   CurrentStorageTransaction,
   invalidateStorageCache,
-  withStorageTransaction,
   type StorageTransaction,
-} from "./internal/StorageTransaction";
+  withStorageTransaction,
+} from './internal/StorageTransaction'
 
-export type SqlStorageValue = globalThis.SqlStorageValue;
+export type SqlStorageValue = globalThis.SqlStorageValue
 
-export class StorageOperationError extends Data.TaggedError("StorageOperationError")<{
-  readonly operation: string;
-  readonly cause: unknown;
+export class StorageOperationError extends Data.TaggedError('StorageOperationError')<{
+  readonly operation: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Durable Object storage ${this.operation} failed: ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Durable Object storage ${this.operation} failed: ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
-type StorageEffect<A> = Effect.Effect<A, StorageOperationError>;
+type StorageEffect<A> = Effect.Effect<A, StorageOperationError>
 
 export interface SqlCursor<T extends Record<string, SqlStorageValue>> {
-  readonly next: StorageEffect<{ done?: false; value: T } | { done: true; value?: never }>;
-  readonly toArray: StorageEffect<Array<T>>;
-  readonly one: StorageEffect<T>;
-  raw<U extends Array<SqlStorageValue>>(): StorageEffect<IterableIterator<U>>;
-  readonly columnNames: Array<string>;
-  readonly rowsRead: StorageEffect<number>;
-  readonly rowsWritten: StorageEffect<number>;
+  readonly next: StorageEffect<{ done?: false; value: T } | { done: true; value?: never }>
+  readonly toArray: StorageEffect<Array<T>>
+  readonly one: StorageEffect<T>
+  raw<U extends Array<SqlStorageValue>>(): StorageEffect<IterableIterator<U>>
+  readonly columnNames: Array<string>
+  readonly rowsRead: StorageEffect<number>
+  readonly rowsWritten: StorageEffect<number>
 }
 
 export interface SqlStorage {
   exec<T extends Record<string, SqlStorageValue>>(
     query: string,
     ...bindings: Array<SqlStorageValue>
-  ): StorageEffect<SqlCursor<T>>;
-  readonly databaseSize: number;
+  ): StorageEffect<SqlCursor<T>>
+  readonly databaseSize: number
 }
 
 export interface SyncKvDefinition<Key, Value, EncodedValue> {
-  readonly key: S.Codec<Key, string>;
-  readonly value: S.Codec<Value, EncodedValue>;
+  readonly key: S.Codec<Key, string>
+  readonly value: S.Codec<Value, EncodedValue>
 }
 
 /**
  * Sync KV wrapper that transparently encodes keys/values through Effect Schema.
  */
 export interface SchemaBackedSyncKvStorage<Key, Value> {
-  get(key: Key): Effect.Effect<Option.Option<Value>, unknown>;
-  put(key: Key, value: Value): Effect.Effect<void, unknown>;
-  delete(key: Key): Effect.Effect<boolean, unknown>;
-  list(options?: globalThis.SyncKvListOptions): Effect.Effect<Array<[Key, Value]>, unknown>;
+  get(key: Key): Effect.Effect<Option.Option<Value>, unknown>
+  put(key: Key, value: Value): Effect.Effect<void, unknown>
+  delete(key: Key): Effect.Effect<boolean, unknown>
+  list(options?: globalThis.SyncKvListOptions): Effect.Effect<Array<[Key, Value]>, unknown>
 }
 
 export interface SyncKvStorage {
-  get<T = unknown>(key: string): StorageEffect<T | undefined>;
-  put<T>(key: string, value: T): StorageEffect<void>;
-  delete(key: string): StorageEffect<boolean>;
-  list<T = unknown>(options?: globalThis.SyncKvListOptions): StorageEffect<Array<[string, T]>>;
+  get<T = unknown>(key: string): StorageEffect<T | undefined>
+  put<T>(key: string, value: T): StorageEffect<void>
+  delete(key: string): StorageEffect<boolean>
+  list<T = unknown>(options?: globalThis.SyncKvListOptions): StorageEffect<Array<[string, T]>>
   schema<Key, Value, EncodedValue>(
     definition: SyncKvDefinition<Key, Value, EncodedValue>,
-  ): SchemaBackedSyncKvStorage<Key, Value>;
+  ): SchemaBackedSyncKvStorage<Key, Value>
 }
 
 /**
@@ -80,36 +80,36 @@ export interface DurableObjectTransaction {
   get<T = unknown>(
     key: string,
     options?: globalThis.DurableObjectGetOptions,
-  ): StorageEffect<T | undefined>;
+  ): StorageEffect<T | undefined>
   get<T = unknown>(
     keys: Array<string>,
     options?: globalThis.DurableObjectGetOptions,
-  ): StorageEffect<Map<string, T>>;
-  list<T = unknown>(options?: globalThis.DurableObjectListOptions): StorageEffect<Map<string, T>>;
-  put<T>(key: string, value: T, options?: globalThis.DurableObjectPutOptions): StorageEffect<void>;
+  ): StorageEffect<Map<string, T>>
+  list<T = unknown>(options?: globalThis.DurableObjectListOptions): StorageEffect<Map<string, T>>
+  put<T>(key: string, value: T, options?: globalThis.DurableObjectPutOptions): StorageEffect<void>
   put<T>(
     entries: Record<string, T>,
     options?: globalThis.DurableObjectPutOptions,
-  ): StorageEffect<void>;
-  delete(key: string, options?: globalThis.DurableObjectPutOptions): StorageEffect<boolean>;
-  delete(keys: Array<string>, options?: globalThis.DurableObjectPutOptions): StorageEffect<number>;
-  readonly rollback: StorageEffect<void>;
-  getAlarm(options?: globalThis.DurableObjectGetAlarmOptions): StorageEffect<number | null>;
+  ): StorageEffect<void>
+  delete(key: string, options?: globalThis.DurableObjectPutOptions): StorageEffect<boolean>
+  delete(keys: Array<string>, options?: globalThis.DurableObjectPutOptions): StorageEffect<number>
+  readonly rollback: StorageEffect<void>
+  getAlarm(options?: globalThis.DurableObjectGetAlarmOptions): StorageEffect<number | null>
 }
 
 export interface DurableObjectStorage {
   get<T = unknown>(
     key: string,
     options?: globalThis.DurableObjectGetOptions,
-  ): StorageEffect<T | undefined>;
-  put<T>(key: string, value: T, options?: globalThis.DurableObjectPutOptions): StorageEffect<void>;
-  delete(key: string, options?: globalThis.DurableObjectPutOptions): StorageEffect<boolean>;
+  ): StorageEffect<T | undefined>
+  put<T>(key: string, value: T, options?: globalThis.DurableObjectPutOptions): StorageEffect<void>
+  delete(key: string, options?: globalThis.DurableObjectPutOptions): StorageEffect<boolean>
   /**
    * Deletes all stored data, including logical schedules. Use the alarm scheduler
    * to cancel individual alarms without deleting application data.
    */
-  deleteAll(options?: globalThis.DurableObjectPutOptions): StorageEffect<void>;
-  getAlarm(options?: globalThis.DurableObjectGetAlarmOptions): StorageEffect<number | null>;
+  deleteAll(options?: globalThis.DurableObjectPutOptions): StorageEffect<void>
+  getAlarm(options?: globalThis.DurableObjectGetAlarmOptions): StorageEffect<number | null>
   /**
    * SQLite-backed Durable Object storage only.
    *
@@ -119,123 +119,120 @@ export interface DurableObjectStorage {
    */
   transactionSync<A, E, R>(
     closure: () => Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | StorageOperationError, R>;
+  ): Effect.Effect<A, E | StorageOperationError, R>
   /**
    * Runs an async transaction and exposes a typed transaction wrapper.
    */
   transaction<A, E, R>(
     closure: (txn: DurableObjectTransaction) => Effect.Effect<A, E, R>,
-  ): Effect.Effect<A, E | StorageOperationError, R>;
+  ): Effect.Effect<A, E | StorageOperationError, R>
   /** Flushes pending writes to disk. */
-  readonly sync: StorageEffect<void>;
+  readonly sync: StorageEffect<void>
   /** Requires SQLite-backed Durable Object storage. */
-  readonly getCurrentBookmark: StorageEffect<string>;
+  readonly getCurrentBookmark: StorageEffect<string>
   /** Requires SQLite-backed Durable Object storage. */
-  onNextSessionRestoreBookmark(bookmark: string): StorageEffect<string>;
-  readonly sql: SqlStorage;
-  readonly kv: SyncKvStorage;
+  onNextSessionRestoreBookmark(bookmark: string): StorageEffect<string>
+  readonly sql: SqlStorage
+  readonly kv: SyncKvStorage
 }
 
-const storageError = (operation: string, cause: unknown) =>
-  new StorageOperationError({ operation, cause });
+const storageError = (operation: string, cause: unknown) => new StorageOperationError({ operation, cause })
 
 const tryStorageSync = <A>(operation: string, evaluate: () => A): StorageEffect<A> =>
   Effect.try({
     try: evaluate,
     catch: (cause) => storageError(operation, cause),
-  });
+  })
 
 const tryStoragePromise = <A>(operation: string, evaluate: () => Promise<A>): StorageEffect<A> =>
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => storageError(operation, cause),
-  });
+  })
 
 const fromSqlCursor = <T extends Record<string, SqlStorageValue>>(
   cursor: globalThis.SqlStorageCursor<T>,
 ): SqlCursor<T> => ({
-  next: tryStorageSync("sql.next", () => cursor.next()),
-  toArray: tryStorageSync("sql.toArray", () => cursor.toArray()),
-  one: tryStorageSync("sql.one", () => cursor.one()),
-  raw: <U extends Array<SqlStorageValue>>() => tryStorageSync("sql.raw", () => cursor.raw<U>()),
+  next: tryStorageSync('sql.next', () => cursor.next()),
+  toArray: tryStorageSync('sql.toArray', () => cursor.toArray()),
+  one: tryStorageSync('sql.one', () => cursor.one()),
+  raw: <U extends Array<SqlStorageValue>>() => tryStorageSync('sql.raw', () => cursor.raw<U>()),
   get columnNames() {
-    return cursor.columnNames;
+    return cursor.columnNames
   },
-  rowsRead: tryStorageSync("sql.rowsRead", () => cursor.rowsRead),
-  rowsWritten: tryStorageSync("sql.rowsWritten", () => cursor.rowsWritten),
-});
+  rowsRead: tryStorageSync('sql.rowsRead', () => cursor.rowsRead),
+  rowsWritten: tryStorageSync('sql.rowsWritten', () => cursor.rowsWritten),
+})
 
 const fromSqlStorage = (sql: globalThis.SqlStorage): SqlStorage => ({
   exec: <T extends Record<string, SqlStorageValue>>(
     query: string,
     ...bindings: Array<SqlStorageValue>
-  ) => tryStorageSync("sql.exec", () => fromSqlCursor(sql.exec<T>(query, ...bindings))),
+  ) => tryStorageSync('sql.exec', () => fromSqlCursor(sql.exec<T>(query, ...bindings))),
   get databaseSize() {
-    return sql.databaseSize;
+    return sql.databaseSize
   },
-});
+})
 
 const schemaBackedSyncKvStorage = <Key, Value, EncodedValue>(
   kv: globalThis.SyncKvStorage,
   definition: SyncKvDefinition<Key, Value, EncodedValue>,
 ): SchemaBackedSyncKvStorage<Key, Value> => {
-  const encodeKey = S.encodeEffect(definition.key);
-  const decodeKey = S.decodeUnknownEffect(definition.key);
-  const encodeValue = S.encodeEffect(definition.value);
-  const decodeValue = S.decodeUnknownEffect(definition.value);
+  const encodeKey = S.encodeEffect(definition.key)
+  const decodeKey = S.decodeUnknownEffect(definition.key)
+  const encodeValue = S.encodeEffect(definition.value)
+  const decodeValue = S.decodeUnknownEffect(definition.value)
 
   return {
     get: (key) =>
-      Effect.gen(function* () {
-        const encodedKey = yield* encodeKey(key);
-        const encodedValue = yield* tryStorageSync("kv.get", () =>
-          kv.get<EncodedValue>(encodedKey),
-        );
+      Effect.gen(function*() {
+        const encodedKey = yield* encodeKey(key)
+        const encodedValue = yield* tryStorageSync('kv.get', () => kv.get<EncodedValue>(encodedKey))
 
         if (encodedValue === undefined) {
-          return Option.none();
+          return Option.none()
         }
 
-        return yield* decodeValue(encodedValue).pipe(Effect.asSome);
+        return yield* decodeValue(encodedValue).pipe(Effect.asSome)
       }),
     put: (key, value) =>
-      Effect.gen(function* () {
-        const encodedKey = yield* encodeKey(key);
-        const encodedValue = yield* encodeValue(value);
+      Effect.gen(function*() {
+        const encodedKey = yield* encodeKey(key)
+        const encodedValue = yield* encodeValue(value)
 
-        yield* tryStorageSync("kv.put", () => kv.put(encodedKey, encodedValue));
+        yield* tryStorageSync('kv.put', () => kv.put(encodedKey, encodedValue))
       }),
     delete: (key) =>
-      Effect.gen(function* () {
-        const encodedKey = yield* encodeKey(key);
+      Effect.gen(function*() {
+        const encodedKey = yield* encodeKey(key)
 
-        return yield* tryStorageSync("kv.delete", () => kv.delete(encodedKey));
+        return yield* tryStorageSync('kv.delete', () => kv.delete(encodedKey))
       }),
     list: (options) =>
-      Effect.gen(function* () {
+      Effect.gen(function*() {
         const entries = Array.from(
-          yield* tryStorageSync("kv.list", () => kv.list<EncodedValue>(options)),
-        );
-        const decoded: Array<[Key, Value]> = [];
+          yield* tryStorageSync('kv.list', () => kv.list<EncodedValue>(options)),
+        )
+        const decoded: Array<[Key, Value]> = []
 
         for (const [key, value] of entries) {
-          decoded.push([yield* decodeKey(key), yield* decodeValue(value)]);
+          decoded.push([yield* decodeKey(key), yield* decodeValue(value)])
         }
 
-        return decoded;
+        return decoded
       }),
-  };
-};
+  }
+}
 
 const fromSyncKvStorage = (kv: globalThis.SyncKvStorage): SyncKvStorage => ({
-  get: <T = unknown>(key: string) => tryStorageSync("kv.get", () => kv.get<T>(key)),
-  put: <T>(key: string, value: T) => tryStorageSync("kv.put", () => kv.put(key, value)),
-  delete: (key: string) => tryStorageSync("kv.delete", () => kv.delete(key)),
+  get: <T = unknown>(key: string) => tryStorageSync('kv.get', () => kv.get<T>(key)),
+  put: <T>(key: string, value: T) => tryStorageSync('kv.put', () => kv.put(key, value)),
+  delete: (key: string) => tryStorageSync('kv.delete', () => kv.delete(key)),
   list: <T = unknown>(options?: globalThis.SyncKvListOptions) =>
-    tryStorageSync("kv.list", () => Array.from(kv.list<T>(options))),
+    tryStorageSync('kv.list', () => Array.from(kv.list<T>(options))),
   schema: <Key, Value, EncodedValue>(definition: SyncKvDefinition<Key, Value, EncodedValue>) =>
     schemaBackedSyncKvStorage(kv, definition),
-});
+})
 
 // SAFETY: every overload is dispatched by the native key form and wrapped with the same Effect error contract.
 const fromDurableObjectTransaction = (
@@ -248,51 +245,50 @@ const fromDurableObjectTransaction = (
       options?: globalThis.DurableObjectGetOptions,
     ) =>
       Array.isArray(keyOrKeys)
-        ? tryStoragePromise("transaction.get", () => txn.get<T>(keyOrKeys, options))
-        : tryStoragePromise("transaction.get", () => txn.get<T>(keyOrKeys, options)),
+        ? tryStoragePromise('transaction.get', () => txn.get<T>(keyOrKeys, options))
+        : tryStoragePromise('transaction.get', () => txn.get<T>(keyOrKeys, options)),
     list: <T = unknown>(options?: globalThis.DurableObjectListOptions) =>
-      tryStoragePromise("transaction.list", () => txn.list<T>(options)),
+      tryStoragePromise('transaction.list', () => txn.list<T>(options)),
     put: <T>(
       keyOrEntries: string | Record<string, T>,
       valueOrOptions?: T | globalThis.DurableObjectPutOptions,
       maybeOptions?: globalThis.DurableObjectPutOptions,
     ) =>
-      tryStoragePromise("transaction.put", () =>
+      tryStoragePromise('transaction.put', () =>
         Predicate.isString(keyOrEntries)
           ? txn.put(keyOrEntries, valueOrOptions as T, maybeOptions)
-          : txn.put(keyOrEntries, valueOrOptions as globalThis.DurableObjectPutOptions | undefined),
-      ),
+          : txn.put(keyOrEntries, valueOrOptions as globalThis.DurableObjectPutOptions | undefined)),
     delete: (keyOrKeys: string | Array<string>, options?: globalThis.DurableObjectPutOptions) =>
       Array.isArray(keyOrKeys)
-        ? tryStoragePromise("transaction.delete", () => txn.delete(keyOrKeys, options))
-        : tryStoragePromise("transaction.delete", () => txn.delete(keyOrKeys, options)),
-    rollback: tryStorageSync("transaction.rollback", () => {
-      txn.rollback();
-      if (owner !== undefined) owner.rolledBack = true;
+        ? tryStoragePromise('transaction.delete', () => txn.delete(keyOrKeys, options))
+        : tryStoragePromise('transaction.delete', () => txn.delete(keyOrKeys, options)),
+    rollback: tryStorageSync('transaction.rollback', () => {
+      txn.rollback()
+      if (owner !== undefined) owner.rolledBack = true
     }),
     getAlarm: (options?: globalThis.DurableObjectGetAlarmOptions) =>
-      tryStoragePromise("transaction.getAlarm", () => txn.getAlarm(options)),
-  }) as DurableObjectTransaction;
+      tryStoragePromise('transaction.getAlarm', () => txn.getAlarm(options)),
+  }) as DurableObjectTransaction
 
 export const fromDurableObjectStorage = (
   storage: globalThis.DurableObjectStorage,
 ): DurableObjectStorage => ({
   get: <T = unknown>(key: string, options?: globalThis.DurableObjectGetOptions) =>
-    tryStoragePromise("get", () => storage.get<T>(key, options)),
+    tryStoragePromise('get', () => storage.get<T>(key, options)),
   put: <T>(key: string, value: T, options?: globalThis.DurableObjectPutOptions) =>
-    tryStoragePromise("put", () => storage.put(key, value, options)),
+    tryStoragePromise('put', () => storage.put(key, value, options)),
   delete: (key: string, options?: globalThis.DurableObjectPutOptions) =>
-    tryStoragePromise("delete", () => storage.delete(key, options)),
+    tryStoragePromise('delete', () => storage.delete(key, options)),
   deleteAll: (options?: globalThis.DurableObjectPutOptions) =>
     Effect.suspend(() => {
-      invalidateStorageCache(storage);
+      invalidateStorageCache(storage)
 
-      return tryStoragePromise("deleteAll", () => storage.deleteAll(options)).pipe(
+      return tryStoragePromise('deleteAll', () => storage.deleteAll(options)).pipe(
         Effect.ensuring(Effect.sync(() => invalidateStorageCache(storage))),
-      );
+      )
     }),
   getAlarm: (options?: globalThis.DurableObjectGetAlarmOptions) =>
-    tryStoragePromise("getAlarm", () => storage.getAlarm(options)),
+    tryStoragePromise('getAlarm', () => storage.getAlarm(options)),
   transactionSync: <A, E, R>(closure: () => Effect.Effect<A, E, R>) =>
     withStorageTransaction(
       storage,
@@ -302,42 +298,42 @@ export const fromDurableObjectStorage = (
             // Cloudflare rolls the transaction back when the callback throws, so a
             // failed Exit is thrown to abort it. Keep a typed reference to that
             // Exit rather than recovering its type from the untyped catch binding.
-            let aborted: Exit.Exit<A, E> | undefined;
-            let escapedFiber: Fiber.Fiber<unknown, unknown> | undefined;
+            let aborted: Exit.Exit<A, E> | undefined
+            let escapedFiber: Fiber.Fiber<unknown, unknown> | undefined
 
             try {
               return Effect.succeed(
                 storage.transactionSync(() => {
-                  const exit = Effect.runSyncExitWith(context)(closure());
+                  const exit = Effect.runSyncExitWith(context)(closure())
 
                   if (Exit.isSuccess(exit)) {
-                    return exit.value;
+                    return exit.value
                   }
-                  const defect = Cause.findDefect(exit.cause);
+                  const defect = Cause.findDefect(exit.cause)
 
                   if (Result.isSuccess(defect) && Cause.isAsyncFiberError(defect.success)) {
-                    escapedFiber = defect.success.fiber;
-                    escapedFiber.interruptUnsafe();
+                    escapedFiber = defect.success.fiber
+                    escapedFiber.interruptUnsafe()
                   }
-                  aborted = exit;
+                  aborted = exit
 
-                  throw exit;
+                  throw exit
                 }),
-              );
+              )
             } catch (cause) {
               const failure: Effect.Effect<never, E | StorageOperationError> =
                 aborted !== undefined && cause === aborted && Exit.isFailure(aborted)
                   ? Effect.failCause(aborted.cause)
-                  : Effect.fail(storageError("transactionSync", cause));
-              const fiber = escapedFiber;
+                  : Effect.fail(storageError('transactionSync', cause))
+              const fiber = escapedFiber
 
               if (fiber !== undefined) {
-                return Fiber.interrupt(fiber).pipe(Effect.andThen(failure));
+                return Fiber.interrupt(fiber).pipe(Effect.andThen(failure))
               }
 
-              return failure;
+              return failure
             }
-          }),
+          })
         ),
       ),
     ),
@@ -347,38 +343,34 @@ export const fromDurableObjectStorage = (
       Effect.suspend(() => {
         // See `transactionSync`: the thrown Exit aborts Cloudflare's
         // transaction, and holding it here keeps its error type.
-        let aborted: Exit.Exit<A, E> | undefined;
+        let aborted: Exit.Exit<A, E> | undefined
 
         return runNativeCallback<A, E, R, A>((run) =>
           storage.transaction(async (txn) => {
             const exit = await run(
-              Effect.flatMap(CurrentStorageTransaction, (owner) =>
-                closure(fromDurableObjectTransaction(txn, owner)),
-              ),
-            );
+              Effect.flatMap(CurrentStorageTransaction, (owner) => closure(fromDurableObjectTransaction(txn, owner))),
+            )
 
             if (Exit.isSuccess(exit)) {
-              return exit.value;
+              return exit.value
             }
-            aborted = exit;
+            aborted = exit
 
-            throw exit;
-          }),
+            throw exit
+          })
         ).pipe(
           Effect.catch((cause): Effect.Effect<never, E | StorageOperationError> =>
             aborted !== undefined && cause === aborted && Exit.isFailure(aborted)
               ? Effect.failCause(aborted.cause)
-              : Effect.fail(storageError("transaction", cause)),
+              : Effect.fail(storageError('transaction', cause))
           ),
-        );
+        )
       }),
     ),
-  sync: tryStoragePromise("sync", () => storage.sync()),
-  getCurrentBookmark: tryStoragePromise("getCurrentBookmark", () => storage.getCurrentBookmark()),
+  sync: tryStoragePromise('sync', () => storage.sync()),
+  getCurrentBookmark: tryStoragePromise('getCurrentBookmark', () => storage.getCurrentBookmark()),
   onNextSessionRestoreBookmark: (bookmark: string) =>
-    tryStoragePromise("onNextSessionRestoreBookmark", () =>
-      storage.onNextSessionRestoreBookmark(bookmark),
-    ),
+    tryStoragePromise('onNextSessionRestoreBookmark', () => storage.onNextSessionRestoreBookmark(bookmark)),
   sql: fromSqlStorage(storage.sql),
   kv: fromSyncKvStorage(storage.kv),
-});
+})

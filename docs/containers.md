@@ -17,16 +17,16 @@ Runtime image selection, instance sizing, and snapshots require the `durable_obj
       "class_name": "AgentContainer",
       "scheduling_policy": "durable_object",
       "images": {
-        "base": { "dockerfile": "./container/Dockerfile" },
-      },
-    },
+        "base": { "dockerfile": "./container/Dockerfile" }
+      }
+    }
   ],
   "durable_objects": {
-    "bindings": [{ "name": "AGENTS", "class_name": "AgentContainer" }],
+    "bindings": [{ "name": "AGENTS", "class_name": "AgentContainer" }]
   },
   "exports": {
-    "AgentContainer": { "type": "durable-object", "storage": "sqlite" },
-  },
+    "AgentContainer": { "type": "durable-object", "storage": "sqlite" }
+  }
 }
 ```
 
@@ -37,40 +37,40 @@ Wrangler exposes each prepared image through the adapter's `images` Effect. Choo
 Pass `DurableObjectContainer.layer` to your Durable Object's builder. The layer fails with `ContainerNotConfiguredError` when the class has no container configuration.
 
 ```ts
-import { Effect } from "effect";
-import { DurableObject, DurableObjectContainer, DurableObjectState } from "effect-cf";
+import { DurableObject, DurableObjectContainer, DurableObjectState } from '@systemfsoftware/effect-cf'
+import { Effect } from 'effect'
 
 export class AgentContainer extends DurableObject.make(DurableObjectContainer.layer, {
-  initialize: Effect.gen(function* () {
-    const container = yield* DurableObjectContainer.DurableObjectContainer;
+  initialize: Effect.gen(function*() {
+    const container = yield* DurableObjectContainer.DurableObjectContainer
 
     if (yield* container.running) {
-      yield* container.setInactivityTimeout("1 minute");
+      yield* container.setInactivityTimeout('1 minute')
     }
   }),
   rpc: {
-    run: Effect.fn("AgentContainer.run")(function* (command: ReadonlyArray<string>) {
-      const container = yield* DurableObjectContainer.DurableObjectContainer;
-      const state = yield* DurableObjectState.DurableObjectState;
+    run: Effect.fn('AgentContainer.run')(function*(command: ReadonlyArray<string>) {
+      const container = yield* DurableObjectContainer.DurableObjectContainer
+      const state = yield* DurableObjectState.DurableObjectState
 
       yield* state.blockConcurrencyWhile(
-        Effect.gen(function* () {
+        Effect.gen(function*() {
           if (!(yield* container.running)) {
-            const images = yield* container.images;
+            const images = yield* container.images
 
             yield* container.start({
               image: images.base,
-              instance: "lite",
+              instance: 'lite',
               enableInternet: false,
-            });
+            })
           }
         }),
-      );
-      yield* container.setInactivityTimeout("1 minute");
+      )
+      yield* container.setInactivityTimeout('1 minute')
 
-      const process = yield* container.execScoped(command);
+      const process = yield* container.execScoped(command)
 
-      return yield* process.outputText;
+      return yield* process.outputText
     }),
   },
 }) {}
@@ -95,18 +95,18 @@ COPY --from=docker.io/cloudflare/sandbox:1.0.3 /usr/local/bin/sandbox-shim /usr/
 Wrap `Files` after obtaining the container service:
 
 ```ts
-import { Files } from "@cloudflare/sandbox";
-import { Effect } from "effect";
-import { ContainerFiles, DurableObjectContainer } from "effect-cf";
+import { Files } from '@cloudflare/sandbox'
+import { ContainerFiles, DurableObjectContainer } from '@systemfsoftware/effect-cf'
+import { Effect } from 'effect'
 
-const writeTask = Effect.fn("writeTask")(function* () {
-  const container = yield* DurableObjectContainer.DurableObjectContainer;
-  const files = ContainerFiles.fromFiles(new Files(container.raw));
+const writeTask = Effect.fn('writeTask')(function*() {
+  const container = yield* DurableObjectContainer.DurableObjectContainer
+  const files = ContainerFiles.fromFiles(new Files(container.raw))
 
-  yield* files.mkdir("/workspace", { recursive: true });
-  yield* files.writeFile("/workspace/task.txt", "hello");
-  return yield* files.readFileString("/workspace/task.txt");
-});
+  yield* files.mkdir('/workspace', { recursive: true })
+  yield* files.writeFile('/workspace/task.txt', 'hello')
+  return yield* files.readFileString('/workspace/task.txt')
+})
 ```
 
 `readFile` returns a native `Response` whose body the caller owns. `readFileStream` returns an Effect byte stream and captures late read failures; `readFileString` collects it as UTF-8. Writes accept strings, binary data, blobs, and native readable streams. Metadata and mutation methods follow SDK 1.x: `stat`, `lstat`, `readDirectory`, `mkdir`, `rename`, and `remove`. Effects are lazy and forward cancellation; `ContainerError.cause` preserves the original `SandboxFileError`, including Linux error codes such as `ENOENT`. Partial writes and mutations retain the SDK's filesystem semantics.
@@ -134,17 +134,17 @@ Acquire a port with `yield* container.getTcpPort(8080)`, then use its `fetch` Ef
 `waitForHttp` probes an already-started container and can require a healthy route:
 
 ```ts
-const waitForPreview = Effect.gen(function* () {
-  const container = yield* DurableObjectContainer.DurableObjectContainer;
+const waitForPreview = Effect.gen(function*() {
+  const container = yield* DurableObjectContainer.DurableObjectContainer
 
   yield* container.waitForHttp(8080, {
-    path: "/health",
+    path: '/health',
     status: { min: 200, max: 299 },
-    timeout: "30 seconds",
+    timeout: '30 seconds',
     interval: 100,
-    attemptTimeout: "1 second",
-  });
-});
+    attemptTimeout: '1 second',
+  })
+})
 ```
 
 All three durations accept Effect `Duration.Input`. Probes respond to interruption and their response bodies are canceled. Exhausting the overall deadline produces `ContainerReadinessTimeoutError`, retaining the last completed probe failure as its cause. Container stop fails the wait; monitor the container separately for its native stop cause. Readiness does not observe a particular child process, so applications replacing `process.waitForPort` also check their job's status. Choose allocation retries appropriate to the application, particularly when restarting shortly after a stop. The adapter does not retry commands or forward a caller's HTTP request more than once.
@@ -169,8 +169,8 @@ Import `Worker` from `effect-cf` alongside the container modules. Keep capabilit
 Save a filesystem checkpoint and retain its handle in Durable Object storage:
 
 ```ts
-const snapshot = yield * container.snapshotContainer({ name: "checkpoint" });
-yield * state.storage.put("workspace-snapshot", snapshot);
+const snapshot = yield * container.snapshotContainer({ name: 'checkpoint' })
+yield * state.storage.put('workspace-snapshot', snapshot)
 ```
 
 When restoring a stopped container, pass that handle to `start`:
@@ -179,9 +179,9 @@ When restoring a stopped container, pass that handle to `start`:
 yield *
   container.start({
     containerSnapshot: snapshot,
-    instance: "standard-2",
+    instance: 'standard-2',
     enableInternet: false,
-  });
+  })
 ```
 
 `image` and `containerSnapshot` are mutually exclusive. Snapshots preserve filesystem contents rather than process memory; the entrypoint runs again on restore. The application coordinates writers and owns snapshot retention and routing. See Cloudflare's [snapshot guide](https://developers.cloudflare.com/containers/guides/snapshots/) for persistence and availability details. `inspect` returns `Option<ContainerInfo>` for the current image and labels.

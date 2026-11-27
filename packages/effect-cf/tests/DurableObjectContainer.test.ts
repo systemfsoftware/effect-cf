@@ -1,67 +1,65 @@
-import { assert, it } from "@effect/vitest";
-import { Cause, Deferred, Duration, Effect, Exit, Fiber, Stream } from "effect";
-import { TestClock } from "effect/testing";
+import { assert, it } from '@effect/vitest'
+import { Cause, Deferred, Duration, Effect, Exit, Fiber, Stream } from 'effect'
+import { TestClock } from 'effect/testing'
 
-import { DurableObjectContainer } from "../src/index";
-import { makePartialTestDouble } from "./TestDoubles";
+import { DurableObjectContainer } from '../src/index'
+import { makePartialTestDouble } from './TestDoubles'
 
-it.effect("inactivity timeouts accept milliseconds and Effect duration inputs", () =>
-  Effect.gen(function* () {
-    const timeouts: Array<number | bigint> = [];
+it.effect('inactivity timeouts accept milliseconds and Effect duration inputs', () =>
+  Effect.gen(function*() {
+    const timeouts: Array<number | bigint> = []
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({
         setInactivityTimeout: async (duration) => {
-          timeouts.push(duration);
+          timeouts.push(duration)
         },
       }),
-    );
-    const milliseconds = container.setInactivityTimeout(60_000);
+    )
+    const milliseconds = container.setInactivityTimeout(60_000)
 
-    assert.deepStrictEqual(timeouts, []);
-    yield* milliseconds;
-    yield* container.setInactivityTimeout("1 minute");
-    yield* container.setInactivityTimeout(Duration.minutes(1));
-    yield* container.setInactivityTimeout(60_000_000_000n);
+    assert.deepStrictEqual(timeouts, [])
+    yield* milliseconds
+    yield* container.setInactivityTimeout('1 minute')
+    yield* container.setInactivityTimeout(Duration.minutes(1))
+    yield* container.setInactivityTimeout(60_000_000_000n)
 
-    assert.deepStrictEqual(timeouts, [60_000, 60_000, 60_000, 60_000]);
-  }),
-);
+    assert.deepStrictEqual(timeouts, [60_000, 60_000, 60_000, 60_000])
+  }))
 
-it.effect("readiness deadlines retain the failed probe without retrying application work", () =>
-  Effect.gen(function* () {
-    const refused = new Error("Connection refused");
+it.effect('readiness deadlines retain the failed probe without retrying application work', () =>
+  Effect.gen(function*() {
+    const refused = new Error('Connection refused')
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({
         running: true,
         getTcpPort: () =>
           makePartialTestDouble<Fetcher>({
             fetch: async () => {
-              throw refused;
+              throw refused
             },
           }),
       }),
-    );
+    )
     const fiber = yield* Effect.forkChild(
       container.waitForHttp(8080, {
         timeout: Duration.seconds(1),
         interval: 100,
-        attemptTimeout: "500 millis",
+        attemptTimeout: '500 millis',
       }),
-    );
+    )
 
-    yield* TestClock.adjust("1 second");
+    yield* TestClock.adjust('1 second')
 
-    const error = yield* Effect.flip(Fiber.join(fiber));
+    const error = yield* Effect.flip(Fiber.join(fiber))
 
-    assert.instanceOf(error, DurableObjectContainer.ContainerReadinessTimeoutError);
-    assert.instanceOf(error.cause, DurableObjectContainer.ContainerError);
-    assert.strictEqual(error.cause.cause, refused);
-  }),
-);
+    assert.instanceOf(error, DurableObjectContainer.ContainerReadinessTimeoutError)
+    assert.instanceOf(error.cause, DurableObjectContainer.ContainerError)
+    assert.strictEqual(error.cause.cause, refused)
+  }))
 
-it.effect("interrupting readiness aborts its pending HTTP probe", () =>
-  Effect.gen(function* () {
-    const acquired = yield* Deferred.make<AbortSignal>();
+it.effect('interrupting readiness aborts its pending HTTP probe', () =>
+  Effect.gen(function*() {
+    const acquired = yield* Deferred.make<AbortSignal>()
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({
         running: true,
@@ -69,195 +67,190 @@ it.effect("interrupting readiness aborts its pending HTTP probe", () =>
           makePartialTestDouble<Fetcher>({
             fetch: (_input, init) =>
               new Promise((_resolve, reject) => {
-                const signal = init!.signal!;
+                const signal = init!.signal!
 
-                Deferred.doneUnsafe(acquired, Effect.succeed(signal));
+                Deferred.doneUnsafe(acquired, Effect.succeed(signal))
                 signal.addEventListener(
-                  "abort",
-                  () => reject(new DOMException("Aborted", "AbortError")),
+                  'abort',
+                  () => reject(new DOMException('Aborted', 'AbortError')),
                   { once: true },
-                );
+                )
               }),
           }),
       }),
-    );
-    const fiber = yield* Effect.forkChild(container.waitForHttp(8080));
+    )
+    const fiber = yield* Effect.forkChild(container.waitForHttp(8080))
 
-    const signal = yield* Deferred.await(acquired);
+    const signal = yield* Deferred.await(acquired)
 
-    yield* Fiber.interrupt(fiber);
+    yield* Fiber.interrupt(fiber)
 
-    assert.isTrue(signal.aborted);
-  }),
-);
+    assert.isTrue(signal.aborted)
+  }))
 
-it.effect("container validation and asynchronous lifecycle failures remain typed and lazy", () =>
-  Effect.gen(function* () {
-    const invalidOptions = new RangeError("Invalid instance resources");
-    const startupFailure = new Error("Image could not be started");
-    let starts = 0;
+it.effect('container validation and asynchronous lifecycle failures remain typed and lazy', () =>
+  Effect.gen(function*() {
+    const invalidOptions = new RangeError('Invalid instance resources')
+    const startupFailure = new Error('Image could not be started')
+    let starts = 0
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({
         start: () => {
-          starts += 1;
-          throw invalidOptions;
+          starts += 1
+          throw invalidOptions
         },
         monitor: () => Promise.reject(startupFailure),
       }),
-    );
-    const start = container.start();
+    )
+    const start = container.start()
 
-    assert.strictEqual(starts, 0);
+    assert.strictEqual(starts, 0)
 
-    const startError = yield* Effect.flip(start);
-    const monitorError = yield* Effect.flip(container.monitor);
+    const startError = yield* Effect.flip(start)
+    const monitorError = yield* Effect.flip(container.monitor)
 
-    assert.instanceOf(startError, DurableObjectContainer.ContainerError);
-    assert.strictEqual(startError.operation, "start");
-    assert.strictEqual(startError.cause, invalidOptions);
-    assert.strictEqual(monitorError.operation, "monitor");
-    assert.strictEqual(monitorError.cause, startupFailure);
-  }),
-);
+    assert.instanceOf(startError, DurableObjectContainer.ContainerError)
+    assert.strictEqual(startError.operation, 'start')
+    assert.strictEqual(startError.cause, invalidOptions)
+    assert.strictEqual(monitorError.operation, 'monitor')
+    assert.strictEqual(monitorError.cause, startupFailure)
+  }))
 
-it.effect("scoped execution signals a running process when its owner is interrupted", () =>
-  Effect.gen(function* () {
-    const acquired = yield* Deferred.make<void>();
-    const completion = Promise.withResolvers<number>();
-    const signals: number[] = [];
+it.effect('scoped execution signals a running process when its owner is interrupted', () =>
+  Effect.gen(function*() {
+    const acquired = yield* Deferred.make<void>()
+    const completion = Promise.withResolvers<number>()
+    const signals: number[] = []
     const process = makePartialTestDouble<ExecProcess>({
       exitCode: completion.promise,
       kill: (signal = 15) => {
-        signals.push(signal);
-        completion.resolve(137);
+        signals.push(signal)
+        completion.resolve(137)
       },
-    });
+    })
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({ exec: async () => process }),
-    );
+    )
     const fiber = yield* Effect.forkChild(
-      Effect.gen(function* () {
-        yield* container.execScoped(["sleep", "60"]);
-        yield* Deferred.succeed(acquired, undefined);
+      Effect.gen(function*() {
+        yield* container.execScoped(['sleep', '60'])
+        yield* Deferred.succeed(acquired, undefined)
 
-        return yield* Effect.never;
+        return yield* Effect.never
       }).pipe(Effect.scoped),
-    );
+    )
 
-    yield* Deferred.await(acquired);
-    yield* Fiber.interrupt(fiber);
+    yield* Deferred.await(acquired)
+    yield* Fiber.interrupt(fiber)
 
-    assert.deepStrictEqual(signals, [9]);
-  }),
-);
+    assert.deepStrictEqual(signals, [9])
+  }))
 
-it("interrupts pending process acquisition through the native abort signal", async () => {
-  const entered = Promise.withResolvers<AbortSignal>();
+it('interrupts pending process acquisition through the native abort signal', async () => {
+  const entered = Promise.withResolvers<AbortSignal>()
   const container = DurableObjectContainer.fromContainer(
     makePartialTestDouble<Container>({
       exec: (_command, options) =>
         new Promise((_resolve, reject) => {
-          const signal = options!.signal!;
+          const signal = options!.signal!
 
           signal.addEventListener(
-            "abort",
-            () => reject(new DOMException("Aborted", "AbortError")),
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
             {
               once: true,
             },
-          );
-          entered.resolve(signal);
+          )
+          entered.resolve(signal)
         }),
     }),
-  );
-  const fiber = Effect.runFork(container.execScoped(["sleep", "60"]).pipe(Effect.scoped));
-  const signal = await entered.promise;
+  )
+  const fiber = Effect.runFork(container.execScoped(['sleep', '60']).pipe(Effect.scoped))
+  const signal = await entered.promise
 
-  await Effect.runPromise(Fiber.interrupt(fiber));
+  await Effect.runPromise(Fiber.interrupt(fiber))
 
-  assert.isTrue(signal.aborted);
-});
+  assert.isTrue(signal.aborted)
+})
 
-it.effect("completed processes preserve nonzero exit codes and are never signaled by cleanup", () =>
-  Effect.gen(function* () {
+it.effect('completed processes preserve nonzero exit codes and are never signaled by cleanup', () =>
+  Effect.gen(function*() {
     const output = {
       stdout: new ArrayBuffer(0),
-      stderr: new Uint8Array(new TextEncoder().encode("command failed")).buffer,
+      stderr: new Uint8Array(new TextEncoder().encode('command failed')).buffer,
       exitCode: 7,
-    };
+    }
     const process = makePartialTestDouble<ExecProcess>({
       exitCode: Promise.resolve(7),
       output: async () => output,
       kill: () => {
-        throw new Error("The native runtime cannot signal an exited process");
+        throw new Error('The native runtime cannot signal an exited process')
       },
-    });
+    })
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({ exec: async () => process }),
-    );
-    const result = yield* Effect.gen(function* () {
-      const child = yield* container.execScoped(["sh", "-c", "exit 7"]);
+    )
+    const result = yield* Effect.gen(function*() {
+      const child = yield* container.execScoped(['sh', '-c', 'exit 7'])
 
-      assert.strictEqual(yield* child.exitCode, 7);
-      yield* child.kill();
+      assert.strictEqual(yield* child.exitCode, 7)
+      yield* child.kill()
 
-      return yield* child.output;
-    }).pipe(Effect.scoped);
+      return yield* child.output
+    }).pipe(Effect.scoped)
 
-    assert.strictEqual(result.exitCode, 7);
-    assert.strictEqual(new TextDecoder().decode(result.stderr), "command failed");
-  }),
-);
+    assert.strictEqual(result.exitCode, 7)
+    assert.strictEqual(new TextDecoder().decode(result.stderr), 'command failed')
+  }))
 
 it.effect("process streams handle the runtime's absent stderr for combined output", () =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const process = makePartialTestDouble<ExecProcess>({
       stdout: new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.enqueue(new TextEncoder().encode("combined output"));
-          controller.close();
+          controller.enqueue(new TextEncoder().encode('combined output'))
+          controller.close()
         },
       }),
       // workerd returns undefined for absent streams despite its nullable declarations.
       exitCode: Promise.resolve(0),
-    });
+    })
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({ exec: async () => process }),
-    );
-    const child = yield* container.exec(["example"], { stderr: "combined" });
-    const stdout = yield* child.stdout.pipe(Stream.decodeText(), Stream.mkString);
-    const stderr = yield* Stream.runCollect(child.stderr);
+    )
+    const child = yield* container.exec(['example'], { stderr: 'combined' })
+    const stdout = yield* child.stdout.pipe(Stream.decodeText(), Stream.mkString)
+    const stderr = yield* Stream.runCollect(child.stderr)
 
-    assert.strictEqual(stdout, "combined output");
-    assert.deepStrictEqual(stderr, []);
-    assert.isNull(child.stdin);
-  }),
-);
+    assert.strictEqual(stdout, 'combined output')
+    assert.deepStrictEqual(stderr, [])
+    assert.isNull(child.stdin)
+  }))
 
-it.effect.each(["failure", "interruption"] as const)(
-  "process logs join delayed reader cleanup before completing after %s",
+it.effect.each(['failure', 'interruption'] as const)(
+  'process logs join delayed reader cleanup before completing after %s',
   (termination) =>
-    Effect.gen(function* () {
-      const cleanupStarted = yield* Deferred.make<void>();
-      const releaseCleanup = Promise.withResolvers<void>();
-      const rejectedRead = new Error("stderr read failed");
-      let cancellations = 0;
-      let cleanupSettled = false;
+    Effect.gen(function*() {
+      const cleanupStarted = yield* Deferred.make<void>()
+      const releaseCleanup = Promise.withResolvers<void>()
+      const rejectedRead = new Error('stderr read failed')
+      let cancellations = 0
+      let cleanupSettled = false
       const stdout = new ReadableStream<Uint8Array>({
         cancel() {
-          cancellations += 1;
-          Deferred.doneUnsafe(cleanupStarted, Effect.void);
+          cancellations += 1
+          Deferred.doneUnsafe(cleanupStarted, Effect.void)
 
           return releaseCleanup.promise.then(() => {
-            cleanupSettled = true;
-          });
+            cleanupSettled = true
+          })
         },
-      });
+      })
       const stderr = new ReadableStream<Uint8Array>({
         start(controller) {
-          controller.error(rejectedRead);
+          controller.error(rejectedRead)
         },
-      });
+      })
       const container = DurableObjectContainer.fromContainer(
         makePartialTestDouble<Container>({
           exec: async () =>
@@ -267,104 +260,103 @@ it.effect.each(["failure", "interruption"] as const)(
               exitCode: Promise.resolve(0),
             }),
         }),
-      );
+      )
       const fiber = yield* Effect.forkChild(
-        Effect.gen(function* () {
-          const child = yield* container.exec(["example"]);
+        Effect.gen(function*() {
+          const child = yield* container.exec(['example'])
 
-          return yield* Stream.runCollect(child.logs);
+          return yield* Stream.runCollect(child.logs)
         }),
-      );
+      )
 
-      yield* Deferred.await(cleanupStarted);
-      if (termination === "interruption") fiber.interruptUnsafe();
-      yield* Effect.yieldNow;
+      yield* Deferred.await(cleanupStarted)
+      if (termination === 'interruption') fiber.interruptUnsafe()
+      yield* Effect.yieldNow
       yield* Effect.sync(() => assert.isUndefined(fiber.pollUnsafe())).pipe(
         Effect.ensuring(Effect.sync(() => releaseCleanup.resolve())),
-      );
-      const exit = yield* Fiber.await(fiber);
+      )
+      const exit = yield* Fiber.await(fiber)
 
-      assert.isTrue(Exit.isFailure(exit));
-      assert.strictEqual(cancellations, 1);
-      assert.isTrue(cleanupSettled);
-      assert.isFalse(stdout.locked);
-      assert.isFalse(stderr.locked);
-      if (termination === "failure" && Exit.isFailure(exit)) {
-        const error = Cause.squash(exit.cause);
+      assert.isTrue(Exit.isFailure(exit))
+      assert.strictEqual(cancellations, 1)
+      assert.isTrue(cleanupSettled)
+      assert.isFalse(stdout.locked)
+      assert.isFalse(stderr.locked)
+      if (termination === 'failure' && Exit.isFailure(exit)) {
+        const error = Cause.squash(exit.cause)
 
-        assert.instanceOf(error, DurableObjectContainer.ContainerError);
-        assert.strictEqual(error.operation, "exec.stderr");
-        assert.strictEqual(error.cause, rejectedRead);
+        assert.instanceOf(error, DurableObjectContainer.ContainerError)
+        assert.strictEqual(error.operation, 'exec.stderr')
+        assert.strictEqual(error.cause, rejectedRead)
       }
     }),
-);
+)
 
-it.effect("immediate scope closure does not signal a process whose exit is already queued", () =>
-  Effect.gen(function* () {
+it.effect('immediate scope closure does not signal a process whose exit is already queued', () =>
+  Effect.gen(function*() {
     const process = makePartialTestDouble<ExecProcess>({
       exitCode: Promise.resolve(0),
       kill: () => {
-        throw new Error("The native runtime cannot signal an exited process");
+        throw new Error('The native runtime cannot signal an exited process')
       },
-    });
+    })
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({ exec: async () => process }),
-    );
-    const child = yield* container.execScoped(["true"]).pipe(Effect.scoped);
+    )
+    const child = yield* container.execScoped(['true']).pipe(Effect.scoped)
 
-    assert.strictEqual(yield* child.exitCode, 0);
-  }),
-);
+    assert.strictEqual(yield* child.exitCode, 0)
+  }))
 
 // Native socket ownership follow-up to https://github.com/danieljvdm/effect-cf/pull/197.
-it.effect.each(["success", "interruption"] as const)(
-  "scoped TCP connections close after %s without replay",
+it.effect.each(['success', 'interruption'] as const)(
+  'scoped TCP connections close after %s without replay',
   (termination) =>
-    Effect.gen(function* () {
-      const acquired = yield* Deferred.make<void>();
-      let connections = 0;
-      let closes = 0;
+    Effect.gen(function*() {
+      const acquired = yield* Deferred.make<void>()
+      let connections = 0
+      let closes = 0
       const socket = makePartialTestDouble<Socket>({
         close: async () => {
-          closes += 1;
+          closes += 1
         },
-      });
+      })
       const container = DurableObjectContainer.fromContainer(
         makePartialTestDouble<Container>({
           getTcpPort: () =>
             makePartialTestDouble<Fetcher>({
               connect: () => {
-                connections += 1;
+                connections += 1
 
-                return socket;
+                return socket
               },
             }),
         }),
-      );
-      const port = yield* container.getTcpPort(8080);
-      const connection = port.connectScoped("localhost:8080");
+      )
+      const port = yield* container.getTcpPort(8080)
+      const connection = port.connectScoped('localhost:8080')
 
-      assert.strictEqual(connections, 0);
+      assert.strictEqual(connections, 0)
       const fiber = yield* Effect.forkChild(
-        Effect.gen(function* () {
-          assert.strictEqual(yield* connection, socket);
-          yield* Deferred.succeed(acquired, undefined);
+        Effect.gen(function*() {
+          assert.strictEqual(yield* connection, socket)
+          yield* Deferred.succeed(acquired, undefined)
 
-          if (termination === "interruption") return yield* Effect.never;
+          if (termination === 'interruption') return yield* Effect.never
         }).pipe(Effect.scoped),
-      );
+      )
 
-      yield* Deferred.await(acquired);
-      if (termination === "interruption") yield* Fiber.interrupt(fiber);
-      else yield* Fiber.join(fiber);
-      assert.strictEqual(connections, 1);
-      assert.strictEqual(closes, 1);
+      yield* Deferred.await(acquired)
+      if (termination === 'interruption') yield* Fiber.interrupt(fiber)
+      else yield* Fiber.join(fiber)
+      assert.strictEqual(connections, 1)
+      assert.strictEqual(closes, 1)
     }),
-);
+)
 
-it.effect("scoped TCP connections retain asynchronous close failures", () =>
-  Effect.gen(function* () {
-    const rejectedClose = new Error("Socket close failed");
+it.effect('scoped TCP connections retain asynchronous close failures', () =>
+  Effect.gen(function*() {
+    const rejectedClose = new Error('Socket close failed')
     const container = DurableObjectContainer.fromContainer(
       makePartialTestDouble<Container>({
         getTcpPort: () =>
@@ -375,17 +367,16 @@ it.effect("scoped TCP connections retain asynchronous close failures", () =>
               }),
           }),
       }),
-    );
-    const port = yield* container.getTcpPort(8080);
-    const result = yield* port.connectScoped("localhost:8080").pipe(Effect.scoped, Effect.exit);
+    )
+    const port = yield* container.getTcpPort(8080)
+    const result = yield* port.connectScoped('localhost:8080').pipe(Effect.scoped, Effect.exit)
 
-    assert.isTrue(Exit.isFailure(result));
+    assert.isTrue(Exit.isFailure(result))
     if (Exit.isFailure(result)) {
-      const error = Cause.squash(result.cause);
+      const error = Cause.squash(result.cause)
 
-      assert.instanceOf(error, DurableObjectContainer.ContainerError);
-      assert.strictEqual(error.operation, "getTcpPort.close");
-      assert.strictEqual(error.cause, rejectedClose);
+      assert.instanceOf(error, DurableObjectContainer.ContainerError)
+      assert.strictEqual(error.operation, 'getTcpPort.close')
+      assert.strictEqual(error.cause, rejectedClose)
     }
-  }),
-);
+  }))

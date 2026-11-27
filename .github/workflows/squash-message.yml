@@ -1,0 +1,41 @@
+name: Squash message
+
+# The squash commit takes the pull request's title and body, so those are linted here rather than in `ci.yml`: a
+# title or body edit starts this job alone, never another run of the full gate on an unchanged tree. A queue draft is
+# titled "merge queue: ..." and is not the message that lands, so it skips the lint; the pull request it embeds was
+# linted, and the queue conditions require this check on that pull request. A fork that names its branch
+# `mergify/merge-queue/...` gets the skip but then fails that queue condition, so the spoof cannot slip a message.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  squash-message:
+    name: squash message
+    if: ${{ !startsWith(github.head_ref, 'mergify/merge-queue/') }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6.1.1
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 26
+      - run: pnpm install --frozen-lockfile --filter . --ignore-scripts
+      - name: Lint the squash message
+        env:
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          title=${PR_TITLE//$'\r'/}
+          body=${PR_BODY//$'\r'/}
+          printf '%s\n\n%s' "$title" "$body" | pnpm --config.verify-deps-before-run=false exec commitlint --verbose

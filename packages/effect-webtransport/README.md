@@ -11,16 +11,16 @@ Requires a platform WebTransport implementation. The constructor is an injectabl
 See the [Effect API migration guide](../../docs/effect-api-migration.md) for numeric validation changes.
 
 ```ts
-import { Effect } from "effect";
-import { WebTransport } from "effect-webtransport";
+import { WebTransport } from '@systemfsoftware/effect-webtransport'
+import { Effect } from 'effect'
 
-const program = Effect.gen(function* () {
-  const session = yield* WebTransport.connect("https://example.com/wt");
-  const stream = yield* session.openBidirectionalStream();
-  const write = yield* WebTransport.writer(stream.writable);
+const program = Effect.gen(function*() {
+  const session = yield* WebTransport.connect('https://example.com/wt')
+  const stream = yield* session.openBidirectionalStream()
+  const write = yield* WebTransport.writer(stream.writable)
 
-  yield* write(new TextEncoder().encode("hello"));
-}).pipe(Effect.scoped, Effect.provide(WebTransport.layerConstructorGlobal));
+  yield* write(new TextEncoder().encode('hello'))
+}).pipe(Effect.scoped, Effect.provide(WebTransport.layerConstructorGlobal))
 ```
 
 Closing the scope closes the session and its streams, including on interruption. Datagrams are unreliable; use reliable streams when delivery matters.
@@ -32,17 +32,17 @@ Closing the scope closes the session and its streams, including on interruption.
 With Effect 4.0, replace `socket.run(handler)` with a scoped reader loop:
 
 ```ts
-const consume = Effect.gen(function* () {
-  const { pull } = yield* socket.reader;
-  const writer = yield* socket.writer;
+const consume = Effect.gen(function*() {
+  const { pull } = yield* socket.reader
+  const writer = yield* socket.writer
 
-  yield* writer.write("hello");
+  yield* writer.write('hello')
   while (true) {
     for (const frame of yield* pull) {
-      yield* handle(frame);
+      yield* handle(frame)
     }
   }
-}).pipe(Effect.scoped);
+}).pipe(Effect.scoped)
 ```
 
 Handle `SocketError` close reasons around this loop, or use `Effect.retry` to

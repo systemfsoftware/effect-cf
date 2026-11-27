@@ -1,32 +1,32 @@
-import * as Context from "effect/Context";
-import type { Digest, SecureRandom } from "effect/crypto";
-import * as Effect from "effect/Effect";
-import * as S from "effect/Schema";
-import type { Layer } from "effect";
+import type { Layer } from 'effect'
+import * as Context from 'effect/Context'
+import type { Digest, SecureRandom } from 'effect/crypto'
+import * as Effect from 'effect/Effect'
+import * as S from 'effect/Schema'
 
-import type * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import type { ExecutionContext, WorkerContext } from "./Worker";
-import type * as RpcDefinition from "./RpcDefinition";
-import * as WorkflowBinding from "./WorkflowBinding";
-import * as WorkflowEntrypoint from "./Workflow";
+import type * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import type * as RpcDefinition from './RpcDefinition'
+import type { ExecutionContext, WorkerContext } from './Worker'
+import * as WorkflowEntrypoint from './Workflow'
+import * as WorkflowBinding from './WorkflowBinding'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 export type {
   WorkflowInstance,
-  WorkflowInstanceCreateOptions,
   WorkflowInstanceCreateBatchOptions,
+  WorkflowInstanceCreateOptions,
   WorkflowOperationError,
-} from "./WorkflowBinding";
+} from './WorkflowBinding'
 
 export interface Definition<
   Id extends string = string,
   Payload extends RpcDefinition.ServiceFreeSchema = RpcDefinition.ServiceFreeSchema,
   Result extends RpcDefinition.ServiceFreeSchema = RpcDefinition.ServiceFreeSchema,
 > {
-  readonly id: Id;
-  readonly payload: Payload;
-  readonly result: Result;
+  readonly id: Id
+  readonly payload: Payload
+  readonly result: Result
 }
 
 export namespace Definition {
@@ -34,84 +34,86 @@ export namespace Definition {
     string,
     RpcDefinition.ServiceFreeSchema,
     RpcDefinition.ServiceFreeSchema
-  >;
+  >
 }
 
 export type Handler<ROut, Self extends Definition.Any> = (
-  payload: S.Schema.Type<Self["payload"]>,
+  payload: S.Schema.Type<Self['payload']>,
 ) => Effect.Effect<
-  S.Schema.Type<Self["result"]>,
+  S.Schema.Type<Self['result']>,
   unknown,
   WorkflowEntrypoint.WorkflowRunContext<ROut>
->;
+>
 
 export interface Options<ROut, Self extends Definition.Any> {
-  readonly run: Handler<ROut, Self>;
+  readonly run: Handler<ROut, Self>
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-};
+  readonly binding: string
+}
 
 export type TagClass<
   Self,
   Id extends string,
   Payload extends RpcDefinition.ServiceFreeSchema,
   Result extends RpcDefinition.ServiceFreeSchema,
-> = Context.ServiceClass<
-  Self,
-  `effect-cf/Workflow/${Id}`,
-  WorkflowBinding.WorkflowBindingClient<Payload, Result>
-> & {
-  readonly id: Id;
-  readonly payload: Payload;
-  readonly result: Result;
-  readonly make: <ROut, LayerError>(
-    layer: Layer.Layer<
-      ROut,
-      LayerError,
-      | Digest.Digest
-      | SecureRandom.SecureRandom
-      | ExecutionContext
-      | WorkerContext
-      | WorkerEnvironment
-    >,
-    options: Options<ROut, Definition<Id, Payload, Result>>,
-  ) => WorkflowEntrypoint.WorkflowClass<S.Codec.Encoded<Payload>, S.Codec.Encoded<Result>, ROut>;
-  readonly layer: (
-    options: LayerOptions,
-  ) => Layer.Layer<
+> =
+  & Context.ServiceClass<
     Self,
-    Binding.BindingNotFoundError | Binding.BindingValidationError,
-    WorkerEnvironment
-  >;
-  readonly create: (
-    payload: S.Schema.Type<Payload>,
-    options?: WorkflowBinding.WorkflowInstanceCreateOptions<S.Codec.Encoded<Payload>>,
-  ) => Effect.Effect<
-    WorkflowBinding.WorkflowInstance<S.Schema.Type<Result>>,
-    WorkflowBinding.WorkflowOperationError | S.SchemaError,
-    Self
-  >;
-  readonly createBatch: (
-    batch: WorkflowBinding.WorkflowInstanceCreateBatchOptions<
-      S.Schema.Type<Payload>,
-      S.Codec.Encoded<Payload>
-    >,
-  ) => Effect.Effect<
-    ReadonlyArray<WorkflowBinding.WorkflowInstance<S.Schema.Type<Result>>>,
-    WorkflowBinding.WorkflowOperationError | S.SchemaError,
-    Self
-  >;
-  readonly get: (
-    instanceId: string,
-  ) => Effect.Effect<
-    WorkflowBinding.WorkflowInstance<S.Schema.Type<Result>>,
-    WorkflowBinding.WorkflowOperationError,
-    Self
-  >;
-  readonly rawUnsafe: Effect.Effect<globalThis.Workflow<S.Codec.Encoded<Payload>>, never, Self>;
-};
+    `effect-cf/Workflow/${Id}`,
+    WorkflowBinding.WorkflowBindingClient<Payload, Result>
+  >
+  & {
+    readonly id: Id
+    readonly payload: Payload
+    readonly result: Result
+    readonly make: <ROut, LayerError>(
+      layer: Layer.Layer<
+        ROut,
+        LayerError,
+        | Digest.Digest
+        | SecureRandom.SecureRandom
+        | ExecutionContext
+        | WorkerContext
+        | WorkerEnvironment
+      >,
+      options: Options<ROut, Definition<Id, Payload, Result>>,
+    ) => WorkflowEntrypoint.WorkflowClass<S.Codec.Encoded<Payload>, S.Codec.Encoded<Result>, ROut>
+    readonly layer: (
+      options: LayerOptions,
+    ) => Layer.Layer<
+      Self,
+      Binding.BindingNotFoundError | Binding.BindingValidationError,
+      WorkerEnvironment
+    >
+    readonly create: (
+      payload: S.Schema.Type<Payload>,
+      options?: WorkflowBinding.WorkflowInstanceCreateOptions<S.Codec.Encoded<Payload>>,
+    ) => Effect.Effect<
+      WorkflowBinding.WorkflowInstance<S.Schema.Type<Result>>,
+      WorkflowBinding.WorkflowOperationError | S.SchemaError,
+      Self
+    >
+    readonly createBatch: (
+      batch: WorkflowBinding.WorkflowInstanceCreateBatchOptions<
+        S.Schema.Type<Payload>,
+        S.Codec.Encoded<Payload>
+      >,
+    ) => Effect.Effect<
+      ReadonlyArray<WorkflowBinding.WorkflowInstance<S.Schema.Type<Result>>>,
+      WorkflowBinding.WorkflowOperationError | S.SchemaError,
+      Self
+    >
+    readonly get: (
+      instanceId: string,
+    ) => Effect.Effect<
+      WorkflowBinding.WorkflowInstance<S.Schema.Type<Result>>,
+      WorkflowBinding.WorkflowOperationError,
+      Self
+    >
+    readonly rawUnsafe: Effect.Effect<globalThis.Workflow<S.Codec.Encoded<Payload>>, never, Self>
+  }
 
 const makeDefinition = <
   Id extends string,
@@ -120,16 +122,16 @@ const makeDefinition = <
 >(
   id: Id,
   definition: {
-    readonly payload: Payload;
-    readonly result: Result;
+    readonly payload: Payload
+    readonly result: Result
   },
 ) => {
-  type SelfDefinition = Definition<Id, Payload, Result>;
+  type SelfDefinition = Definition<Id, Payload, Result>
   const workflowDefinition: SelfDefinition = {
     id,
     payload: definition.payload,
     result: definition.result,
-  };
+  }
 
   return Object.assign(workflowDefinition, {
     make: <ROut, LayerError>(
@@ -147,8 +149,8 @@ const makeDefinition = <
       WorkflowEntrypoint.make(layer, {
         run: wrapHandler(workflowDefinition, options.run),
       }),
-  });
-};
+  })
+}
 
 export const make = <
   Id extends string,
@@ -157,108 +159,107 @@ export const make = <
 >(
   id: Id,
   definition: {
-    readonly payload: Payload;
-    readonly result: Result;
+    readonly payload: Payload
+    readonly result: Result
   },
-) => Tag<Definition<Id, Payload, Result>>()(id, definition);
+) => Tag<Definition<Id, Payload, Result>>()(id, definition)
 
-export const Tag =
-  <Self>() =>
-  <
-    Id extends string,
-    Payload extends RpcDefinition.ServiceFreeSchema,
-    Result extends RpcDefinition.ServiceFreeSchema,
-  >(
-    id: Id,
-    definition: {
-      readonly payload: Payload;
-      readonly result: Result;
-    },
-  ) => {
-    const workflowDefinition = makeDefinition(id, definition);
-    const tag = Context.Service<Self, WorkflowBinding.WorkflowBindingClient<Payload, Result>>()(
-      `effect-cf/Workflow/${id}` as const,
-    );
+export const Tag = <Self>() =>
+<
+  Id extends string,
+  Payload extends RpcDefinition.ServiceFreeSchema,
+  Result extends RpcDefinition.ServiceFreeSchema,
+>(
+  id: Id,
+  definition: {
+    readonly payload: Payload
+    readonly result: Result
+  },
+) => {
+  const workflowDefinition = makeDefinition(id, definition)
+  const tag = Context.Service<Self, WorkflowBinding.WorkflowBindingClient<Payload, Result>>()(
+    `effect-cf/Workflow/${id}` as const,
+  )
 
-    const layer = (binding: LayerOptions) =>
-      WorkflowBinding.layer(tag, {
-        ...binding,
-        payload: definition.payload,
-        result: definition.result,
-      });
+  const layer = (binding: LayerOptions) =>
+    WorkflowBinding.layer(tag, {
+      ...binding,
+      payload: definition.payload,
+      result: definition.result,
+    })
 
-    const create = Effect.fnUntraced(function* (
-      payload: S.Schema.Type<Payload>,
-      options?: WorkflowBinding.WorkflowInstanceCreateOptions<S.Codec.Encoded<Payload>>,
-    ) {
-      const workflow = yield* tag;
+  const create = Effect.fnUntraced(function*(
+    payload: S.Schema.Type<Payload>,
+    options?: WorkflowBinding.WorkflowInstanceCreateOptions<S.Codec.Encoded<Payload>>,
+  ) {
+    const workflow = yield* tag
 
-      return yield* workflow.create(payload, options);
-    });
+    return yield* workflow.create(payload, options)
+  })
 
-    const createBatch = Effect.fnUntraced(function* (
-      batch: WorkflowBinding.WorkflowInstanceCreateBatchOptions<
-        S.Schema.Type<Payload>,
-        S.Codec.Encoded<Payload>
-      >,
-    ) {
-      const workflow = yield* tag;
+  const createBatch = Effect.fnUntraced(function*(
+    batch: WorkflowBinding.WorkflowInstanceCreateBatchOptions<
+      S.Schema.Type<Payload>,
+      S.Codec.Encoded<Payload>
+    >,
+  ) {
+    const workflow = yield* tag
 
-      return yield* workflow.createBatch(batch);
-    });
+    return yield* workflow.createBatch(batch)
+  })
 
-    const get = Effect.fnUntraced(function* (instanceId: string) {
-      const workflow = yield* tag;
+  const get = Effect.fnUntraced(function*(instanceId: string) {
+    const workflow = yield* tag
 
-      return yield* workflow.get(instanceId);
-    });
+    return yield* workflow.get(instanceId)
+  })
 
-    const rawUnsafe = Effect.flatMap(tag, (workflow) => workflow.rawUnsafe);
+  const rawUnsafe = Effect.flatMap(tag, (workflow) => workflow.rawUnsafe)
 
-    // SAFETY: Object.assign attaches the definition-derived static helpers declared by TagClass.
-    return Object.assign(tag, {
-      id: workflowDefinition.id,
-      payload: workflowDefinition.payload,
-      result: workflowDefinition.result,
-      make: workflowDefinition.make,
-      layer,
-      create,
-      createBatch,
-      get,
-      rawUnsafe,
-    }) as TagClass<Self, Id, Payload, Result>;
-  };
+  // SAFETY: Object.assign attaches the definition-derived static helpers declared by TagClass.
+  return Object.assign(tag, {
+    id: workflowDefinition.id,
+    payload: workflowDefinition.payload,
+    result: workflowDefinition.result,
+    make: workflowDefinition.make,
+    layer,
+    create,
+    createBatch,
+    get,
+    rawUnsafe,
+  }) as TagClass<Self, Id, Payload, Result>
+}
 
-export const Workflow = Tag;
+export const Workflow = Tag
 
 const wrapHandler = <ROut, const Self extends Definition.Any>(
   definition: Self,
   handler: Handler<ROut, Self>,
 ): WorkflowEntrypoint.WorkflowHandler<
   ROut,
-  S.Codec.Encoded<Self["payload"]>,
-  S.Codec.Encoded<Self["result"]>
+  S.Codec.Encoded<Self['payload']>,
+  S.Codec.Encoded<Self['result']>
 > => {
-  const decodePayload = S.decodeUnknownEffect(definition.payload);
-  const encodeResult = S.encodeEffect(definition.result);
+  const decodePayload = S.decodeUnknownEffect(definition.payload)
+  const encodeResult = S.encodeEffect(definition.result)
 
-  return Effect.fnUntraced(function* (payload: S.Codec.Encoded<Self["payload"]>) {
-    const decodedPayload = yield* decodePayload(payload);
-    const event = yield* WorkflowEntrypoint.WorkflowEvent;
+  return Effect.fnUntraced(function*(payload: S.Codec.Encoded<Self['payload']>) {
+    const decodedPayload = yield* decodePayload(payload)
+    const event = yield* WorkflowEntrypoint.WorkflowEvent
     // SAFETY: replacing the encoded event payload with its schema-decoded value establishes this service type.
     const decodedEvent = {
       ...event,
       payload: decodedPayload,
-    } as WorkflowEntrypoint.WorkflowEventService<S.Schema.Type<Self["payload"]>>;
+    } as WorkflowEntrypoint.WorkflowEventService<S.Schema.Type<Self['payload']>>
     const result = yield* handler(decodedPayload).pipe(
       Effect.provideService(WorkflowEntrypoint.WorkflowEvent, decodedEvent),
-    );
+    )
 
-    return yield* encodeResult(result);
-  });
-};
+    return yield* encodeResult(result)
+  })
+}
 
 export const implement = <ROut, const Self extends Definition.Any>(
   _definition: Self,
   handler: Handler<ROut, Self>,
-): Handler<ROut, Self> => handler;
+): Handler<ROut, Self> => handler

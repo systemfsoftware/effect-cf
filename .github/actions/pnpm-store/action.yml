@@ -1,0 +1,38 @@
+name: pnpm store cache
+description: Restore the pnpm store in every run; let only a push to main write it, so a pull request never creates a cache entry.
+inputs:
+  mode:
+    description: restore locates and restores the store; save writes the store after an install, and only from a push to main
+    required: false
+    default: restore
+  key:
+    description: the primary key a restore resolved, required when mode is save
+    required: false
+    default: ""
+outputs:
+  hit:
+    description: whether the store was restored under its own lockfile key
+    value: ${{ steps.restore.outputs.cache-hit }}
+  key:
+    description: the primary key the restore resolved, to hand to a save
+    value: ${{ steps.restore.outputs.cache-primary-key }}
+runs:
+  using: composite
+  steps:
+    - id: store
+      name: Locate the pnpm store
+      shell: bash
+      run: echo "path=$(pnpm store path --silent)" >> "$GITHUB_OUTPUT"
+    - id: restore
+      if: inputs.mode == 'restore'
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: pnpm-store-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: pnpm-store-${{ runner.os }}-${{ runner.arch }}-
+    - name: Save the pnpm store from main
+      if: inputs.mode == 'save' && github.event_name == 'push' && github.ref == 'refs/heads/main' && inputs.key != ''
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
+      with:
+        path: ${{ steps.store.outputs.path }}
+        key: ${{ inputs.key }}

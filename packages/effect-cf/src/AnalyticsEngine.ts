@@ -1,27 +1,27 @@
-import * as Config from "effect/Config";
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import * as Result from "effect/Result";
-import * as S from "effect/Schema";
-import type { Redacted } from "effect";
-import * as FetchHttpClient from "effect/http/FetchHttpClient";
-import * as HttpClient from "effect/http/HttpClient";
-import * as HttpClientRequest from "effect/http/HttpClientRequest";
-import type { Headers, HttpClientResponse } from "effect/http";
+import type { Redacted } from 'effect'
+import * as Config from 'effect/Config'
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import type { Headers, HttpClientResponse } from 'effect/http'
+import * as FetchHttpClient from 'effect/http/FetchHttpClient'
+import * as HttpClient from 'effect/http/HttpClient'
+import * as HttpClientRequest from 'effect/http/HttpClientRequest'
+import * as Layer from 'effect/Layer'
+import * as Option from 'effect/Option'
+import * as Predicate from 'effect/Predicate'
+import * as Result from 'effect/Result'
+import * as S from 'effect/Schema'
 
-import * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
-const expectedAnalyticsEngineDataset = "Analytics Engine dataset binding with writeDataPoint()";
-const defaultQueryApiBaseUrl = "https://api.cloudflare.com/client/v4";
-const textEncoder = new TextEncoder();
+const expectedAnalyticsEngineDataset = 'Analytics Engine dataset binding with writeDataPoint()'
+const defaultQueryApiBaseUrl = 'https://api.cloudflare.com/client/v4'
+const textEncoder = new TextEncoder()
 
 export const writeLimits = {
   maxBlobs: 20,
@@ -30,222 +30,230 @@ export const writeLimits = {
   maxBlobBytes: 16 * 1024,
   maxIndexBytes: 96,
   maxDataPointsPerInvocation: 250,
-} as const;
+} as const
 
 const queryColumnSchema = S.Struct({
   name: S.String,
   type: S.String,
-});
+})
 
-const queryRowSchema = S.Record(S.String, S.Unknown);
+const queryRowSchema = S.Record(S.String, S.Unknown)
 
 const queryResponseSchema = S.Struct({
   meta: S.Array(queryColumnSchema),
   data: S.Array(queryRowSchema),
   rows: S.Finite,
-});
+})
 
 export const AnalyticsEngineFieldValueSchema = S.NullOr(
   S.Union([S.String, S.instanceOf(ArrayBuffer)]),
-);
+)
 
 export const AnalyticsEngineDataPointSchema = S.Struct({
   indexes: S.optional(S.Array(AnalyticsEngineFieldValueSchema)),
   doubles: S.optional(S.Array(S.Finite)),
   blobs: S.optional(S.Array(AnalyticsEngineFieldValueSchema)),
-});
+})
 
-const decodeQueryResponse = S.decodeUnknownEffect(queryResponseSchema);
-const decodeDataPoint = S.decodeUnknownEffect(AnalyticsEngineDataPointSchema);
+const decodeQueryResponse = S.decodeUnknownEffect(queryResponseSchema)
+const decodeDataPoint = S.decodeUnknownEffect(AnalyticsEngineDataPointSchema)
 
 export class AnalyticsEngineOperationError extends Data.TaggedError(
-  "AnalyticsEngineOperationError",
+  'AnalyticsEngineOperationError',
 )<{
-  readonly binding: string;
-  readonly operation: string;
-  readonly cause: unknown;
+  readonly binding: string
+  readonly operation: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Analytics Engine ${this.operation} failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Analytics Engine ${this.operation} failed for binding "${this.binding}": ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
 export interface AnalyticsEngineWriteViolation {
-  readonly path: string;
-  readonly message: string;
-  readonly limit?: number;
-  readonly actual?: number;
+  readonly path: string
+  readonly message: string
+  readonly limit?: number
+  readonly actual?: number
 }
 
 export class AnalyticsEngineWriteValidationError extends Data.TaggedError(
-  "AnalyticsEngineWriteValidationError",
+  'AnalyticsEngineWriteValidationError',
 )<{
-  readonly binding: string;
-  readonly operation: string;
-  readonly violations: ReadonlyArray<AnalyticsEngineWriteViolation>;
-  readonly cause?: unknown;
+  readonly binding: string
+  readonly operation: string
+  readonly violations: ReadonlyArray<AnalyticsEngineWriteViolation>
+  readonly cause?: unknown
 }> {
   override get message(): string {
-    return `Analytics Engine ${this.operation} for binding "${this.binding}" failed validation: ${ErrorMessage.violationsMessage(this.violations)}`;
+    return `Analytics Engine ${this.operation} for binding "${this.binding}" failed validation: ${
+      ErrorMessage.violationsMessage(this.violations)
+    }`
   }
 }
 
-export class AnalyticsEngineQueryError extends Data.TaggedError("AnalyticsEngineQueryError")<{
-  readonly operation: string;
-  readonly accountId: string;
-  readonly message: string;
-  readonly status?: number;
-  readonly body?: string;
-  readonly cause?: unknown;
+export class AnalyticsEngineQueryError extends Data.TaggedError('AnalyticsEngineQueryError')<{
+  readonly operation: string
+  readonly accountId: string
+  readonly message: string
+  readonly status?: number
+  readonly body?: string
+  readonly cause?: unknown
 }> {}
 
 export interface AnalyticsEngineDefinition {
-  readonly binding: string;
+  readonly binding: string
 }
 
-export type AnalyticsEngineBinding = AnalyticsEngineDataset;
-export type AnalyticsEngineDataPoint = globalThis.AnalyticsEngineDataPoint;
-export type AnalyticsEngineFieldValue = ArrayBuffer | string | null;
+export type AnalyticsEngineBinding = AnalyticsEngineDataset
+export type AnalyticsEngineDataPoint = globalThis.AnalyticsEngineDataPoint
+export type AnalyticsEngineFieldValue = ArrayBuffer | string | null
 export type AnalyticsEngineWriteError =
   | AnalyticsEngineOperationError
-  | AnalyticsEngineWriteValidationError;
-export type AnalyticsEngineInvalidWritePolicy = "error" | "drop";
-export type AnalyticsEngineQueryColumn = typeof queryColumnSchema.Type;
-export type AnalyticsEngineQueryRow = typeof queryRowSchema.Type;
+  | AnalyticsEngineWriteValidationError
+export type AnalyticsEngineInvalidWritePolicy = 'error' | 'drop'
+export type AnalyticsEngineQueryColumn = typeof queryColumnSchema.Type
+export type AnalyticsEngineQueryRow = typeof queryRowSchema.Type
 
 export interface AnalyticsEngineWriteOptions {
   /**
    * Controls invalid write behavior. The default is `"error"`, which fails with
    * `AnalyticsEngineWriteValidationError`. `"drop"` skips invalid points.
    */
-  readonly onInvalid?: AnalyticsEngineInvalidWritePolicy;
+  readonly onInvalid?: AnalyticsEngineInvalidWritePolicy
 }
 
-export type AnalyticsEngineWritePolicy = AnalyticsEngineWriteOptions;
+export type AnalyticsEngineWritePolicy = AnalyticsEngineWriteOptions
 
 export interface AnalyticsEngineQueryResult<Row = AnalyticsEngineQueryRow> {
-  readonly meta: ReadonlyArray<AnalyticsEngineQueryColumn>;
-  readonly data: ReadonlyArray<Row>;
-  readonly rows: number;
+  readonly meta: ReadonlyArray<AnalyticsEngineQueryColumn>
+  readonly data: ReadonlyArray<Row>
+  readonly rows: number
 }
 
 export interface AnalyticsEngineQueryDefinition {
-  readonly accountId: string;
+  readonly accountId: string
   /** API token with Account Analytics Read permission. */
-  readonly apiToken: Redacted.Redacted<string>;
-  readonly apiBaseUrl?: string | URL;
+  readonly apiToken: Redacted.Redacted<string>
+  readonly apiBaseUrl?: string | URL
 }
 
 export interface AnalyticsEngineQueryOptions {
   /** Additional request headers. Authorization is always derived from `apiToken`. */
-  readonly headers?: Headers.Input;
+  readonly headers?: Headers.Input
 }
 
 export interface AnalyticsEngineClient {
   readonly writeDataPoint: (
     dataPoint?: AnalyticsEngineDataPoint,
     options?: AnalyticsEngineWriteOptions,
-  ) => Effect.Effect<void, AnalyticsEngineWriteError>;
+  ) => Effect.Effect<void, AnalyticsEngineWriteError>
   readonly writeDataPoints: (
     dataPoints: ReadonlyArray<AnalyticsEngineDataPoint>,
     options?: AnalyticsEngineWriteOptions,
-  ) => Effect.Effect<void, AnalyticsEngineWriteError>;
-  readonly rawUnsafe: Effect.Effect<AnalyticsEngineBinding>;
-  readonly definition: AnalyticsEngineDefinition;
+  ) => Effect.Effect<void, AnalyticsEngineWriteError>
+  readonly rawUnsafe: Effect.Effect<AnalyticsEngineBinding>
+  readonly definition: AnalyticsEngineDefinition
 }
 
 export interface AnalyticsEngineQueryClient {
   readonly query: (
     sql: string,
     options?: AnalyticsEngineQueryOptions,
-  ) => Effect.Effect<AnalyticsEngineQueryResult, AnalyticsEngineQueryError | S.SchemaError>;
+  ) => Effect.Effect<AnalyticsEngineQueryResult, AnalyticsEngineQueryError | S.SchemaError>
   readonly queryResult: <Row>(
     row: S.Codec<Row, unknown>,
     sql: string,
     options?: AnalyticsEngineQueryOptions,
-  ) => Effect.Effect<AnalyticsEngineQueryResult<Row>, AnalyticsEngineQueryError | S.SchemaError>;
+  ) => Effect.Effect<AnalyticsEngineQueryResult<Row>, AnalyticsEngineQueryError | S.SchemaError>
   readonly queryRows: <Row>(
     row: S.Codec<Row, unknown>,
     sql: string,
     options?: AnalyticsEngineQueryOptions,
-  ) => Effect.Effect<ReadonlyArray<Row>, AnalyticsEngineQueryError | S.SchemaError>;
+  ) => Effect.Effect<ReadonlyArray<Row>, AnalyticsEngineQueryError | S.SchemaError>
   readonly queryOne: <Row>(
     row: S.Codec<Row, unknown>,
     sql: string,
     options?: AnalyticsEngineQueryOptions,
-  ) => Effect.Effect<Option.Option<Row>, AnalyticsEngineQueryError | S.SchemaError>;
+  ) => Effect.Effect<Option.Option<Row>, AnalyticsEngineQueryError | S.SchemaError>
   readonly queryText: (
     sql: string,
     options?: AnalyticsEngineQueryOptions,
-  ) => Effect.Effect<string, AnalyticsEngineQueryError>;
+  ) => Effect.Effect<string, AnalyticsEngineQueryError>
   readonly raw: (
     sql: string,
     options?: AnalyticsEngineQueryOptions,
-  ) => Effect.Effect<HttpClientResponse.HttpClientResponse, AnalyticsEngineQueryError>;
-  readonly definition: AnalyticsEngineQueryDefinition;
+  ) => Effect.Effect<HttpClientResponse.HttpClientResponse, AnalyticsEngineQueryError>
+  readonly definition: AnalyticsEngineQueryDefinition
 }
 
-declare const AnalyticsEngineServiceTypeId: unique symbol;
-declare const AnalyticsEngineQueryServiceTypeId: unique symbol;
+declare const AnalyticsEngineServiceTypeId: unique symbol
+declare const AnalyticsEngineQueryServiceTypeId: unique symbol
 
 export interface AnalyticsEngineService<Id extends string> {
   readonly [AnalyticsEngineServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export interface AnalyticsEngineQueryService<Id extends string> {
   readonly [AnalyticsEngineQueryServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-  readonly write?: AnalyticsEngineWritePolicy;
-};
+  readonly binding: string
+  readonly write?: AnalyticsEngineWritePolicy
+}
 
 export type QueryConfigOptions = {
-  readonly accountId?: Config.Config<string>;
-  readonly apiToken?: Config.Config<Redacted.Redacted<string>>;
-  readonly apiBaseUrl?: Config.Config<string>;
-};
+  readonly accountId?: Config.Config<string>
+  readonly apiToken?: Config.Config<Redacted.Redacted<string>>
+  readonly apiBaseUrl?: Config.Config<string>
+}
 
-export interface TagClass<Self, Id extends string> extends Context.ServiceClass<
-  Self,
-  Id,
-  AnalyticsEngineClient
-> {
-  readonly id: Id;
+export interface TagClass<Self, Id extends string> extends
+  Context.ServiceClass<
+    Self,
+    Id,
+    AnalyticsEngineClient
+  >
+{
+  readonly id: Id
   readonly layer: (
     options: LayerOptions,
   ) => Layer.Layer<
     Self,
     Binding.BindingNotFoundError | Binding.BindingValidationError,
     WorkerEnvironment
-  >;
+  >
 }
 
-export interface QueryTagClass<Self, Id extends string> extends Context.ServiceClass<
-  Self,
-  Id,
-  AnalyticsEngineQueryClient
-> {
-  readonly id: Id;
+export interface QueryTagClass<Self, Id extends string> extends
+  Context.ServiceClass<
+    Self,
+    Id,
+    AnalyticsEngineQueryClient
+  >
+{
+  readonly id: Id
   readonly layer: (
     definition: AnalyticsEngineQueryDefinition,
-  ) => Layer.Layer<Self, never, HttpClient.HttpClient>;
-  readonly layerFetch: (definition: AnalyticsEngineQueryDefinition) => Layer.Layer<Self>;
+  ) => Layer.Layer<Self, never, HttpClient.HttpClient>
+  readonly layerFetch: (definition: AnalyticsEngineQueryDefinition) => Layer.Layer<Self>
   readonly layerConfig: (
     config?: Config.Config<AnalyticsEngineQueryDefinition>,
-  ) => Layer.Layer<Self, Config.ConfigError, HttpClient.HttpClient>;
+  ) => Layer.Layer<Self, Config.ConfigError, HttpClient.HttpClient>
   readonly layerFetchConfig: (
     config?: Config.Config<AnalyticsEngineQueryDefinition>,
-  ) => Layer.Layer<Self, Config.ConfigError>;
+  ) => Layer.Layer<Self, Config.ConfigError>
 }
 
 const analyticsEngineError = (binding: string, operation: string, cause: unknown) =>
-  new AnalyticsEngineOperationError({ binding, operation, cause });
+  new AnalyticsEngineOperationError({ binding, operation, cause })
 
 const analyticsEngineWriteValidationError = (
   binding: string,
@@ -258,16 +266,16 @@ const analyticsEngineWriteValidationError = (
     operation,
     violations,
     cause,
-  });
+  })
 
 const analyticsEngineQueryError = (
   definition: AnalyticsEngineQueryDefinition,
   operation: string,
   message: string,
   options?: {
-    readonly status?: number;
-    readonly body?: string;
-    readonly cause?: unknown;
+    readonly status?: number
+    readonly body?: string
+    readonly cause?: unknown
   },
 ) =>
   new AnalyticsEngineQueryError({
@@ -277,7 +285,7 @@ const analyticsEngineQueryError = (
     status: options?.status,
     body: options?.body,
     cause: options?.cause,
-  });
+  })
 
 const tryAnalyticsEngineSync = <A>(
   binding: string,
@@ -287,27 +295,26 @@ const tryAnalyticsEngineSync = <A>(
   Effect.try({
     try: evaluate,
     catch: (cause) => analyticsEngineError(binding, operation, cause),
-  });
+  })
 
 const resolveWritePolicy = (
   defaults: AnalyticsEngineWritePolicy | undefined,
   options: AnalyticsEngineWriteOptions | undefined,
 ) => ({
-  onInvalid: options?.onInvalid ?? defaults?.onInvalid ?? "error",
-});
+  onInvalid: options?.onInvalid ?? defaults?.onInvalid ?? 'error',
+})
 
-const fieldPath = (prefix: string, field: string) => (prefix === "" ? field : `${prefix}.${field}`);
+const fieldPath = (prefix: string, field: string) => (prefix === '' ? field : `${prefix}.${field}`)
 
-const indexedPath = (prefix: string, field: string, index: number) =>
-  `${fieldPath(prefix, field)}[${index}]`;
+const indexedPath = (prefix: string, field: string, index: number) => `${fieldPath(prefix, field)}[${index}]`
 
 const byteLength = (value: AnalyticsEngineFieldValue) => {
   if (value === null) {
-    return 0;
+    return 0
   }
 
-  return Predicate.isString(value) ? textEncoder.encode(value).byteLength : value.byteLength;
-};
+  return Predicate.isString(value) ? textEncoder.encode(value).byteLength : value.byteLength
+}
 
 const lengthViolation = (
   path: string,
@@ -319,109 +326,109 @@ const lengthViolation = (
   message: `${label} exceeds Cloudflare Analytics Engine limit`,
   actual,
   limit,
-});
+})
 
 const validateDataPointLimits = (
   dataPoint: AnalyticsEngineDataPoint,
-  pathPrefix = "",
+  pathPrefix = '',
 ): ReadonlyArray<AnalyticsEngineWriteViolation> => {
-  const violations: Array<AnalyticsEngineWriteViolation> = [];
+  const violations: Array<AnalyticsEngineWriteViolation> = []
 
   if (dataPoint.blobs !== undefined && dataPoint.blobs.length > writeLimits.maxBlobs) {
     violations.push(
       lengthViolation(
-        fieldPath(pathPrefix, "blobs"),
-        "blobs",
+        fieldPath(pathPrefix, 'blobs'),
+        'blobs',
         dataPoint.blobs.length,
         writeLimits.maxBlobs,
       ),
-    );
+    )
   }
 
   if (dataPoint.doubles !== undefined && dataPoint.doubles.length > writeLimits.maxDoubles) {
     violations.push(
       lengthViolation(
-        fieldPath(pathPrefix, "doubles"),
-        "doubles",
+        fieldPath(pathPrefix, 'doubles'),
+        'doubles',
         dataPoint.doubles.length,
         writeLimits.maxDoubles,
       ),
-    );
+    )
   }
 
   if (dataPoint.indexes !== undefined && dataPoint.indexes.length > writeLimits.maxIndexes) {
     violations.push(
       lengthViolation(
-        fieldPath(pathPrefix, "indexes"),
-        "indexes",
+        fieldPath(pathPrefix, 'indexes'),
+        'indexes',
         dataPoint.indexes.length,
         writeLimits.maxIndexes,
       ),
-    );
+    )
   }
 
   if (dataPoint.blobs !== undefined) {
-    const blobBytes = dataPoint.blobs.reduce((total, value) => total + byteLength(value), 0);
+    const blobBytes = dataPoint.blobs.reduce((total, value) => total + byteLength(value), 0)
 
     if (blobBytes > writeLimits.maxBlobBytes) {
       violations.push(
         lengthViolation(
-          fieldPath(pathPrefix, "blobs"),
-          "blob bytes",
+          fieldPath(pathPrefix, 'blobs'),
+          'blob bytes',
           blobBytes,
           writeLimits.maxBlobBytes,
         ),
-      );
+      )
     }
   }
 
   if (dataPoint.indexes !== undefined) {
     for (let index = 0; index < dataPoint.indexes.length; index++) {
-      const indexBytes = byteLength(dataPoint.indexes[index] ?? null);
+      const indexBytes = byteLength(dataPoint.indexes[index] ?? null)
 
       if (indexBytes > writeLimits.maxIndexBytes) {
         violations.push(
           lengthViolation(
-            indexedPath(pathPrefix, "indexes", index),
-            "index bytes",
+            indexedPath(pathPrefix, 'indexes', index),
+            'index bytes',
             indexBytes,
             writeLimits.maxIndexBytes,
           ),
-        );
+        )
       }
     }
   }
 
-  return violations;
-};
+  return violations
+}
 
 const schemaViolation = (
   pathPrefix: string,
   cause: S.SchemaError,
 ): AnalyticsEngineWriteViolation => ({
-  path: pathPrefix === "" ? "$" : pathPrefix,
+  path: pathPrefix === '' ? '$' : pathPrefix,
   message: cause.message,
-});
+})
 
 const toAnalyticsEngineDataPoint = (
   dataPoint: typeof AnalyticsEngineDataPointSchema.Type,
 ): AnalyticsEngineDataPoint => {
-  const result: AnalyticsEngineDataPoint = {};
+  const result: AnalyticsEngineDataPoint = {}
 
-  if (dataPoint.indexes !== undefined) result.indexes = [...dataPoint.indexes];
-  if (dataPoint.doubles !== undefined) result.doubles = [...dataPoint.doubles];
-  if (dataPoint.blobs !== undefined) result.blobs = [...dataPoint.blobs];
+  if (dataPoint.indexes !== undefined) result.indexes = [...dataPoint.indexes]
+  if (dataPoint.doubles !== undefined) result.doubles = [...dataPoint.doubles]
+  if (dataPoint.blobs !== undefined) result.blobs = [...dataPoint.blobs]
 
-  return result;
-};
+  return result
+}
 
 const validateDataPoint = (
   binding: string,
   operation: string,
   dataPoint: AnalyticsEngineDataPoint,
-  pathPrefix = "",
+  pathPrefix = '',
 ): Effect.Effect<AnalyticsEngineDataPoint, AnalyticsEngineWriteValidationError> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const decoded = yield* decodeDataPoint(dataPoint).pipe(
       Effect.mapError((cause) =>
         analyticsEngineWriteValidationError(
@@ -429,18 +436,18 @@ const validateDataPoint = (
           operation,
           [schemaViolation(pathPrefix, cause)],
           cause,
-        ),
+        )
       ),
-    );
-    const validated = toAnalyticsEngineDataPoint(decoded);
-    const violations = validateDataPointLimits(validated, pathPrefix);
+    )
+    const validated = toAnalyticsEngineDataPoint(decoded)
+    const violations = validateDataPointLimits(validated, pathPrefix)
 
     if (violations.length > 0) {
-      return yield* analyticsEngineWriteValidationError(binding, operation, violations);
+      return yield* analyticsEngineWriteValidationError(binding, operation, violations)
     }
 
-    return validated;
-  });
+    return validated
+  })
 
 const validateOptionalDataPoint = (
   binding: string,
@@ -449,7 +456,7 @@ const validateOptionalDataPoint = (
 ): Effect.Effect<AnalyticsEngineDataPoint | undefined, AnalyticsEngineWriteValidationError> =>
   dataPoint === undefined
     ? Effect.as(Effect.void, undefined)
-    : validateDataPoint(binding, operation, dataPoint);
+    : validateDataPoint(binding, operation, dataPoint)
 
 const validateDataPoints = (
   binding: string,
@@ -457,47 +464,46 @@ const validateDataPoints = (
   dataPoints: ReadonlyArray<AnalyticsEngineDataPoint>,
   policy: ReturnType<typeof resolveWritePolicy>,
 ): Effect.Effect<ReadonlyArray<AnalyticsEngineDataPoint>, AnalyticsEngineWriteValidationError> =>
-  Effect.gen(function* () {
-    const points =
-      dataPoints.length > writeLimits.maxDataPointsPerInvocation && policy.onInvalid === "drop"
-        ? dataPoints.slice(0, writeLimits.maxDataPointsPerInvocation)
-        : dataPoints;
-    const violations: Array<AnalyticsEngineWriteViolation> = [];
+  Effect.gen(function*() {
+    const points = dataPoints.length > writeLimits.maxDataPointsPerInvocation && policy.onInvalid === 'drop'
+      ? dataPoints.slice(0, writeLimits.maxDataPointsPerInvocation)
+      : dataPoints
+    const violations: Array<AnalyticsEngineWriteViolation> = []
 
     if (
       dataPoints.length > writeLimits.maxDataPointsPerInvocation &&
-      policy.onInvalid === "error"
+      policy.onInvalid === 'error'
     ) {
       violations.push(
         lengthViolation(
-          "dataPoints",
-          "data points per Worker invocation",
+          'dataPoints',
+          'data points per Worker invocation',
           dataPoints.length,
           writeLimits.maxDataPointsPerInvocation,
         ),
-      );
+      )
     }
 
-    const validPoints: Array<AnalyticsEngineDataPoint> = [];
+    const validPoints: Array<AnalyticsEngineDataPoint> = []
 
     for (let index = 0; index < points.length; index++) {
       const result = yield* Effect.result(
         validateDataPoint(binding, operation, points[index], `dataPoints[${index}]`),
-      );
+      )
 
       if (Result.isSuccess(result)) {
-        validPoints.push(result.success);
-      } else if (policy.onInvalid === "error") {
-        violations.push(...result.failure.violations);
+        validPoints.push(result.success)
+      } else if (policy.onInvalid === 'error') {
+        violations.push(...result.failure.violations)
       }
     }
 
     if (violations.length > 0) {
-      return yield* analyticsEngineWriteValidationError(binding, operation, violations);
+      return yield* analyticsEngineWriteValidationError(binding, operation, violations)
     }
 
-    return validPoints;
-  });
+    return validPoints
+  })
 
 const writeChunks = (
   binding: string,
@@ -505,20 +511,20 @@ const writeChunks = (
   dataset: AnalyticsEngineBinding,
   dataPoints: ReadonlyArray<AnalyticsEngineDataPoint>,
 ): Effect.Effect<void, AnalyticsEngineOperationError> =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     for (const point of dataPoints) {
-      yield* tryAnalyticsEngineSync(binding, operation, () => dataset.writeDataPoint(point));
+      yield* tryAnalyticsEngineSync(binding, operation, () => dataset.writeDataPoint(point))
     }
-  });
+  })
 
 const queryApiUrl = (definition: AnalyticsEngineQueryDefinition) => {
-  const baseUrl = new URL(definition.apiBaseUrl ?? defaultQueryApiBaseUrl);
-  const pathname = baseUrl.pathname.replace(/\/+$/, "");
+  const baseUrl = new URL(definition.apiBaseUrl ?? defaultQueryApiBaseUrl)
+  const pathname = baseUrl.pathname.replace(/\/+$/, '')
 
-  baseUrl.pathname = `${pathname}/accounts/${definition.accountId}/analytics_engine/sql`;
+  baseUrl.pathname = `${pathname}/accounts/${definition.accountId}/analytics_engine/sql`
 
-  return baseUrl.href;
-};
+  return baseUrl.href
+}
 
 const queryRequest = (
   definition: AnalyticsEngineQueryDefinition,
@@ -526,15 +532,15 @@ const queryRequest = (
   options?: AnalyticsEngineQueryOptions,
 ) => {
   let request = HttpClientRequest.post(queryApiUrl(definition)).pipe(
-    HttpClientRequest.bodyText(sql, "text/plain;charset=UTF-8"),
-  );
+    HttpClientRequest.bodyText(sql, 'text/plain;charset=UTF-8'),
+  )
 
   if (options?.headers !== undefined) {
-    request = HttpClientRequest.setHeaders(request, options.headers);
+    request = HttpClientRequest.setHeaders(request, options.headers)
   }
 
-  return HttpClientRequest.bearerToken(request, definition.apiToken);
-};
+  return HttpClientRequest.bearerToken(request, definition.apiToken)
+}
 
 const responseText = (
   definition: AnalyticsEngineQueryDefinition,
@@ -546,11 +552,11 @@ const responseText = (
       analyticsEngineQueryError(
         definition,
         operation,
-        "Failed to read Analytics Engine SQL API response body",
+        'Failed to read Analytics Engine SQL API response body',
         { cause },
-      ),
+      )
     ),
-  );
+  )
 
 const executeQueryRequest = (
   definition: AnalyticsEngineQueryDefinition,
@@ -558,81 +564,80 @@ const executeQueryRequest = (
   sql: string,
   options?: AnalyticsEngineQueryOptions,
 ) =>
-  Effect.gen(function* () {
+  Effect.gen(function*() {
     const request = yield* Effect.try({
       try: () => queryRequest(definition, sql, options),
       catch: (cause) =>
-        analyticsEngineQueryError(definition, "query", "Invalid Analytics Engine SQL API URL", {
+        analyticsEngineQueryError(definition, 'query', 'Invalid Analytics Engine SQL API URL', {
           cause,
         }),
-    });
+    })
     const response = yield* httpClient.execute(request).pipe(
       Effect.mapError((cause) =>
-        analyticsEngineQueryError(definition, "query", "Analytics Engine SQL API request failed", {
+        analyticsEngineQueryError(definition, 'query', 'Analytics Engine SQL API request failed', {
           cause,
-        }),
+        })
       ),
-    );
+    )
 
     if (response.status < 200 || response.status >= 300) {
-      const body = yield* responseText(definition, response, "queryErrorBody");
+      const body = yield* responseText(definition, response, 'queryErrorBody')
 
       return yield* analyticsEngineQueryError(
         definition,
-        "query",
+        'query',
         `Analytics Engine SQL API returned HTTP ${response.status}`,
         { status: response.status, body },
-      );
+      )
     }
 
-    return response;
-  });
+    return response
+  })
 
 const makeQueryClientWith = (
   definition: AnalyticsEngineQueryDefinition,
   httpClient: HttpClient.HttpClient,
 ): AnalyticsEngineQueryClient => {
-  const raw = Effect.fn("AnalyticsEngine.raw")(
-    (sql: string, options?: AnalyticsEngineQueryOptions) =>
-      executeQueryRequest(definition, httpClient, sql, options),
-  );
-  const query = Effect.fn("AnalyticsEngine.query")(function* (
+  const raw = Effect.fn('AnalyticsEngine.raw')(
+    (sql: string, options?: AnalyticsEngineQueryOptions) => executeQueryRequest(definition, httpClient, sql, options),
+  )
+  const query = Effect.fn('AnalyticsEngine.query')(function*(
     sql: string,
     options?: AnalyticsEngineQueryOptions,
   ) {
-    const response = yield* raw(sql, options);
+    const response = yield* raw(sql, options)
     const json = yield* response.json.pipe(
       Effect.mapError((cause) =>
         analyticsEngineQueryError(
           definition,
-          "json",
-          "Failed to read Analytics Engine SQL API JSON response body",
+          'json',
+          'Failed to read Analytics Engine SQL API JSON response body',
           { cause },
-        ),
+        )
       ),
-    );
+    )
 
-    return yield* decodeQueryResponse(json);
-  });
-  const queryResult = Effect.fn("AnalyticsEngine.queryResult")(function* <Row>(
+    return yield* decodeQueryResponse(json)
+  })
+  const queryResult = Effect.fn('AnalyticsEngine.queryResult')(function*<Row>(
     row: S.Codec<Row, unknown>,
     sql: string,
     options?: AnalyticsEngineQueryOptions,
   ) {
-    const result = yield* query(sql, options);
-    const decodeRow = S.decodeUnknownEffect(row);
-    const data: Array<Row> = [];
+    const result = yield* query(sql, options)
+    const decodeRow = S.decodeUnknownEffect(row)
+    const data: Array<Row> = []
 
     for (const value of result.data) {
-      data.push(yield* decodeRow(value));
+      data.push(yield* decodeRow(value))
     }
 
     return {
       ...result,
       data,
       rows: result.rows,
-    } satisfies AnalyticsEngineQueryResult<Row>;
-  });
+    } satisfies AnalyticsEngineQueryResult<Row>
+  })
 
   return {
     definition,
@@ -642,93 +647,88 @@ const makeQueryClientWith = (
     queryRows: (row, sql, options) =>
       queryResult(row, sql, options).pipe(
         Effect.map((result) => result.data),
-        Effect.withSpan("AnalyticsEngine.queryRows"),
+        Effect.withSpan('AnalyticsEngine.queryRows'),
       ),
     queryOne: (row, sql, options) =>
       queryResult(row, sql, options).pipe(
-        Effect.map((result) =>
-          result.data[0] === undefined ? Option.none() : Option.some(result.data[0]),
-        ),
-        Effect.withSpan("AnalyticsEngine.queryOne"),
+        Effect.map((result) => result.data[0] === undefined ? Option.none() : Option.some(result.data[0])),
+        Effect.withSpan('AnalyticsEngine.queryOne'),
       ),
-    queryText: Effect.fn("AnalyticsEngine.queryText")(
+    queryText: Effect.fn('AnalyticsEngine.queryText')(
       (sql: string, options?: AnalyticsEngineQueryOptions) =>
         raw(sql, options).pipe(
-          Effect.flatMap((response) => responseText(definition, response, "text")),
+          Effect.flatMap((response) => responseText(definition, response, 'text')),
         ),
     ),
-  };
-};
+  }
+}
 
 export const makeQueryClient = (definition: AnalyticsEngineQueryDefinition) =>
-  Effect.map(HttpClient.HttpClient, (httpClient) => makeQueryClientWith(definition, httpClient));
+  Effect.map(HttpClient.HttpClient, (httpClient) => makeQueryClientWith(definition, httpClient))
 
 export const isAnalyticsEngineDataset = <Candidate>(
   value: Candidate,
 ): value is Candidate & AnalyticsEngineBinding =>
-  Predicate.hasProperty(value, "writeDataPoint") && Predicate.isFunction(value.writeDataPoint);
+  Predicate.hasProperty(value, 'writeDataPoint') && Predicate.isFunction(value.writeDataPoint)
 
 export const makeClient =
   (definition: AnalyticsEngineDefinition, defaults?: AnalyticsEngineWritePolicy) =>
   (dataset: AnalyticsEngineBinding): AnalyticsEngineClient => {
-    const writeDataPoint = Effect.fn("AnalyticsEngine.writeDataPoint")((
+    const writeDataPoint = Effect.fn('AnalyticsEngine.writeDataPoint')((
       dataPoint?: AnalyticsEngineDataPoint,
       options?: AnalyticsEngineWriteOptions,
     ) => {
-      const policy = resolveWritePolicy(defaults, options);
+      const policy = resolveWritePolicy(defaults, options)
 
-      return validateOptionalDataPoint(definition.binding, "writeDataPoint", dataPoint).pipe(
+      return validateOptionalDataPoint(definition.binding, 'writeDataPoint', dataPoint).pipe(
         Effect.matchEffect({
-          onFailure: (error) => (policy.onInvalid === "drop" ? Effect.void : Effect.fail(error)),
+          onFailure: (error) => (policy.onInvalid === 'drop' ? Effect.void : Effect.fail(error)),
           onSuccess: (point) =>
-            tryAnalyticsEngineSync(definition.binding, "writeDataPoint", () =>
-              dataset.writeDataPoint(point),
-            ),
+            tryAnalyticsEngineSync(definition.binding, 'writeDataPoint', () => dataset.writeDataPoint(point)),
         }),
-      );
-    });
+      )
+    })
 
-    const writeDataPoints = Effect.fn("AnalyticsEngine.writeDataPoints")(function* (
+    const writeDataPoints = Effect.fn('AnalyticsEngine.writeDataPoints')(function*(
       dataPoints: ReadonlyArray<AnalyticsEngineDataPoint>,
       options?: AnalyticsEngineWriteOptions,
     ) {
-      const policy = resolveWritePolicy(defaults, options);
+      const policy = resolveWritePolicy(defaults, options)
       const validPoints = yield* validateDataPoints(
         definition.binding,
-        "writeDataPoints",
+        'writeDataPoints',
         dataPoints,
         policy,
-      );
+      )
 
-      yield* writeChunks(definition.binding, "writeDataPoints", dataset, validPoints);
-    });
+      yield* writeChunks(definition.binding, 'writeDataPoints', dataset, validPoints)
+    })
 
     return {
       definition,
       writeDataPoint,
       writeDataPoints,
       rawUnsafe: Effect.succeed(dataset),
-    };
-  };
+    }
+  }
 
 export const queryConfig = (options?: QueryConfigOptions) =>
   Config.all({
-    accountId: options?.accountId ?? Config.String("CLOUDFLARE_ACCOUNT_ID"),
-    apiToken: options?.apiToken ?? Config.Redacted("CLOUDFLARE_API_TOKEN"),
-    apiBaseUrl:
-      options?.apiBaseUrl ??
-      Config.String("CLOUDFLARE_API_BASE_URL").pipe(Config.withDefault(defaultQueryApiBaseUrl)),
-  });
+    accountId: options?.accountId ?? Config.String('CLOUDFLARE_ACCOUNT_ID'),
+    apiToken: options?.apiToken ?? Config.Redacted('CLOUDFLARE_API_TOKEN'),
+    apiBaseUrl: options?.apiBaseUrl ??
+      Config.String('CLOUDFLARE_API_BASE_URL').pipe(Config.withDefault(defaultQueryApiBaseUrl)),
+  })
 
 export const queryLayer = <Self>(
   tag: Context.Service<Self, AnalyticsEngineQueryClient>,
   definition: AnalyticsEngineQueryDefinition,
-) => Layer.effect(tag, makeQueryClient(definition));
+) => Layer.effect(tag, makeQueryClient(definition))
 
 export const layerFetch = <Self>(
   tag: Context.Service<Self, AnalyticsEngineQueryClient>,
   definition: AnalyticsEngineQueryDefinition,
-) => queryLayer(tag, definition).pipe(Layer.provide(FetchHttpClient.layer));
+) => queryLayer(tag, definition).pipe(Layer.provide(FetchHttpClient.layer))
 
 export const queryLayerConfig = <Self>(
   tag: Context.Service<Self, AnalyticsEngineQueryClient>,
@@ -736,17 +736,17 @@ export const queryLayerConfig = <Self>(
 ) =>
   Layer.effect(
     tag,
-    Effect.gen(function* () {
-      const definition = yield* config;
+    Effect.gen(function*() {
+      const definition = yield* config
 
-      return yield* makeQueryClient(definition);
+      return yield* makeQueryClient(definition)
     }),
-  );
+  )
 
 export const layerFetchConfig = <Self>(
   tag: Context.Service<Self, AnalyticsEngineQueryClient>,
   config: Config.Config<AnalyticsEngineQueryDefinition> = queryConfig(),
-) => queryLayerConfig(tag, config).pipe(Layer.provide(FetchHttpClient.layer));
+) => queryLayerConfig(tag, config).pipe(Layer.provide(FetchHttpClient.layer))
 
 export const layer = <Self>(
   tag: Context.Service<Self, AnalyticsEngineClient>,
@@ -760,45 +760,37 @@ export const layer = <Self>(
     {
       expected: expectedAnalyticsEngineDataset,
     },
-  );
+  )
 
-export const make = <Id extends string>(id: Id) => Tag<AnalyticsEngineService<Id>>()<Id>(id);
+export const make = <Id extends string>(id: Id) => Tag<AnalyticsEngineService<Id>>()<Id>(id)
 
-export const makeQuery = <Id extends string>(id: Id) =>
-  QueryTag<AnalyticsEngineQueryService<Id>>()<Id>(id);
+export const makeQuery = <Id extends string>(id: Id) => QueryTag<AnalyticsEngineQueryService<Id>>()<Id>(id)
 
-export const Tag =
-  <Self>() =>
-  <Id extends string>(id: Id) => {
-    const tag = Context.Service<Self, AnalyticsEngineClient>()(id);
+export const Tag = <Self>() => <Id extends string>(id: Id) => {
+  const tag = Context.Service<Self, AnalyticsEngineClient>()(id)
 
-    const makeLayer = (definition: LayerOptions) => layer(tag, definition);
+  const makeLayer = (definition: LayerOptions) => layer(tag, definition)
 
-    // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
-    return Object.assign(tag, {
-      id,
-      layer: makeLayer,
-    }) as TagClass<Self, Id>;
-  };
+  // SAFETY: these are exactly the members required by TagClass, attached to the matching service tag.
+  return Object.assign(tag, {
+    id,
+    layer: makeLayer,
+  }) as TagClass<Self, Id>
+}
 
-export const QueryTag =
-  <Self>() =>
-  <Id extends string>(id: Id) => {
-    const tag = Context.Service<Self, AnalyticsEngineQueryClient>()(id);
-    const makeLayer = (definition: AnalyticsEngineQueryDefinition) => queryLayer(tag, definition);
-    const makeLayerFetch = (definition: AnalyticsEngineQueryDefinition) =>
-      layerFetch(tag, definition);
-    const makeLayerConfig = (config?: Config.Config<AnalyticsEngineQueryDefinition>) =>
-      queryLayerConfig(tag, config);
-    const makeLayerFetchConfig = (config?: Config.Config<AnalyticsEngineQueryDefinition>) =>
-      layerFetchConfig(tag, config);
+export const QueryTag = <Self>() => <Id extends string>(id: Id) => {
+  const tag = Context.Service<Self, AnalyticsEngineQueryClient>()(id)
+  const makeLayer = (definition: AnalyticsEngineQueryDefinition) => queryLayer(tag, definition)
+  const makeLayerFetch = (definition: AnalyticsEngineQueryDefinition) => layerFetch(tag, definition)
+  const makeLayerConfig = (config?: Config.Config<AnalyticsEngineQueryDefinition>) => queryLayerConfig(tag, config)
+  const makeLayerFetchConfig = (config?: Config.Config<AnalyticsEngineQueryDefinition>) => layerFetchConfig(tag, config)
 
-    // SAFETY: these are exactly the members required by QueryTagClass, attached to the matching service tag.
-    return Object.assign(tag, {
-      id,
-      layer: makeLayer,
-      layerFetch: makeLayerFetch,
-      layerConfig: makeLayerConfig,
-      layerFetchConfig: makeLayerFetchConfig,
-    }) as QueryTagClass<Self, Id>;
-  };
+  // SAFETY: these are exactly the members required by QueryTagClass, attached to the matching service tag.
+  return Object.assign(tag, {
+    id,
+    layer: makeLayer,
+    layerFetch: makeLayerFetch,
+    layerConfig: makeLayerConfig,
+    layerFetchConfig: makeLayerFetchConfig,
+  }) as QueryTagClass<Self, Id>
+}

@@ -5,12 +5,12 @@
   "type": "module",
   "scripts": {
     "dev": "vp exec wrangler dev",
-    "build": "vp run effect-cf#build && vp exec wrangler deploy --dry-run --outdir dist",
+    "build": "vp run @systemfsoftware/effect-cf#build && vp exec wrangler deploy --dry-run --outdir dist",
     "typecheck": "vp exec effect-tsrs diagnostics --type-check --project tsconfig.json"
   },
   "dependencies": {
     "effect": "catalog:",
-    "effect-cf": "workspace:*"
+    "@systemfsoftware/effect-cf": "workspace:*"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "catalog:",

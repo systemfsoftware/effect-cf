@@ -1,72 +1,69 @@
-import * as Context from "effect/Context";
-import type { Digest, SecureRandom } from "effect/crypto";
-import * as Effect from "effect/Effect";
-import type { Layer, Schema as S } from "effect";
+import type { Layer, Schema as S } from 'effect'
+import * as Context from 'effect/Context'
+import type { Digest, SecureRandom } from 'effect/crypto'
+import * as Effect from 'effect/Effect'
 
-import type * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import * as WorkerEntrypoint from "./Worker";
-import type { WorkerRpcHandler } from "./Worker";
-import type * as Rpc from "./Rpc";
-import * as RpcDefinition from "./RpcDefinition";
-import { recordDecodedArgs } from "./internal/RpcInvocation";
-import * as ServiceBinding from "./ServiceBinding";
+import type * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import { recordDecodedArgs } from './internal/RpcInvocation'
+import type * as Rpc from './Rpc'
+import * as RpcDefinition from './RpcDefinition'
+import * as ServiceBinding from './ServiceBinding'
+import * as WorkerEntrypoint from './Worker'
+import type { WorkerRpcHandler } from './Worker'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 export type {
   ServiceBindingFetchError,
   ServiceBindingRpcError,
   ServiceCall,
   ServiceRpc,
   ServiceScopedCall,
-} from "./ServiceBinding";
+} from './ServiceBinding'
 
 /**
  * The client tuple types are re-established by the final `TagClass` cast, so
  * these internal invocations erase the binding client's generic argument
  * tuples instead of instantiating them at `never`.
  */
-type UnsafeInvoke<E> = (...args: ReadonlyArray<unknown>) => Effect.Effect<unknown, E>;
+type UnsafeInvoke<E> = (...args: ReadonlyArray<unknown>) => Effect.Effect<unknown, E>
 
-export type ServiceFreeSchema = S.Codec<any, any, never, never>;
-export type NativeSchema<Schema extends ServiceFreeSchema = ServiceFreeSchema> =
-  RpcDefinition.NativeSchema<Schema>;
-export type RpcSchema = RpcDefinition.RpcSchema;
+export type ServiceFreeSchema = S.Codec<any, any, never, never>
+export type NativeSchema<Schema extends ServiceFreeSchema = ServiceFreeSchema> = RpcDefinition.NativeSchema<Schema>
+export type RpcSchema = RpcDefinition.RpcSchema
 
 export interface Method<
   Args extends ReadonlyArray<RpcSchema> = ReadonlyArray<RpcSchema>,
   Success extends RpcSchema = RpcSchema,
 > {
-  readonly args: Args;
-  readonly success: Success;
+  readonly args: Args
+  readonly success: Success
 }
 
 export namespace Method {
-  export type Any = Method<ReadonlyArray<RpcSchema>, RpcSchema>;
+  export type Any = Method<ReadonlyArray<RpcSchema>, RpcSchema>
 
-  type ArgsFromSchemas<Args extends ReadonlyArray<RpcSchema>> = Args extends readonly []
-    ? []
+  type ArgsFromSchemas<Args extends ReadonlyArray<RpcSchema>> = Args extends readonly [] ? []
     : Args extends readonly [
-          infer Head extends RpcSchema,
-          ...infer Tail extends ReadonlyArray<RpcSchema>,
-        ]
-      ? [RpcDefinition.SchemaType<Head>, ...ArgsFromSchemas<Tail>]
-      : Array<RpcDefinition.SchemaType<Args[number]>>;
+      infer Head extends RpcSchema,
+      ...infer Tail extends ReadonlyArray<RpcSchema>,
+    ] ? [RpcDefinition.SchemaType<Head>, ...ArgsFromSchemas<Tail>]
+    : Array<RpcDefinition.SchemaType<Args[number]>>
 
   type EncodedArgsFromSchemas<Args extends ReadonlyArray<RpcSchema>> = {
-    [Index in keyof Args]: RpcDefinition.WireEncoded<Args[Index]>;
-  };
+    [Index in keyof Args]: RpcDefinition.WireEncoded<Args[Index]>
+  }
 
-  export type Args<Self extends Any> = ArgsFromSchemas<Self["args"]>;
+  export type Args<Self extends Any> = ArgsFromSchemas<Self['args']>
 
-  export type EncodedArgs<Self extends Any> = EncodedArgsFromSchemas<Self["args"]>;
+  export type EncodedArgs<Self extends Any> = EncodedArgsFromSchemas<Self['args']>
 
-  export type Success<Self extends Any> = RpcDefinition.SchemaType<Self["success"]>;
+  export type Success<Self extends Any> = RpcDefinition.SchemaType<Self['success']>
 
-  export type EncodedSuccess<Self extends Any> = RpcDefinition.WireEncoded<Self["success"]>;
+  export type EncodedSuccess<Self extends Any> = RpcDefinition.WireEncoded<Self['success']>
 }
 
-export type Methods = Record<string, Method.Any>;
+export type Methods = Record<string, Method.Any>
 
 /**
  * RPC contract for a Worker service.
@@ -78,82 +75,84 @@ export interface Definition<
   Id extends string = string,
   MethodDefinitions extends Methods = Methods,
 > {
-  readonly id: Id;
-  readonly methods: MethodDefinitions;
+  readonly id: Id
+  readonly methods: MethodDefinitions
 }
 
 export namespace Definition {
-  export type Any = Definition<string, Methods>;
+  export type Any = Definition<string, Methods>
 }
 
-export type ReservedMethodName = WorkerEntrypoint.ReservedMethodName;
+export type ReservedMethodName = WorkerEntrypoint.ReservedMethodName
 
 export type NoReservedMethods<MethodDefinitions extends Methods> =
-  Extract<keyof MethodDefinitions, ReservedMethodName> extends never ? MethodDefinitions : never;
+  Extract<keyof MethodDefinitions, ReservedMethodName> extends never ? MethodDefinitions : never
 
 const reservedMethodNames = new Set<string>([
-  "constructor",
-  "dup",
-  "fetch",
-  "connect",
-  "queue",
-  "scheduled",
-  "tail",
-  "tailStream",
-  "test",
-  "trace",
-  "alarm",
-  "webSocketMessage",
-  "webSocketClose",
-  "webSocketError",
-]);
+  'constructor',
+  'dup',
+  'fetch',
+  'connect',
+  'queue',
+  'scheduled',
+  'tail',
+  'tailStream',
+  'test',
+  'trace',
+  'alarm',
+  'webSocketMessage',
+  'webSocketClose',
+  'webSocketError',
+])
 
 /**
  * Promise-based client API derived from a {@link Definition}.
  */
 export type ServerApi<Self extends Definition.Any> = {
-  readonly [Key in keyof Self["methods"]]: (
-    ...args: Method.Args<Self["methods"][Key]>
-  ) => Promise<Method.Success<Self["methods"][Key]>>;
-};
+  readonly [Key in keyof Self['methods']]: (
+    ...args: Method.Args<Self['methods'][Key]>
+  ) => Promise<Method.Success<Self['methods'][Key]>>
+}
 
-export type Api<Self extends Definition.Any> = Rpc.Provider<ServerApi<Self>, ReservedMethodName>;
+export type Api<Self extends Definition.Any> = Rpc.Provider<ServerApi<Self>, ReservedMethodName>
 
 /**
  * Effect handlers for each RPC method in a worker definition.
  */
 export type Handlers<ROut, Self extends Definition.Any> = {
-  readonly [Key in keyof Self["methods"]]: (
-    ...args: Method.Args<Self["methods"][Key]>
-  ) => WorkerRpcHandler<ROut, Method.Success<Self["methods"][Key]>>;
-};
+  readonly [Key in keyof Self['methods']]: (
+    ...args: Method.Args<Self['methods'][Key]>
+  ) => WorkerRpcHandler<ROut, Method.Success<Self['methods'][Key]>>
+}
 
 type BoundaryHandlers<ROut, Self extends Definition.Any> = {
-  readonly [Key in keyof Self["methods"]]: (
+  readonly [Key in keyof Self['methods']]: (
     ...args: Array<unknown>
-  ) => WorkerRpcHandler<ROut, Method.EncodedSuccess<Self["methods"][Key]>>;
-};
+  ) => WorkerRpcHandler<ROut, Method.EncodedSuccess<Self['methods'][Key]>>
+}
 
 type MutableBoundaryHandlers<ROut, Self extends Definition.Any> = {
-  -readonly [Key in keyof Self["methods"]]: (
+  -readonly [Key in keyof Self['methods']]: (
     ...args: Array<unknown>
-  ) => WorkerRpcHandler<ROut, Method.EncodedSuccess<Self["methods"][Key]>>;
-};
+  ) => WorkerRpcHandler<ROut, Method.EncodedSuccess<Self['methods'][Key]>>
+}
 
-type BaseOptions<ROut, Self extends Definition.Any, REvent, EventLayerError> = Omit<
-  WorkerEntrypoint.WorkerOptions<ROut, REvent, EventLayerError, Handlers<ROut | REvent, Self>>,
-  "eventLayer" | "rpc"
-> & {
-  readonly rpc: Handlers<ROut | REvent, Self>;
-};
+type BaseOptions<ROut, Self extends Definition.Any, REvent, EventLayerError> =
+  & Omit<
+    WorkerEntrypoint.WorkerOptions<ROut, REvent, EventLayerError, Handlers<ROut | REvent, Self>>,
+    'eventLayer' | 'rpc'
+  >
+  & {
+    readonly rpc: Handlers<ROut | REvent, Self>
+  }
 
 type EventLayerOptions<ROut, REvent, EventLayerError> = [REvent] extends [never]
-  ? Pick<WorkerEntrypoint.WorkerOptions<ROut, never, EventLayerError>, "eventLayer">
+  ? Pick<WorkerEntrypoint.WorkerOptions<ROut, never, EventLayerError>, 'eventLayer'>
   : {
-      readonly eventLayer: NonNullable<
-        WorkerEntrypoint.WorkerOptions<ROut, REvent, EventLayerError>["eventLayer"]
-      >;
-    };
+    readonly eventLayer: NonNullable<
+      WorkerEntrypoint.WorkerOptions<ROut, REvent, EventLayerError>['eventLayer']
+    >
+  }
 
 /**
  * Worker constructor options for a specific RPC definition.
@@ -163,33 +162,36 @@ export type Options<
   Self extends Definition.Any,
   REvent = never,
   EventLayerError = never,
-> = BaseOptions<ROut, Self, REvent, EventLayerError> &
-  EventLayerOptions<ROut, REvent, EventLayerError>;
+> =
+  & BaseOptions<ROut, Self, REvent, EventLayerError>
+  & EventLayerOptions<ROut, REvent, EventLayerError>
 
 export type LayerOptions = {
-  readonly binding: string;
-  readonly rpcTracing?: boolean;
-};
+  readonly binding: string
+  readonly rpcTracing?: boolean
+}
 
 export type TagClass<
   Self,
   Id extends string,
   MethodDefinitions extends Methods,
-> = Context.ServiceClass<
-  Self,
-  Id,
-  ServiceBinding.ServiceBindingEffectClient<
-    Api<Definition<Id, MethodDefinitions>>,
-    Definition<Id, MethodDefinitions>
+> =
+  & Context.ServiceClass<
+    Self,
+    Id,
+    ServiceBinding.ServiceBindingEffectClient<
+      Api<Definition<Id, MethodDefinitions>>,
+      Definition<Id, MethodDefinitions>
+    >
   >
-> &
-  ServiceBinding.ServiceBindingStaticClient<
+  & ServiceBinding.ServiceBindingStaticClient<
     Self,
     Api<Definition<Id, MethodDefinitions>>,
     Definition<Id, MethodDefinitions>
-  > & {
-    readonly id: Id;
-    readonly methods: MethodDefinitions;
+  >
+  & {
+    readonly id: Id
+    readonly methods: MethodDefinitions
     readonly make: {
       <ROut, LayerError, REvent, EventLayerError = never>(
         layer: Layer.Layer<
@@ -203,13 +205,13 @@ export type TagClass<
         >,
         options: Options<ROut, Definition<Id, MethodDefinitions>, REvent, EventLayerError> & {
           readonly eventLayer: NonNullable<
-            WorkerEntrypoint.WorkerOptions<ROut, REvent, EventLayerError>["eventLayer"]
-          >;
+            WorkerEntrypoint.WorkerOptions<ROut, REvent, EventLayerError>['eventLayer']
+          >
         },
       ): WorkerEntrypoint.WorkerClass<
         Handlers<ROut | REvent, Definition<Id, MethodDefinitions>>,
         ROut | REvent
-      >;
+      >
       <ROut, LayerError, REvent extends never = never, EventLayerError = never>(
         layer: Layer.Layer<
           ROut,
@@ -224,48 +226,48 @@ export type TagClass<
       ): WorkerEntrypoint.WorkerClass<
         Handlers<ROut | REvent, Definition<Id, MethodDefinitions>>,
         ROut | REvent
-      >;
-    };
+      >
+    }
     readonly layer: (
       options: LayerOptions,
     ) => Layer.Layer<
       Self,
       Binding.BindingNotFoundError | Binding.BindingValidationError,
       WorkerEnvironment
-    >;
-  };
+    >
+  }
 
-type TagClassValue = typeof S.Unknown.Type;
+type TagClassValue = typeof S.Unknown.Type
 
 const assumeTagClass = <Self, Id extends string, MethodDefinitions extends Methods>(
   value: TagClassValue,
 ): TagClass<Self, Id, MethodDefinitions> => {
   // SAFETY: callers supply a Context service tag with every definition-derived static member attached.
-  return value as TagClass<Self, Id, MethodDefinitions>;
-};
+  return value as TagClass<Self, Id, MethodDefinitions>
+}
 
 /**
  * Defines a single RPC method schema in a worker definition.
  */
 export const method: {
   <Success extends RpcSchema>(definition: {
-    readonly success: Success;
-  }): Method<readonly [], Success>;
+    readonly success: Success
+  }): Method<readonly [], Success>
   <const Args extends ReadonlyArray<RpcSchema>, Success extends RpcSchema>(definition: {
-    readonly args: Args;
-    readonly success: Success;
-  }): Method<Args, Success>;
-} = RpcDefinition.method;
+    readonly args: Args
+    readonly success: Success
+  }): Method<Args, Success>
+} = RpcDefinition.method
 
-export const native = RpcDefinition.native;
+export const native = RpcDefinition.native
 
 const makeDefinition = <Id extends string, const MethodDefinitions extends Methods>(
   id: Id,
   methods: MethodDefinitions & NoReservedMethods<MethodDefinitions>,
 ) => {
-  type SelfDefinition = Definition<Id, MethodDefinitions>;
-  RpcDefinition.assertNoReservedMethods("Worker", methods, reservedMethodNames);
-  const definition: SelfDefinition = RpcDefinition.make(id, methods);
+  type SelfDefinition = Definition<Id, MethodDefinitions>
+  RpcDefinition.assertNoReservedMethods('Worker', methods, reservedMethodNames)
+  const definition: SelfDefinition = RpcDefinition.make(id, methods)
 
   return Object.assign(definition, {
     make: <ROut, LayerError, REvent = never, EventLayerError = never>(
@@ -280,20 +282,20 @@ const makeDefinition = <Id extends string, const MethodDefinitions extends Metho
       >,
       options: Options<ROut, SelfDefinition, REvent, EventLayerError>,
     ) => {
-      type WrappedRpc = BoundaryHandlers<ROut | REvent, SelfDefinition>;
+      type WrappedRpc = BoundaryHandlers<ROut | REvent, SelfDefinition>
       type WrappedOptions = WorkerEntrypoint.WorkerOptions<
         ROut,
         REvent,
         EventLayerError,
         WrappedRpc
-      >;
-      type WrappedOptionsWithEventLayer = Omit<WrappedOptions, "eventLayer"> & {
-        readonly eventLayer: NonNullable<WrappedOptions["eventLayer"]>;
-      };
+      >
+      type WrappedOptionsWithEventLayer = Omit<WrappedOptions, 'eventLayer'> & {
+        readonly eventLayer: NonNullable<WrappedOptions['eventLayer']>
+      }
       const workerOptions = {
         ...options,
         rpc: wrapHandlers(definition, options.rpc),
-      };
+      }
 
       if (workerOptions.eventLayer === undefined) {
         // SAFETY: Options permits an absent eventLayer only when REvent is never.
@@ -305,140 +307,141 @@ const makeDefinition = <Id extends string, const MethodDefinitions extends Metho
             EventLayerError,
             BoundaryHandlers<ROut, SelfDefinition>
           >,
-        );
+        )
       }
 
       // SAFETY: this branch has the eventLayer required by WorkerEntrypoint.make's event overload.
-      return WorkerEntrypoint.make(layer, workerOptions as WrappedOptionsWithEventLayer);
+      return WorkerEntrypoint.make(layer, workerOptions as WrappedOptionsWithEventLayer)
     },
-  });
-};
+  })
+}
 
 export const make = <Id extends string, const MethodDefinitions extends Methods>(
   id: Id,
   methods: MethodDefinitions & NoReservedMethods<MethodDefinitions>,
-) => Tag<Definition<Id, MethodDefinitions>>()<Id, MethodDefinitions>(id, methods);
+) => Tag<Definition<Id, MethodDefinitions>>()<Id, MethodDefinitions>(id, methods)
 
-export const Tag =
-  <Self>() =>
-  <Id extends string, const MethodDefinitions extends Methods>(
-    id: Id,
-    methods: MethodDefinitions & NoReservedMethods<MethodDefinitions>,
-  ) => {
-    const definition = makeDefinition<Id, MethodDefinitions>(id, methods);
+export const Tag = <Self>() =>
+<Id extends string, const MethodDefinitions extends Methods>(
+  id: Id,
+  methods: MethodDefinitions & NoReservedMethods<MethodDefinitions>,
+) => {
+  const definition = makeDefinition<Id, MethodDefinitions>(id, methods)
 
-    type SelfDefinition = Definition<Id, MethodDefinitions>;
-    type ClientApi = Api<SelfDefinition>;
-    const tag = Context.Service<
-      Self,
-      ServiceBinding.ServiceBindingEffectClient<ClientApi, SelfDefinition>
-    >()(id);
+  type SelfDefinition = Definition<Id, MethodDefinitions>
+  type ClientApi = Api<SelfDefinition>
+  const tag = Context.Service<
+    Self,
+    ServiceBinding.ServiceBindingEffectClient<ClientApi, SelfDefinition>
+  >()(id)
 
-    const bindingDefinition = (binding: LayerOptions) => ({
-      ...binding,
-      definition,
-    });
+  const bindingDefinition = (binding: LayerOptions) => ({
+    ...binding,
+    definition,
+  })
 
-    const layer = (binding: LayerOptions) =>
-      ServiceBinding.layer<Self, ClientApi, SelfDefinition>(tag, bindingDefinition(binding));
+  const layer = (binding: LayerOptions) =>
+    ServiceBinding.layer<Self, ClientApi, SelfDefinition>(tag, bindingDefinition(binding))
 
-    const fetch = (input: RequestInfo | URL, init?: RequestInit) =>
-      Effect.gen(function* () {
-        const service = yield* tag;
+  const fetch = (input: RequestInfo | URL, init?: RequestInit) =>
+    Effect.gen(function*() {
+      const service = yield* tag
 
-        return yield* service.fetch(input, init);
-      });
+      return yield* service.fetch(input, init)
+    })
 
-    const rpc = <Method extends keyof ClientApi>(
-      method: Method,
-      ...args: ClientApi[Method] extends (...args: infer Args) => any ? Args : never
-    ) =>
-      Effect.gen(function* () {
-        const service = yield* tag;
+  const rpc = <Method extends keyof ClientApi>(
+    method: Method,
+    ...args: ClientApi[Method] extends (...args: infer Args) => any ? Args : never
+  ) =>
+    Effect.gen(function*() {
+      const service = yield* tag
 
-        // SAFETY: the public signature above restores the selected ClientApi tuple and result types.
-        return yield* (service.rpc as UnsafeInvoke<ServiceBinding.ServiceBindingRpcError>)(
-          method,
-          ...args,
-        );
-      });
+      // SAFETY: the public signature above restores the selected ClientApi tuple and result types.
+      return yield* (service.rpc as UnsafeInvoke<ServiceBinding.ServiceBindingRpcError>)(
+        method,
+        ...args,
+      )
+    })
 
-    const call = <Method extends keyof ClientApi>(
-      method: Method,
-      ...args: ClientApi[Method] extends (...args: infer Args) => any ? Args : never
-    ) =>
-      Effect.gen(function* () {
-        const service = yield* tag;
+  const call = <Method extends keyof ClientApi>(
+    method: Method,
+    ...args: ClientApi[Method] extends (...args: infer Args) => any ? Args : never
+  ) =>
+    Effect.gen(function*() {
+      const service = yield* tag
 
-        // SAFETY: the public signature above restores the selected ClientApi tuple and result types.
-        return yield* (service.call as UnsafeInvoke<ServiceBinding.ServiceBindingRpcError>)(
-          method,
-          ...args,
-        );
-      });
+      // SAFETY: the public signature above restores the selected ClientApi tuple and result types.
+      return yield* (service.call as UnsafeInvoke<ServiceBinding.ServiceBindingRpcError>)(
+        method,
+        ...args,
+      )
+    })
 
-    const scopedCall = <Method extends keyof ClientApi>(
-      method: Method,
-      ...args: ClientApi[Method] extends (...args: infer Args) => any ? Args : never
-    ) =>
-      Effect.gen(function* () {
-        const service = yield* tag;
+  const scopedCall = <Method extends keyof ClientApi>(
+    method: Method,
+    ...args: ClientApi[Method] extends (...args: infer Args) => any ? Args : never
+  ) =>
+    Effect.gen(function*() {
+      const service = yield* tag
 
-        // SAFETY: the public signature above restores the selected ClientApi tuple and result types.
-        return yield* (service.scopedCall as UnsafeInvoke<ServiceBinding.ServiceBindingRpcError>)(
-          method,
-          ...args,
-        );
-      });
+      // SAFETY: the public signature above restores the selected ClientApi tuple and result types.
+      return yield* (service.scopedCall as UnsafeInvoke<ServiceBinding.ServiceBindingRpcError>)(
+        method,
+        ...args,
+      )
+    })
 
-    const directMethods = ServiceBinding.makeDirectMethods<Self, ClientApi, SelfDefinition>(
-      definition,
-      // SAFETY: call's public generic signature is derived from this same ClientApi definition.
-      call as never,
-    );
+  const directMethods = ServiceBinding.makeDirectMethods<Self, ClientApi, SelfDefinition>(
+    definition,
+    // SAFETY: call's public generic signature is derived from this same ClientApi definition.
+    call as never,
+  )
 
-    return assumeTagClass<Self, Id, MethodDefinitions>(
-      Object.assign(tag, directMethods, {
-        id: definition.id,
-        methods: definition.methods,
-        make: definition.make,
-        layer,
-        fetch,
-        rpc,
-        call,
-        scopedCall,
-      }),
-    );
-  };
+  return assumeTagClass<Self, Id, MethodDefinitions>(
+    Object.assign(tag, directMethods, {
+      id: definition.id,
+      methods: definition.methods,
+      make: definition.make,
+      layer,
+      fetch,
+      rpc,
+      call,
+      scopedCall,
+    }),
+  )
+}
 
-export const Worker = Tag;
+export const Worker = Tag
 
 const wrapHandlers = <ROut, const Self extends Definition.Any>(
   definition: Self,
   handlers: Handlers<ROut, Self>,
 ): BoundaryHandlers<ROut, Self> => {
-  const wrapped: MutableBoundaryHandlers<ROut, Self> = Object.create(null);
+  const wrapped: MutableBoundaryHandlers<ROut, Self> = Object.create(null)
 
   // SAFETY: definition.methods is the owner of the method-name union used to index both mappings.
-  for (const key of Object.keys(definition.methods) as Array<
-    RpcDefinition.Definition.MethodNames<Self>
-  >) {
-    const handler = handlers[key];
+  for (
+    const key of Object.keys(definition.methods) as Array<
+      RpcDefinition.Definition.MethodNames<Self>
+    >
+  ) {
+    const handler = handlers[key]
 
     wrapped[key] = (...args: Array<unknown>) =>
-      Effect.gen(function* () {
-        const decodedArgs = yield* RpcDefinition.decodeArgs(definition, key, args);
+      Effect.gen(function*() {
+        const decodedArgs = yield* RpcDefinition.decodeArgs(definition, key, args)
 
-        yield* recordDecodedArgs(decodedArgs);
+        yield* recordDecodedArgs(decodedArgs)
 
-        const value = yield* handler(...decodedArgs);
+        const value = yield* handler(...decodedArgs)
 
-        return yield* RpcDefinition.encodeSuccess(definition, key, value);
-      });
+        return yield* RpcDefinition.encodeSuccess(definition, key, value)
+      })
   }
 
-  return wrapped;
-};
+  return wrapped
+}
 
 /**
  * Helper for implementing handlers with the exact method shape of a definition.
@@ -446,7 +449,7 @@ const wrapHandlers = <ROut, const Self extends Definition.Any>(
 export const implement = <ROut, const Self extends Definition.Any>(
   _definition: Self,
   handlers: Handlers<ROut, Self>,
-): Handlers<ROut, Self> => handlers;
+): Handlers<ROut, Self> => handlers
 
 /**
  * Convenience alias for a single worker RPC handler Effect.
@@ -454,5 +457,5 @@ export const implement = <ROut, const Self extends Definition.Any>(
 export type HandlerEffect<
   ROut,
   Self extends Definition.Any,
-  Key extends keyof Self["methods"],
-> = WorkerRpcHandler<ROut, Method.Success<Self["methods"][Key]>>;
+  Key extends keyof Self['methods'],
+> = WorkerRpcHandler<ROut, Method.Success<Self['methods'][Key]>>

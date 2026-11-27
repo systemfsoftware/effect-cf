@@ -1,6 +1,6 @@
-import { Effect, Layer } from "effect";
-import { Worker } from "effect-cf";
+import { Worker } from '@systemfsoftware/effect-cf'
+import { Effect, Layer } from 'effect'
 
 export default Worker.make(Layer.empty, {
-  fetch: Effect.sync(() => new Response("ok")),
-});
+  fetch: Effect.sync(() => new Response('ok')),
+})

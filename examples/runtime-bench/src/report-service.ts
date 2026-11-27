@@ -1,27 +1,27 @@
-import * as Context from "effect/Context";
-import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Schema from "effect/Schema";
+import * as Context from 'effect/Context'
+import * as DateTime from 'effect/DateTime'
+import * as Effect from 'effect/Effect'
+import * as Layer from 'effect/Layer'
+import * as Schema from 'effect/Schema'
 
-import { ValidationIssue } from "./order-model";
-import { BatchValidator } from "./order-validation";
+import { ValidationIssue } from './order-model'
+import { BatchValidator } from './order-validation'
 
 const MonthTotal = Schema.Struct({
   month: Schema.String,
   orders: Schema.Int,
   totalCents: Schema.Int,
-});
+})
 const CustomerTotal = Schema.Struct({
   customerId: Schema.String,
   orders: Schema.Int,
   totalCents: Schema.Int,
-});
+})
 const ProductTotal = Schema.Struct({
   sku: Schema.String,
   units: Schema.Int,
   netMerchandiseCents: Schema.Int,
-});
+})
 
 export const SalesReport = Schema.Struct({
   batchId: Schema.String,
@@ -33,59 +33,58 @@ export const SalesReport = Schema.Struct({
   topCustomers: Schema.Array(CustomerTotal),
   products: Schema.Array(ProductTotal),
   errors: Schema.Array(ValidationIssue),
-});
+})
 
-const byKey = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0);
+const byKey = (left: string, right: string) => (left < right ? -1 : left > right ? 1 : 0)
 
 export class ReportBuilder extends Context.Service<
   ReportBuilder,
   { readonly summarize: (json: string) => Effect.Effect<typeof SalesReport.Type> }
->()("runtime-bench/ReportBuilder") {
+>()('runtime-bench/ReportBuilder') {
   static readonly layer = Layer.effect(
     ReportBuilder,
-    Effect.gen(function* () {
-      const validator = yield* BatchValidator;
-      const summarize = Effect.fn("ReportBuilder.summarize")(function* (json: string) {
-        const { orders, summary } = yield* validator.validate(json);
-        const months = new Map<string, { month: string; orders: number; totalCents: number }>();
+    Effect.gen(function*() {
+      const validator = yield* BatchValidator
+      const summarize = Effect.fn('ReportBuilder.summarize')(function*(json: string) {
+        const { orders, summary } = yield* validator.validate(json)
+        const months = new Map<string, { month: string; orders: number; totalCents: number }>()
         const customers = new Map<
           string,
           { customerId: string; orders: number; totalCents: number }
-        >();
+        >()
         const products = new Map<
           string,
           { sku: string; units: number; netMerchandiseCents: number }
-        >();
+        >()
 
         for (const order of orders) {
-          const month = DateTime.formatIso(order.placedAt).slice(0, 7);
-          const monthTotal = months.get(month) ?? { month, orders: 0, totalCents: 0 };
+          const month = DateTime.formatIso(order.placedAt).slice(0, 7)
+          const monthTotal = months.get(month) ?? { month, orders: 0, totalCents: 0 }
 
-          monthTotal.orders++;
-          monthTotal.totalCents += order.totalCents;
-          months.set(month, monthTotal);
-          const customerId = order.customer.id;
+          monthTotal.orders++
+          monthTotal.totalCents += order.totalCents
+          months.set(month, monthTotal)
+          const customerId = order.customer.id
           const customerTotal = customers.get(customerId) ?? {
             customerId,
             orders: 0,
             totalCents: 0,
-          };
+          }
 
-          customerTotal.orders++;
-          customerTotal.totalCents += order.totalCents;
-          customers.set(customerId, customerTotal);
+          customerTotal.orders++
+          customerTotal.totalCents += order.totalCents
+          customers.set(customerId, customerTotal)
           for (const line of order.lines) {
             const productTotal = products.get(line.sku) ?? {
               sku: line.sku,
               units: 0,
               netMerchandiseCents: 0,
-            };
-            const subtotal = line.quantity * line.unitPriceCents;
+            }
+            const subtotal = line.quantity * line.unitPriceCents
 
-            productTotal.units += line.quantity;
-            productTotal.netMerchandiseCents +=
-              subtotal - Math.round((subtotal * line.discountBasisPoints) / 10000);
-            products.set(line.sku, productTotal);
+            productTotal.units += line.quantity
+            productTotal.netMerchandiseCents += subtotal - Math.round((subtotal * line.discountBasisPoints) / 10000)
+            products.set(line.sku, productTotal)
           }
         }
 
@@ -103,10 +102,10 @@ export class ReportBuilder extends Context.Service<
             (a, b) => b.netMerchandiseCents - a.netMerchandiseCents || byKey(a.sku, b.sku),
           ),
           errors: summary.errors,
-        };
-      });
+        }
+      })
 
-      return ReportBuilder.of({ summarize });
+      return ReportBuilder.of({ summarize })
     }),
-  ).pipe(Layer.provide(BatchValidator.layer));
+  ).pipe(Layer.provide(BatchValidator.layer))
 }

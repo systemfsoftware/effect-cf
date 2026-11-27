@@ -1,17 +1,17 @@
-import { PgClient } from "@effect/sql-pg";
-import * as Effect from "effect/Effect";
-import * as Layer from "effect/Layer";
-import * as Redacted from "effect/Redacted";
-import type { SqlClient, SqlError } from "effect/sql";
+import { PgClient } from '@effect/sql-pg'
+import * as Effect from 'effect/Effect'
+import * as Layer from 'effect/Layer'
+import * as Redacted from 'effect/Redacted'
+import type { SqlClient, SqlError } from 'effect/sql'
 
-import type * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import type * as Hyperdrive from "./Hyperdrive";
+import type * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import type * as Hyperdrive from './Hyperdrive'
 
 export type PgLayerOptions = Omit<
   PgClient.PgClientConfig,
-  "url" | "host" | "port" | "path" | "ssl" | "database" | "username" | "password" | "stream"
->;
+  'url' | 'host' | 'port' | 'path' | 'ssl' | 'database' | 'username' | 'password' | 'stream'
+>
 
 export const layer = <Self, Id extends string>(
   tag: Hyperdrive.TagClass<Self, Id>,
@@ -27,6 +27,5 @@ export const layer = <Self, Id extends string>(
       PgClient.makeClient({
         ...options,
         url: Redacted.make(hyperdrive.connectionString),
-      }),
-    ),
-  ).pipe(Layer.provide(tag.layer(binding)));
+      })),
+  ).pipe(Layer.provide(tag.layer(binding)))

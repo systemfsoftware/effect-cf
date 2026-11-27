@@ -1,139 +1,139 @@
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import * as S from "effect/Schema";
-import type { Layer } from "effect";
+import type { Layer } from 'effect'
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Predicate from 'effect/Predicate'
+import * as S from 'effect/Schema'
 
-import * as Binding from "./Binding";
-import type { WorkerEnvironment } from "./Environment";
-import * as ErrorMessage from "./internal/ErrorMessage";
+import * as Binding from './Binding'
+import type { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
-const expectedWorkersAiBinding = "Workers AI binding with run(), gateway(), and models()";
+const expectedWorkersAiBinding = 'Workers AI binding with run(), gateway(), and models()'
 
-export class WorkersAiOperationError extends Data.TaggedError("WorkersAiOperationError")<{
-  readonly binding: string;
-  readonly operation: string;
-  readonly cause: unknown;
+export class WorkersAiOperationError extends Data.TaggedError('WorkersAiOperationError')<{
+  readonly binding: string
+  readonly operation: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Workers AI ${this.operation} failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Workers AI ${this.operation} failed for binding "${this.binding}": ${ErrorMessage.causeMessage(this.cause)}`
   }
 }
 
 export interface WorkersAiDefinition {
-  readonly binding: string;
+  readonly binding: string
 }
 
-export type WorkersAiBinding<ModelList extends AiModelListType = AiModels> = Ai<ModelList>;
-export type WorkersAiOptions = AiOptions;
-export type WorkersAiModelsSearchParams = AiModelsSearchParams;
-export type WorkersAiModelsSearchObject = AiModelsSearchObject;
-export type WorkersAiAsyncBatchResponse = AiAsyncBatchResponse;
+export type WorkersAiBinding<ModelList extends AiModelListType = AiModels> = Ai<ModelList>
+export type WorkersAiOptions = AiOptions
+export type WorkersAiModelsSearchParams = AiModelsSearchParams
+export type WorkersAiModelsSearchObject = AiModelsSearchObject
+export type WorkersAiAsyncBatchResponse = AiAsyncBatchResponse
 export type WorkersAiEmbeddingInput =
   | AiTextEmbeddingsInput
   | Ai_Cf_Qwen_Qwen3_Embedding_0_6B_Input
-  | Parameters<WorkersAiBinding["run"]>[1];
+  | Parameters<WorkersAiBinding['run']>[1]
 
-const embeddingDimensionsKey = "shape";
+const embeddingDimensionsKey = 'shape'
 
 export interface WorkersAiEmbeddingResponse {
-  readonly data: ReadonlyArray<ReadonlyArray<number>>;
-  readonly [embeddingDimensionsKey]: ReadonlyArray<number>;
+  readonly data: ReadonlyArray<ReadonlyArray<number>>
+  readonly [embeddingDimensionsKey]: ReadonlyArray<number>
 }
 
 export interface WorkersAiClient<ModelList extends AiModelListType = AiModels> {
-  readonly aiGatewayLogId: Effect.Effect<string | null, WorkersAiOperationError>;
+  readonly aiGatewayLogId: Effect.Effect<string | null, WorkersAiOperationError>
   readonly run: {
     <Name extends keyof ModelList>(
       model: Name,
       input: {
-        readonly requests: ReadonlyArray<ModelList[Name]["inputs"]>;
+        readonly requests: ReadonlyArray<ModelList[Name]['inputs']>
       },
       options: WorkersAiOptions & {
-        readonly queueRequest: true;
+        readonly queueRequest: true
       },
-    ): Effect.Effect<WorkersAiAsyncBatchResponse, WorkersAiOperationError>;
+    ): Effect.Effect<WorkersAiAsyncBatchResponse, WorkersAiOperationError>
     <Name extends keyof ModelList>(
       model: Name,
-      input: ModelList[Name]["inputs"],
+      input: ModelList[Name]['inputs'],
       options: WorkersAiOptions & {
-        readonly returnRawResponse: true;
+        readonly returnRawResponse: true
       },
-    ): Effect.Effect<Response, WorkersAiOperationError>;
+    ): Effect.Effect<Response, WorkersAiOperationError>
     <Name extends keyof ModelList>(
       model: Name,
-      input: ModelList[Name]["inputs"],
+      input: ModelList[Name]['inputs'],
       options: WorkersAiOptions & {
-        readonly websocket: true;
+        readonly websocket: true
       },
-    ): Effect.Effect<Response, WorkersAiOperationError>;
+    ): Effect.Effect<Response, WorkersAiOperationError>
     <Name extends keyof ModelList>(
       model: Name,
-      input: ModelList[Name]["inputs"] & {
-        readonly stream: true;
+      input: ModelList[Name]['inputs'] & {
+        readonly stream: true
       },
       options?: WorkersAiOptions,
-    ): Effect.Effect<ReadableStream, WorkersAiOperationError>;
+    ): Effect.Effect<ReadableStream, WorkersAiOperationError>
     <Name extends keyof ModelList>(
       model: Name,
-      input: ModelList[Name]["inputs"],
+      input: ModelList[Name]['inputs'],
       options?: WorkersAiOptions,
-    ): Effect.Effect<ModelList[Name]["postProcessedOutputs"], WorkersAiOperationError>;
+    ): Effect.Effect<ModelList[Name]['postProcessedOutputs'], WorkersAiOperationError>
     <
-      Input extends Parameters<WorkersAiBinding["run"]>[1],
-      Output = Awaited<ReturnType<WorkersAiBinding["run"]>>,
+      Input extends Parameters<WorkersAiBinding['run']>[1],
+      Output = Awaited<ReturnType<WorkersAiBinding['run']>>,
     >(
       model: string,
       input: Input,
       options?: WorkersAiOptions,
-    ): Effect.Effect<Output, WorkersAiOperationError>;
-  };
+    ): Effect.Effect<Output, WorkersAiOperationError>
+  }
   readonly runEmbedding: <Input extends WorkersAiEmbeddingInput>(
     model: string,
     input: Input,
     options?: WorkersAiOptions,
-  ) => Effect.Effect<WorkersAiEmbeddingResponse, WorkersAiOperationError>;
+  ) => Effect.Effect<WorkersAiEmbeddingResponse, WorkersAiOperationError>
   readonly models: (
     params?: WorkersAiModelsSearchParams,
-  ) => Effect.Effect<ReadonlyArray<WorkersAiModelsSearchObject>, WorkersAiOperationError>;
-  readonly gateway: (gatewayId: string) => Effect.Effect<AiGateway, WorkersAiOperationError>;
-  readonly rawUnsafe: Effect.Effect<WorkersAiBinding<ModelList>>;
-  readonly definition: WorkersAiDefinition;
+  ) => Effect.Effect<ReadonlyArray<WorkersAiModelsSearchObject>, WorkersAiOperationError>
+  readonly gateway: (gatewayId: string) => Effect.Effect<AiGateway, WorkersAiOperationError>
+  readonly rawUnsafe: Effect.Effect<WorkersAiBinding<ModelList>>
+  readonly definition: WorkersAiDefinition
 }
 
-declare const WorkersAiServiceTypeId: unique symbol;
+declare const WorkersAiServiceTypeId: unique symbol
 
 export interface WorkersAiService<Id extends string> {
   readonly [WorkersAiServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-};
+  readonly binding: string
+}
 
 export interface TagClass<
   Self,
   Id extends string,
   ModelList extends AiModelListType = AiModels,
 > extends Context.ServiceClass<Self, Id, WorkersAiClient<ModelList>> {
-  readonly id: Id;
+  readonly id: Id
   readonly layer: (
     options: LayerOptions,
   ) => Layer.Layer<
     Self,
     Binding.BindingNotFoundError | Binding.BindingValidationError,
     WorkerEnvironment
-  >;
+  >
 }
 
 const workersAiError = (binding: string, operation: string, cause: unknown) =>
-  new WorkersAiOperationError({ binding, operation, cause });
+  new WorkersAiOperationError({ binding, operation, cause })
 
 const tryWorkersAiPromise = <A>(
   binding: string,
@@ -143,7 +143,7 @@ const tryWorkersAiPromise = <A>(
   Effect.tryPromise({
     try: evaluate,
     catch: (cause) => workersAiError(binding, operation, cause),
-  });
+  })
 
 const tryWorkersAiSync = <A>(
   binding: string,
@@ -153,88 +153,87 @@ const tryWorkersAiSync = <A>(
   Effect.try({
     try: evaluate,
     catch: (cause) => workersAiError(binding, operation, cause),
-  });
+  })
 
-type WorkersAiBindingValue = typeof S.Unknown.Type;
+type WorkersAiBindingValue = typeof S.Unknown.Type
 
 const WorkersAiBindingSchema = S.declare(
   (value: WorkersAiBindingValue): value is WorkersAiBinding =>
-    Predicate.hasProperty(value, "run") &&
+    Predicate.hasProperty(value, 'run') &&
     Predicate.isFunction(value.run) &&
-    Predicate.hasProperty(value, "gateway") &&
+    Predicate.hasProperty(value, 'gateway') &&
     Predicate.isFunction(value.gateway) &&
-    Predicate.hasProperty(value, "models") &&
+    Predicate.hasProperty(value, 'models') &&
     Predicate.isFunction(value.models),
-);
-const decodeWorkersAiBinding = S.decodeUnknownOption(WorkersAiBindingSchema);
+)
+const decodeWorkersAiBinding = S.decodeUnknownOption(WorkersAiBindingSchema)
 
 export const isWorkersAiBinding = (value: WorkersAiBindingValue): value is WorkersAiBinding =>
-  Option.isSome(decodeWorkersAiBinding(value));
+  Option.isSome(decodeWorkersAiBinding(value))
 
 export const embeddingResponse = (value: {
-  readonly data?: ReadonlyArray<ReadonlyArray<number>>;
-  readonly [embeddingDimensionsKey]?: ReadonlyArray<number>;
+  readonly data?: ReadonlyArray<ReadonlyArray<number>>
+  readonly [embeddingDimensionsKey]?: ReadonlyArray<number>
 }): WorkersAiEmbeddingResponse => ({
   data: value.data ?? [],
   [embeddingDimensionsKey]: value[embeddingDimensionsKey] ?? [],
-});
+})
 
 const decodeEmbeddingResponse = S.decodeUnknownEffect(
   S.Struct({
     data: S.optional(S.Array(S.Array(S.Finite))),
     [embeddingDimensionsKey]: S.optional(S.Array(S.Finite)),
   }),
-);
+)
 
 export const makeClient =
   <ModelList extends AiModelListType = AiModels>(definition: WorkersAiDefinition) =>
   (ai: WorkersAiBinding<ModelList>): WorkersAiClient<ModelList> => {
-    const run = Effect.fn("WorkersAi.run")(
-      (model: string, input: Parameters<WorkersAiBinding["run"]>[1], options?: WorkersAiOptions) =>
-        tryWorkersAiPromise(definition.binding, "run", () => {
+    const run = Effect.fn('WorkersAi.run')(
+      (model: string, input: Parameters<WorkersAiBinding['run']>[1], options?: WorkersAiOptions) =>
+        tryWorkersAiPromise(definition.binding, 'run', () => {
           // SAFETY: a non-literal string intentionally selects Cloudflare's unknown-model fallback overload.
-          return ai.run(model as string & {}, input, options);
+          return ai.run(model as string & {}, input, options)
         }),
-    );
+    )
 
     return {
       definition,
       aiGatewayLogId: tryWorkersAiSync(
         definition.binding,
-        "aiGatewayLogId",
+        'aiGatewayLogId',
         () => ai.aiGatewayLogId,
       ),
       run,
-      runEmbedding: Effect.fn("WorkersAi.runEmbedding")(function* (
+      runEmbedding: Effect.fn('WorkersAi.runEmbedding')(function*(
         model: string,
         input: WorkersAiEmbeddingInput,
         options?: WorkersAiOptions,
       ) {
         // SAFETY: every WorkersAiEmbeddingInput variant is a string-keyed Workers AI payload.
-        const modelInput = input as Parameters<WorkersAiBinding["run"]>[1];
+        const modelInput = input as Parameters<WorkersAiBinding['run']>[1]
 
-        const response = yield* run(model, modelInput, options);
+        const response = yield* run(model, modelInput, options)
         const decoded = yield* decodeEmbeddingResponse(response).pipe(
           Effect.mapError(
             (cause) =>
               new WorkersAiOperationError({
                 binding: definition.binding,
-                operation: "runEmbedding",
+                operation: 'runEmbedding',
                 cause,
               }),
           ),
-        );
+        )
 
-        return embeddingResponse(decoded);
+        return embeddingResponse(decoded)
       }),
-      models: Effect.fn("WorkersAi.models")((params?: WorkersAiModelsSearchParams) =>
-        tryWorkersAiPromise(definition.binding, "models", () => ai.models(params)),
+      models: Effect.fn('WorkersAi.models')((params?: WorkersAiModelsSearchParams) =>
+        tryWorkersAiPromise(definition.binding, 'models', () => ai.models(params))
       ),
-      gateway: (gatewayId) =>
-        tryWorkersAiSync(definition.binding, "gateway", () => ai.gateway(gatewayId)),
+      gateway: (gatewayId) => tryWorkersAiSync(definition.binding, 'gateway', () => ai.gateway(gatewayId)),
       rawUnsafe: Effect.succeed(ai),
-    };
-  };
+    }
+  }
 
 export const layer = <Self, ModelList extends AiModelListType = AiModels>(
   tag: Context.Service<Self, WorkersAiClient<ModelList>>,
@@ -248,20 +247,18 @@ export const layer = <Self, ModelList extends AiModelListType = AiModels>(
     {
       expected: expectedWorkersAiBinding,
     },
-  );
+  )
 
-export const make = <Id extends string>(id: Id) => Tag<WorkersAiService<Id>>()<Id, AiModels>(id);
+export const make = <Id extends string>(id: Id) => Tag<WorkersAiService<Id>>()<Id, AiModels>(id)
 
-export const Tag =
-  <Self>() =>
-  <Id extends string, ModelList extends AiModelListType = AiModels>(id: Id) => {
-    const tag = Context.Service<Self, WorkersAiClient<ModelList>>()(id);
+export const Tag = <Self>() => <Id extends string, ModelList extends AiModelListType = AiModels>(id: Id) => {
+  const tag = Context.Service<Self, WorkersAiClient<ModelList>>()(id)
 
-    const makeLayer = (definition: LayerOptions) => layer(tag, definition);
+  const makeLayer = (definition: LayerOptions) => layer(tag, definition)
 
-    // SAFETY: Object.assign attaches exactly the static id/layer members declared by TagClass.
-    return Object.assign(tag, {
-      id,
-      layer: makeLayer,
-    }) as TagClass<Self, Id, ModelList>;
-  };
+  // SAFETY: Object.assign attaches exactly the static id/layer members declared by TagClass.
+  return Object.assign(tag, {
+    id,
+    layer: makeLayer,
+  }) as TagClass<Self, Id, ModelList>
+}

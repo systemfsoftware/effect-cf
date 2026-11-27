@@ -1,0 +1,14 @@
+{
+  // Read by systemfsoftware/pnpm-release-management's release tools, which the
+  // reusable workflows in .github/workflows/ run. Each package is versioned
+  // through its change intents, tagged <pkg>@vX.Y.Z, released on GitHub and
+  // published to npm through trusted publishing.
+  "base": "main",
+  "branch": "changeset-release/main",
+  "versioning": {
+    "strategy": "changesets",
+  },
+  // The paths gate classifies a change by the member directory it touches; this
+  // repository has no root Turbo config.
+  "gate": { "strategy": "paths" },
+}

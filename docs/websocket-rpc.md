@@ -10,10 +10,10 @@ Keep schemas in a module that both the client and Durable Object can import.
 
 ```ts
 // counter-rpcs.ts
-import { Schema } from "effect";
-import { Rpc, RpcGroup } from "effect/rpc";
+import { Schema } from 'effect'
+import { Rpc, RpcGroup } from 'effect/rpc'
 
-export class CounterRpcs extends RpcGroup.make(Rpc.make("increment", { success: Schema.Finite })) {}
+export class CounterRpcs extends RpcGroup.make(Rpc.make('increment', { success: Schema.Finite })) {}
 ```
 
 ## Provide a client service
@@ -21,33 +21,33 @@ export class CounterRpcs extends RpcGroup.make(Rpc.make("increment", { success: 
 Use the browser-safe subpath to avoid importing Cloudflare runtime modules.
 
 ```ts
-import { Context, Effect, Layer } from "effect";
-import { RpcClient } from "effect/rpc";
-import type { RpcClientError } from "effect/rpc/RpcClientError";
-import * as Socket from "effect/socket/Socket";
-import * as RpcWebSocketClient from "effect-cf/rpc-websocket-client";
-import { CounterRpcs } from "./counter-rpcs";
+import * as RpcWebSocketClient from '@systemfsoftware/effect-cf/rpc-websocket-client'
+import { Context, Effect, Layer } from 'effect'
+import { RpcClient } from 'effect/rpc'
+import type { RpcClientError } from 'effect/rpc/RpcClientError'
+import * as Socket from 'effect/socket/Socket'
+import { CounterRpcs } from './counter-rpcs'
 
 class CounterClient extends Context.Service<
   CounterClient,
   RpcClient.FromGroup<typeof CounterRpcs, RpcClientError>
->()("app/CounterClient") {
+>()('app/CounterClient') {
   static readonly layer = RpcWebSocketClient.layer(
     CounterClient,
     CounterRpcs,
-    "wss://example.com/counter",
-  ).pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal));
+    'wss://example.com/counter',
+  ).pipe(Layer.provide(Socket.layerWebSocketConstructorGlobal))
 }
 
-const program = Effect.gen(function* () {
-  const counter = yield* CounterClient;
-  const first = yield* counter.increment();
-  const second = yield* counter.increment();
+const program = Effect.gen(function*() {
+  const counter = yield* CounterClient
+  const first = yield* counter.increment()
+  const second = yield* counter.increment()
 
-  return { first, second };
-}).pipe(Effect.provide(CounterClient.layer));
+  return { first, second }
+}).pipe(Effect.provide(CounterClient.layer))
 
-const result = await Effect.runPromise(program);
+const result = await Effect.runPromise(program)
 ```
 
 Both calls share the same connection. It closes when the provided program ends,
@@ -95,7 +95,6 @@ The default heartbeat mode owns the Durable Object's WebSocket auto-response
 pair for the lifetime of RPC sockets, including pending operations, and rejects
 a conflicting existing pair. Keepalives never invoke the object. Lost ordinary
 operations reset on the next application message after eviction; clients should
-use operation deadlines to recover them. See the [keepalive protocol and migration
-guide](durable-object-wakeups.md#keepalive-protocol). Use `heartbeat: "passthrough"`
+use operation deadlines to recover them. See the [keepalive protocol and migration guide](durable-object-wakeups.md#keepalive-protocol). Use `heartbeat: "passthrough"`
 when the application manages that pair itself or shares the object with another
 WebSocket protocol.

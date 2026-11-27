@@ -1,9 +1,9 @@
-import { Schema } from "effect";
-import { QueueDefinition } from "effect-cf";
+import { QueueDefinition } from '@systemfsoftware/effect-cf'
+import { Schema } from 'effect'
 
-export class Api extends QueueDefinition.Tag<Api>()("Api", { message: Schema.String }) {}
+export class Api extends QueueDefinition.Tag<Api>()('Api', { message: Schema.String }) {}
 
-export const bindingLayer = Api.layer({ binding: "API" });
-export const sent = Api.send("hello");
-export const sendBatch = Api.sendBatch;
-export const raw = Api.rawUnsafe;
+export const bindingLayer = Api.layer({ binding: 'API' })
+export const sent = Api.send('hello')
+export const sendBatch = Api.sendBatch
+export const raw = Api.rawUnsafe

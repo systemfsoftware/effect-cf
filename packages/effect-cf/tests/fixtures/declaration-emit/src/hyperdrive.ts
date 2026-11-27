@@ -1,5 +1,5 @@
-import { Hyperdrive } from "effect-cf";
+import { Hyperdrive } from '@systemfsoftware/effect-cf'
 
-export class Database extends Hyperdrive.Tag<Database>()("Database") {}
+export class Database extends Hyperdrive.Tag<Database>()('Database') {}
 
-export const bindingLayer = Database.layer({ binding: "DATABASE" });
+export const bindingLayer = Database.layer({ binding: 'DATABASE' })

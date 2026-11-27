@@ -1,5 +1,5 @@
-import { Images } from "effect-cf";
+import { Images } from '@systemfsoftware/effect-cf'
 
-export class ImageService extends Images.Tag<ImageService>()("ImageService") {}
+export class ImageService extends Images.Tag<ImageService>()('ImageService') {}
 
-export const bindingLayer = ImageService.layer({ binding: "IMAGES" });
+export const bindingLayer = ImageService.layer({ binding: 'IMAGES' })

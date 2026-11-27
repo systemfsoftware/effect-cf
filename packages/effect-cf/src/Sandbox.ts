@@ -35,23 +35,23 @@ import type {
   WaitForLogResult,
   WaitForPortOptions,
   WatchOptions,
-} from "@cloudflare/sandbox";
-import * as Context from "effect/Context";
-import * as Data from "effect/Data";
-import * as Effect from "effect/Effect";
-import * as Option from "effect/Option";
-import * as Predicate from "effect/Predicate";
-import * as Stream from "effect/Stream";
-import type { Layer } from "effect";
+} from '@cloudflare/sandbox'
+import type { Layer } from 'effect'
+import * as Context from 'effect/Context'
+import * as Data from 'effect/Data'
+import * as Effect from 'effect/Effect'
+import * as Option from 'effect/Option'
+import * as Predicate from 'effect/Predicate'
+import * as Stream from 'effect/Stream'
 
-import * as Binding from "./Binding";
-import type { ContainerStartOptions, ContainerStopSignal } from "./ContainerNamespace";
-import { WorkerEnvironment } from "./Environment";
-import * as ErrorMessage from "./internal/ErrorMessage";
-import { CurrentTargets } from "./internal/RpcTargets";
-import * as RpcTargets from "./RpcTargets";
+import * as Binding from './Binding'
+import type { ContainerStartOptions, ContainerStopSignal } from './ContainerNamespace'
+import { WorkerEnvironment } from './Environment'
+import * as ErrorMessage from './internal/ErrorMessage'
+import { CurrentTargets } from './internal/RpcTargets'
+import * as RpcTargets from './RpcTargets'
 
-export type { BindingNotFoundError, BindingValidationError } from "./Binding";
+export type { BindingNotFoundError, BindingValidationError } from './Binding'
 
 export type {
   BackupOptions,
@@ -86,23 +86,24 @@ export type {
   WaitForLogResult,
   WaitForPortOptions,
   WatchOptions,
-} from "@cloudflare/sandbox";
+} from '@cloudflare/sandbox'
 
-const expectedSandboxNamespace =
-  "Sandbox Durable Object namespace binding with idFromName() and get()";
+const expectedSandboxNamespace = 'Sandbox Durable Object namespace binding with idFromName() and get()'
 
 export interface SandboxDefinition {
-  readonly binding: string;
+  readonly binding: string
 }
 
-export class SandboxOperationError extends Data.TaggedError("SandboxOperationError")<{
-  readonly binding: string;
-  readonly instance: string;
-  readonly operation: string;
-  readonly cause: unknown;
+export class SandboxOperationError extends Data.TaggedError('SandboxOperationError')<{
+  readonly binding: string
+  readonly instance: string
+  readonly operation: string
+  readonly cause: unknown
 }> {
   override get message(): string {
-    return `Sandbox ${this.operation} failed for binding "${this.binding}" instance "${this.instance}": ${ErrorMessage.causeMessage(this.cause)}`;
+    return `Sandbox ${this.operation} failed for binding "${this.binding}" instance "${this.instance}": ${
+      ErrorMessage.causeMessage(this.cause)
+    }`
   }
 }
 
@@ -114,53 +115,53 @@ export class SandboxOperationError extends Data.TaggedError("SandboxOperationErr
  * sandbox instance is first requested.
  */
 export interface SandboxNamespaceResource {
-  idFromName(name: string): globalThis.DurableObjectId;
+  idFromName(name: string): globalThis.DurableObjectId
   get(
     id: globalThis.DurableObjectId,
     options?: globalThis.DurableObjectNamespaceGetDurableObjectOptions,
-  ): globalThis.DurableObjectStub;
+  ): globalThis.DurableObjectStub
 }
 
-export type WriteFileResult = Awaited<ReturnType<ISandbox["writeFile"]>>;
+export type WriteFileResult = Awaited<ReturnType<ISandbox['writeFile']>>
 
-export type ReadFileResult = Awaited<ReturnType<ISandbox["readFile"]>>;
+export type ReadFileResult = Awaited<ReturnType<ISandbox['readFile']>>
 
-export type MkdirResult = Awaited<ReturnType<ISandbox["mkdir"]>>;
+export type MkdirResult = Awaited<ReturnType<ISandbox['mkdir']>>
 
-export type DeleteFileResult = Awaited<ReturnType<ISandbox["deleteFile"]>>;
+export type DeleteFileResult = Awaited<ReturnType<ISandbox['deleteFile']>>
 
-export type RenameFileResult = Awaited<ReturnType<ISandbox["renameFile"]>>;
+export type RenameFileResult = Awaited<ReturnType<ISandbox['renameFile']>>
 
-export type MoveFileResult = Awaited<ReturnType<ISandbox["moveFile"]>>;
+export type MoveFileResult = Awaited<ReturnType<ISandbox['moveFile']>>
 
-export type ListFilesResult = Awaited<ReturnType<ISandbox["listFiles"]>>;
+export type ListFilesResult = Awaited<ReturnType<ISandbox['listFiles']>>
 
-export type FileExistsResult = Awaited<ReturnType<ISandbox["exists"]>>;
+export type FileExistsResult = Awaited<ReturnType<ISandbox['exists']>>
 
-export type ReadFileEncoding = "utf-8" | "utf8" | "base64";
+export type ReadFileEncoding = 'utf-8' | 'utf8' | 'base64'
 
 export interface ExposePortOptions {
-  readonly name?: string;
-  readonly hostname: string;
-  readonly token?: string;
+  readonly name?: string
+  readonly hostname: string
+  readonly token?: string
 }
 
 export interface ExposedPort {
-  readonly url: string;
-  readonly port: number;
-  readonly name?: string;
+  readonly url: string
+  readonly port: number
+  readonly name?: string
 }
 
 export interface ExposedPortStatus {
-  readonly url: string;
-  readonly port: number;
-  readonly status: "active";
+  readonly url: string
+  readonly port: number
+  readonly status: 'active'
 }
 
 export interface SandboxTunnelsResource {
-  get(port: number, options?: TunnelOptions): Promise<TunnelInfo>;
-  list(): Promise<Array<TunnelInfo>>;
-  destroy(portOrInfo: number | TunnelInfo): Promise<void>;
+  get(port: number, options?: TunnelOptions): Promise<TunnelInfo>
+  list(): Promise<Array<TunnelInfo>>
+  destroy(portOrInfo: number | TunnelInfo): Promise<void>
 }
 
 /**
@@ -169,212 +170,212 @@ export interface SandboxTunnelsResource {
  * tunnel methods the client proxy forwards to the Sandbox Durable Object.
  */
 export interface SandboxClientResource extends ISandbox {
-  start(options?: ContainerStartOptions): Promise<void>;
-  stop(signal?: ContainerStopSignal): Promise<void>;
-  destroy(): Promise<void>;
-  containerFetch(requestOrUrl: Request | string | URL, port?: number): Promise<Response>;
-  exposePort(port: number, options: ExposePortOptions): Promise<ExposedPort>;
-  unexposePort(port: number): Promise<void>;
-  getExposedPorts(hostname: string): Promise<Array<ExposedPortStatus>>;
-  isPortExposed(port: number): Promise<boolean>;
-  validatePortToken(port: number, token: string): Promise<boolean>;
-  readonly tunnels: SandboxTunnelsResource;
+  start(options?: ContainerStartOptions): Promise<void>
+  stop(signal?: ContainerStopSignal): Promise<void>
+  destroy(): Promise<void>
+  containerFetch(requestOrUrl: Request | string | URL, port?: number): Promise<Response>
+  exposePort(port: number, options: ExposePortOptions): Promise<ExposedPort>
+  unexposePort(port: number): Promise<void>
+  getExposedPorts(hostname: string): Promise<Array<ExposedPortStatus>>
+  isPortExposed(port: number): Promise<boolean>
+  validatePortToken(port: number, token: string): Promise<boolean>
+  readonly tunnels: SandboxTunnelsResource
 }
 
 export interface SandboxProcessHandle {
   /** Releases the RPC reference without stopping the process. */
-  [Symbol.dispose](): void;
-  readonly id: string;
-  readonly pid: number;
-  readonly rawUnsafe: Effect.Effect<SandboxProcess>;
-  readonly status: Effect.Effect<ProcessStatus, SandboxOperationError>;
-  readonly exitCode: Effect.Effect<number, SandboxOperationError>;
+  [Symbol.dispose](): void
+  readonly id: string
+  readonly pid: number
+  readonly rawUnsafe: Effect.Effect<SandboxProcess>
+  readonly status: Effect.Effect<ProcessStatus, SandboxOperationError>
+  readonly exitCode: Effect.Effect<number, SandboxOperationError>
   readonly logs: (
-    options?: Omit<ProcessLogsOptions, "signal">,
-  ) => Stream.Stream<ProcessLogEvent, SandboxOperationError>;
+    options?: Omit<ProcessLogsOptions, 'signal'>,
+  ) => Stream.Stream<ProcessLogEvent, SandboxOperationError>
   readonly waitForLog: (
     pattern: string | RegExp,
-    options?: Omit<WaitForLogOptions, "signal">,
-  ) => Effect.Effect<WaitForLogResult, SandboxOperationError>;
+    options?: Omit<WaitForLogOptions, 'signal'>,
+  ) => Effect.Effect<WaitForLogResult, SandboxOperationError>
   readonly waitForExit: (
-    options?: Omit<WaitForExitOptions, "signal">,
-  ) => Effect.Effect<ProcessExit, SandboxOperationError>;
+    options?: Omit<WaitForExitOptions, 'signal'>,
+  ) => Effect.Effect<ProcessExit, SandboxOperationError>
   readonly output: (
-    options?: Omit<ProcessOutputOptions, "signal">,
-  ) => Effect.Effect<ProcessOutput<Uint8Array>, SandboxOperationError>;
+    options?: Omit<ProcessOutputOptions, 'signal'>,
+  ) => Effect.Effect<ProcessOutput<Uint8Array>, SandboxOperationError>
   readonly outputText: (
-    options?: Omit<ProcessOutputOptions, "signal">,
-  ) => Effect.Effect<ProcessOutput<string>, SandboxOperationError>;
+    options?: Omit<ProcessOutputOptions, 'signal'>,
+  ) => Effect.Effect<ProcessOutput<string>, SandboxOperationError>
   readonly waitForPort: (
     port: number,
-    options?: Omit<WaitForPortOptions, "signal">,
-  ) => Effect.Effect<void, SandboxOperationError>;
-  readonly kill: (signal?: number) => Effect.Effect<void, SandboxOperationError>;
+    options?: Omit<WaitForPortOptions, 'signal'>,
+  ) => Effect.Effect<void, SandboxOperationError>
+  readonly kill: (signal?: number) => Effect.Effect<void, SandboxOperationError>
 }
 
 export interface SandboxTerminalHandle {
   /** Releases the RPC reference without terminating the terminal. */
-  [Symbol.dispose](): void;
-  readonly id: string;
-  readonly rawUnsafe: Effect.Effect<Terminal>;
-  readonly snapshot: Effect.Effect<TerminalSnapshot, SandboxOperationError>;
-  readonly write: (data: Uint8Array) => Effect.Effect<void, SandboxOperationError>;
-  readonly resize: (cols: number, rows: number) => Effect.Effect<void, SandboxOperationError>;
+  [Symbol.dispose](): void
+  readonly id: string
+  readonly rawUnsafe: Effect.Effect<Terminal>
+  readonly snapshot: Effect.Effect<TerminalSnapshot, SandboxOperationError>
+  readonly write: (data: Uint8Array) => Effect.Effect<void, SandboxOperationError>
+  readonly resize: (cols: number, rows: number) => Effect.Effect<void, SandboxOperationError>
   readonly output: (
-    options?: Omit<TerminalOutputOptions, "signal">,
-  ) => Stream.Stream<TerminalOutputEvent, SandboxOperationError>;
+    options?: Omit<TerminalOutputOptions, 'signal'>,
+  ) => Stream.Stream<TerminalOutputEvent, SandboxOperationError>
   readonly waitForExit: (
-    options?: Omit<WaitForExitOptions, "signal">,
-  ) => Effect.Effect<ProcessExit, SandboxOperationError>;
-  readonly interrupt: Effect.Effect<void, SandboxOperationError>;
-  readonly terminate: Effect.Effect<void, SandboxOperationError>;
+    options?: Omit<WaitForExitOptions, 'signal'>,
+  ) => Effect.Effect<ProcessExit, SandboxOperationError>
+  readonly interrupt: Effect.Effect<void, SandboxOperationError>
+  readonly terminate: Effect.Effect<void, SandboxOperationError>
   readonly connect: (
     request: Request,
     options?: {
-      readonly cursor?: TerminalOutputCursor;
-      readonly cols?: number;
-      readonly rows?: number;
+      readonly cursor?: TerminalOutputCursor
+      readonly cols?: number
+      readonly rows?: number
     },
-  ) => Effect.Effect<Response, SandboxOperationError>;
+  ) => Effect.Effect<Response, SandboxOperationError>
 }
 
 export interface SandboxTunnelsClient {
   readonly get: (
     port: number,
     options?: TunnelOptions,
-  ) => Effect.Effect<TunnelInfo, SandboxOperationError>;
-  readonly list: Effect.Effect<Array<TunnelInfo>, SandboxOperationError>;
-  readonly destroy: (portOrInfo: number | TunnelInfo) => Effect.Effect<void, SandboxOperationError>;
+  ) => Effect.Effect<TunnelInfo, SandboxOperationError>
+  readonly list: Effect.Effect<Array<TunnelInfo>, SandboxOperationError>
+  readonly destroy: (portOrInfo: number | TunnelInfo) => Effect.Effect<void, SandboxOperationError>
 }
 
 export interface SandboxInstanceClient {
-  readonly rawUnsafe: Effect.Effect<SandboxClientResource, SandboxOperationError>;
+  readonly rawUnsafe: Effect.Effect<SandboxClientResource, SandboxOperationError>
   readonly exec: (
     command: SandboxCommand,
     options?: ExecOptions,
-  ) => Effect.Effect<SandboxProcessHandle, SandboxOperationError>;
+  ) => Effect.Effect<SandboxProcessHandle, SandboxOperationError>
   readonly getProcess: (
     id: string,
-  ) => Effect.Effect<Option.Option<SandboxProcessHandle>, SandboxOperationError>;
-  readonly listProcesses: Effect.Effect<Array<ProcessStatus>, SandboxOperationError>;
+  ) => Effect.Effect<Option.Option<SandboxProcessHandle>, SandboxOperationError>
+  readonly listProcesses: Effect.Effect<Array<ProcessStatus>, SandboxOperationError>
   readonly writeFile: (
     path: string,
     content: string | ReadableStream<Uint8Array>,
     options?: { readonly encoding?: string },
-  ) => Effect.Effect<WriteFileResult, SandboxOperationError>;
+  ) => Effect.Effect<WriteFileResult, SandboxOperationError>
   readonly readFile: (
     path: string,
     options?: { readonly encoding?: ReadFileEncoding },
-  ) => Effect.Effect<ReadFileResult, SandboxOperationError>;
-  readonly readFileStream: (path: string) => Stream.Stream<Uint8Array, SandboxOperationError>;
+  ) => Effect.Effect<ReadFileResult, SandboxOperationError>
+  readonly readFileStream: (path: string) => Stream.Stream<Uint8Array, SandboxOperationError>
   readonly mkdir: (
     path: string,
     options?: { readonly recursive?: boolean },
-  ) => Effect.Effect<MkdirResult, SandboxOperationError>;
-  readonly deleteFile: (path: string) => Effect.Effect<DeleteFileResult, SandboxOperationError>;
+  ) => Effect.Effect<MkdirResult, SandboxOperationError>
+  readonly deleteFile: (path: string) => Effect.Effect<DeleteFileResult, SandboxOperationError>
   readonly renameFile: (
     oldPath: string,
     newPath: string,
-  ) => Effect.Effect<RenameFileResult, SandboxOperationError>;
+  ) => Effect.Effect<RenameFileResult, SandboxOperationError>
   readonly moveFile: (
     sourcePath: string,
     destinationPath: string,
-  ) => Effect.Effect<MoveFileResult, SandboxOperationError>;
+  ) => Effect.Effect<MoveFileResult, SandboxOperationError>
   readonly listFiles: (
     path: string,
     options?: ListFilesOptions,
-  ) => Effect.Effect<ListFilesResult, SandboxOperationError>;
-  readonly exists: (path: string) => Effect.Effect<FileExistsResult, SandboxOperationError>;
+  ) => Effect.Effect<ListFilesResult, SandboxOperationError>
+  readonly exists: (path: string) => Effect.Effect<FileExistsResult, SandboxOperationError>
   readonly watch: (
     path: string,
     options?: WatchOptions,
-  ) => Stream.Stream<FileWatchSSEEvent, SandboxOperationError>;
+  ) => Stream.Stream<FileWatchSSEEvent, SandboxOperationError>
   readonly checkChanges: (
     path: string,
     options?: CheckChangesOptions,
-  ) => Effect.Effect<CheckChangesResult, SandboxOperationError>;
+  ) => Effect.Effect<CheckChangesResult, SandboxOperationError>
   readonly setEnvVars: (
     envVars: Record<string, string | undefined>,
-  ) => Effect.Effect<void, SandboxOperationError>;
+  ) => Effect.Effect<void, SandboxOperationError>
   readonly exposePort: (
     port: number,
     options: ExposePortOptions,
-  ) => Effect.Effect<ExposedPort, SandboxOperationError>;
-  readonly unexposePort: (port: number) => Effect.Effect<void, SandboxOperationError>;
+  ) => Effect.Effect<ExposedPort, SandboxOperationError>
+  readonly unexposePort: (port: number) => Effect.Effect<void, SandboxOperationError>
   readonly getExposedPorts: (
     hostname: string,
-  ) => Effect.Effect<Array<ExposedPortStatus>, SandboxOperationError>;
-  readonly isPortExposed: (port: number) => Effect.Effect<boolean, SandboxOperationError>;
+  ) => Effect.Effect<Array<ExposedPortStatus>, SandboxOperationError>
+  readonly isPortExposed: (port: number) => Effect.Effect<boolean, SandboxOperationError>
   readonly validatePortToken: (
     port: number,
     token: string,
-  ) => Effect.Effect<boolean, SandboxOperationError>;
+  ) => Effect.Effect<boolean, SandboxOperationError>
   readonly containerFetch: (
     requestOrUrl: Request | string | URL,
     port?: number,
-  ) => Effect.Effect<Response, SandboxOperationError>;
+  ) => Effect.Effect<Response, SandboxOperationError>
   readonly wsConnect: (
     request: Request,
     port: number,
-  ) => Effect.Effect<Response, SandboxOperationError>;
+  ) => Effect.Effect<Response, SandboxOperationError>
   readonly mountBucket: (
     bucket: string,
     mountPath: string,
     options: MountBucketOptions,
-  ) => Effect.Effect<void, SandboxOperationError>;
-  readonly unmountBucket: (mountPath: string) => Effect.Effect<void, SandboxOperationError>;
+  ) => Effect.Effect<void, SandboxOperationError>
+  readonly unmountBucket: (mountPath: string) => Effect.Effect<void, SandboxOperationError>
   readonly createBackup: (
     options: BackupOptions,
-  ) => Effect.Effect<DirectoryBackup, SandboxOperationError>;
+  ) => Effect.Effect<DirectoryBackup, SandboxOperationError>
   readonly restoreBackup: (
     backup: DirectoryBackup,
-  ) => Effect.Effect<RestoreBackupResult, SandboxOperationError>;
+  ) => Effect.Effect<RestoreBackupResult, SandboxOperationError>
   readonly createTerminal: (
     options: CreateTerminalOptions,
-  ) => Effect.Effect<SandboxTerminalHandle, SandboxOperationError>;
+  ) => Effect.Effect<SandboxTerminalHandle, SandboxOperationError>
   readonly getTerminal: (
     id: string,
-  ) => Effect.Effect<Option.Option<SandboxTerminalHandle>, SandboxOperationError>;
-  readonly listTerminals: Effect.Effect<Array<SandboxTerminalHandle>, SandboxOperationError>;
-  readonly tunnels: SandboxTunnelsClient;
-  readonly start: (options?: ContainerStartOptions) => Effect.Effect<void, SandboxOperationError>;
-  readonly stop: (signal?: ContainerStopSignal) => Effect.Effect<void, SandboxOperationError>;
-  readonly destroy: Effect.Effect<void, SandboxOperationError>;
+  ) => Effect.Effect<Option.Option<SandboxTerminalHandle>, SandboxOperationError>
+  readonly listTerminals: Effect.Effect<Array<SandboxTerminalHandle>, SandboxOperationError>
+  readonly tunnels: SandboxTunnelsClient
+  readonly start: (options?: ContainerStartOptions) => Effect.Effect<void, SandboxOperationError>
+  readonly stop: (signal?: ContainerStopSignal) => Effect.Effect<void, SandboxOperationError>
+  readonly destroy: Effect.Effect<void, SandboxOperationError>
 }
 
 export interface SandboxNamespaceClient<
   Namespace extends SandboxNamespaceResource = SandboxNamespaceResource,
 > {
-  readonly definition: SandboxDefinition;
+  readonly definition: SandboxDefinition
   readonly get: (
     name: string,
     options?: SandboxOptions,
-  ) => Effect.Effect<SandboxInstanceClient, SandboxOperationError>;
-  readonly rawUnsafe: Effect.Effect<Namespace>;
+  ) => Effect.Effect<SandboxInstanceClient, SandboxOperationError>
+  readonly rawUnsafe: Effect.Effect<Namespace>
 }
 
 export type LayerOptions = {
-  readonly binding: string;
-};
+  readonly binding: string
+}
 
 export interface TagClass<
   Self,
   Id extends string,
   Namespace extends SandboxNamespaceResource = SandboxNamespaceResource,
 > extends Context.ServiceClass<Self, `effect-cf/Sandbox/${Id}`, SandboxNamespaceClient<Namespace>> {
-  readonly id: Id;
+  readonly id: Id
   readonly layer: (
     options: LayerOptions,
   ) => Layer.Layer<
     Self,
     Binding.BindingNotFoundError | Binding.BindingValidationError,
     WorkerEnvironment
-  >;
+  >
   readonly get: (
     name: string,
     options?: SandboxOptions,
-  ) => Effect.Effect<SandboxInstanceClient, SandboxOperationError, Self>;
-  readonly rawUnsafe: Effect.Effect<Namespace, never, Self>;
+  ) => Effect.Effect<SandboxInstanceClient, SandboxOperationError, Self>
+  readonly rawUnsafe: Effect.Effect<Namespace, never, Self>
 }
 
 const trySandboxPromise = <A>(
@@ -395,7 +396,7 @@ const trySandboxPromise = <A>(
       }),
   }).pipe(
     Effect.tapCause(() => (target === undefined ? Effect.void : RpcTargets.invalidate(target))),
-  );
+  )
 
 const sandboxStream = <A>(
   definition: SandboxDefinition,
@@ -407,7 +408,8 @@ const sandboxStream = <A>(
   Stream.unwrap(
     Effect.map(trySandboxPromise(definition, instance, operation, acquire, target), (readable) =>
       Stream.fromReadableStream({
-        evaluate: () => readable,
+        evaluate: () =>
+          readable,
         onError: (cause) =>
           new SandboxOperationError({
             binding: definition.binding,
@@ -415,23 +417,24 @@ const sandboxStream = <A>(
             operation,
             cause,
           }),
-      }),
-    ),
-  ).pipe(Stream.tapCause(() => RpcTargets.invalidate(target)));
+      })),
+  ).pipe(Stream.tapCause(() =>
+    RpcTargets.invalidate(target)
+  ))
 
 const decodeSseData = <A>(payload: string): ReadonlyArray<A> => {
-  if (payload === "[DONE]" || payload.trim() === "") {
-    return [];
+  if (payload === '[DONE]' || payload.trim() === '') {
+    return []
   }
 
   try {
     // SAFETY: sandbox watch frames are JSON-encoded event payloads produced by
     // the sandbox runtime; the caller fixes A to the matching event type.
-    return [JSON.parse(payload) as A];
+    return [JSON.parse(payload) as A]
   } catch {
-    return [];
+    return []
   }
-};
+}
 
 /**
  * Decodes the sandbox runtime's `data:`-framed Server-Sent Events byte stream
@@ -445,23 +448,23 @@ const decodeSseEvents = <A, E, R>(bytes: Stream.Stream<Uint8Array, E, R>): Strea
     Stream.mapAccum(
       (): ReadonlyArray<string> => [],
       (pending, line) => {
-        if (line === "") {
-          return pending.length > 0 ? [[], decodeSseData<A>(pending.join("\n"))] : [pending, []];
+        if (line === '') {
+          return pending.length > 0 ? [[], decodeSseData<A>(pending.join('\n'))] : [pending, []]
         }
 
-        if (line.startsWith("data:")) {
-          const value = line.startsWith("data: ") ? line.slice(6) : line.slice(5);
+        if (line.startsWith('data:')) {
+          const value = line.startsWith('data: ') ? line.slice(6) : line.slice(5)
 
-          return [[...pending, value], []];
+          return [[...pending, value], []]
         }
 
-        return [pending, []];
+        return [pending, []]
       },
       {
-        onHalt: (pending) => (pending.length > 0 ? decodeSseData<A>(pending.join("\n")) : []),
+        onHalt: (pending) => (pending.length > 0 ? decodeSseData<A>(pending.join('\n')) : []),
       },
     ),
-  );
+  )
 
 const makeProcessHandle = (
   definition: SandboxDefinition,
@@ -470,11 +473,11 @@ const makeProcessHandle = (
   target: SandboxClientResource | SandboxNamespaceResource,
 ): SandboxProcessHandle => {
   const attempt = <A>(operation: string, evaluate: (signal: AbortSignal) => PromiseLike<A>) =>
-    trySandboxPromise(definition, instance, operation, evaluate, target);
+    trySandboxPromise(definition, instance, operation, evaluate, target)
   const stream = <A>(
     operation: string,
     acquire: (signal: AbortSignal) => PromiseLike<ReadableStream<A>>,
-  ) => sandboxStream(definition, instance, operation, acquire, target);
+  ) => sandboxStream(definition, instance, operation, acquire, target)
   const spanOptions = (operation: string) => ({
     attributes: {
       binding: definition.binding,
@@ -482,67 +485,59 @@ const makeProcessHandle = (
       processId: process.id,
       operation,
     },
-  });
+  })
 
   return {
     id: process.id,
     pid: process.pid,
     [Symbol.dispose]: () => process[Symbol.dispose](),
     rawUnsafe: Effect.succeed(process),
-    status: attempt("process.status", () => process.status()).pipe(
-      Effect.withSpan("Sandbox.process.status", spanOptions("process.status")),
+    status: attempt('process.status', () => process.status()).pipe(
+      Effect.withSpan('Sandbox.process.status', spanOptions('process.status')),
     ),
-    exitCode: attempt("process.exitCode", () => process.exitCode).pipe(
-      Effect.withSpan("Sandbox.process.exitCode", spanOptions("process.exitCode")),
+    exitCode: attempt('process.exitCode', () => process.exitCode).pipe(
+      Effect.withSpan('Sandbox.process.exitCode', spanOptions('process.exitCode')),
     ),
-    logs: (options?: Omit<ProcessLogsOptions, "signal">) =>
-      stream("process.logs", (signal) => process.logs({ ...options, signal })),
+    logs: (options?: Omit<ProcessLogsOptions, 'signal'>) =>
+      stream('process.logs', (signal) => process.logs({ ...options, signal })),
     waitForLog: Effect.fn(
-      "Sandbox.process.waitForLog",
-      spanOptions("process.waitForLog"),
-    )(function* (pattern: string | RegExp, options?: Omit<WaitForLogOptions, "signal">) {
-      return yield* attempt("process.waitForLog", (signal) =>
-        process.waitForLog(pattern, { ...options, signal }),
-      );
+      'Sandbox.process.waitForLog',
+      spanOptions('process.waitForLog'),
+    )(function*(pattern: string | RegExp, options?: Omit<WaitForLogOptions, 'signal'>) {
+      return yield* attempt('process.waitForLog', (signal) => process.waitForLog(pattern, { ...options, signal }))
     }),
     waitForExit: Effect.fn(
-      "Sandbox.process.waitForExit",
-      spanOptions("process.waitForExit"),
-    )(function* (options?: Omit<WaitForExitOptions, "signal">) {
-      return yield* attempt("process.waitForExit", (signal) =>
-        process.waitForExit({ ...options, signal }),
-      );
+      'Sandbox.process.waitForExit',
+      spanOptions('process.waitForExit'),
+    )(function*(options?: Omit<WaitForExitOptions, 'signal'>) {
+      return yield* attempt('process.waitForExit', (signal) => process.waitForExit({ ...options, signal }))
     }),
     output: Effect.fn(
-      "Sandbox.process.output",
-      spanOptions("process.output"),
-    )(function* (options?: Omit<ProcessOutputOptions, "signal">) {
-      return yield* attempt("process.output", (signal) => process.output({ ...options, signal }));
+      'Sandbox.process.output',
+      spanOptions('process.output'),
+    )(function*(options?: Omit<ProcessOutputOptions, 'signal'>) {
+      return yield* attempt('process.output', (signal) => process.output({ ...options, signal }))
     }),
     outputText: Effect.fn(
-      "Sandbox.process.outputText",
-      spanOptions("process.outputText"),
-    )(function* (options?: Omit<ProcessOutputOptions, "signal">) {
-      return yield* attempt("process.outputText", (signal) =>
-        process.output({ ...options, encoding: "utf8", signal }),
-      );
+      'Sandbox.process.outputText',
+      spanOptions('process.outputText'),
+    )(function*(options?: Omit<ProcessOutputOptions, 'signal'>) {
+      return yield* attempt('process.outputText', (signal) => process.output({ ...options, encoding: 'utf8', signal }))
     }),
     waitForPort: Effect.fn(
-      "Sandbox.process.waitForPort",
-      spanOptions("process.waitForPort"),
-    )(function* (port: number, options?: Omit<WaitForPortOptions, "signal">) {
-      return yield* attempt("process.waitForPort", (signal) =>
-        process.waitForPort(port, { ...options, signal }),
-      );
+      'Sandbox.process.waitForPort',
+      spanOptions('process.waitForPort'),
+    )(function*(port: number, options?: Omit<WaitForPortOptions, 'signal'>) {
+      return yield* attempt('process.waitForPort', (signal) => process.waitForPort(port, { ...options, signal }))
     }),
     kill: Effect.fn(
-      "Sandbox.process.kill",
-      spanOptions("process.kill"),
-    )(function* (signal?: number) {
-      return yield* attempt("process.kill", () => process.kill(signal));
+      'Sandbox.process.kill',
+      spanOptions('process.kill'),
+    )(function*(signal?: number) {
+      return yield* attempt('process.kill', () => process.kill(signal))
     }),
-  };
-};
+  }
+}
 
 const makeTerminalHandle = (
   definition: SandboxDefinition,
@@ -551,11 +546,11 @@ const makeTerminalHandle = (
   target: SandboxClientResource | SandboxNamespaceResource,
 ): SandboxTerminalHandle => {
   const attempt = <A>(operation: string, evaluate: (signal: AbortSignal) => PromiseLike<A>) =>
-    trySandboxPromise(definition, instance, operation, evaluate, target);
+    trySandboxPromise(definition, instance, operation, evaluate, target)
   const stream = <A>(
     operation: string,
     acquire: (signal: AbortSignal) => PromiseLike<ReadableStream<A>>,
-  ) => sandboxStream(definition, instance, operation, acquire, target);
+  ) => sandboxStream(definition, instance, operation, acquire, target)
   const spanOptions = (operation: string) => ({
     attributes: {
       binding: definition.binding,
@@ -563,71 +558,68 @@ const makeTerminalHandle = (
       terminalId: terminal.id,
       operation,
     },
-  });
+  })
 
   return {
     id: terminal.id,
     [Symbol.dispose]: () => terminal[Symbol.dispose](),
     rawUnsafe: Effect.succeed(terminal),
-    snapshot: attempt("terminal.snapshot", () => terminal.getSnapshot()).pipe(
-      Effect.withSpan("Sandbox.terminal.snapshot", spanOptions("terminal.snapshot")),
+    snapshot: attempt('terminal.snapshot', () => terminal.getSnapshot()).pipe(
+      Effect.withSpan('Sandbox.terminal.snapshot', spanOptions('terminal.snapshot')),
     ),
     write: Effect.fn(
-      "Sandbox.terminal.write",
-      spanOptions("terminal.write"),
-    )(function* (data: Uint8Array) {
-      return yield* attempt("terminal.write", () => terminal.write(data));
+      'Sandbox.terminal.write',
+      spanOptions('terminal.write'),
+    )(function*(data: Uint8Array) {
+      return yield* attempt('terminal.write', () => terminal.write(data))
     }),
     resize: Effect.fn(
-      "Sandbox.terminal.resize",
-      spanOptions("terminal.resize"),
-    )(function* (cols: number, rows: number) {
-      return yield* attempt("terminal.resize", () => terminal.resize(cols, rows));
+      'Sandbox.terminal.resize',
+      spanOptions('terminal.resize'),
+    )(function*(cols: number, rows: number) {
+      return yield* attempt('terminal.resize', () => terminal.resize(cols, rows))
     }),
-    output: (options?: Omit<TerminalOutputOptions, "signal">) =>
-      stream("terminal.output", (signal) => terminal.output({ ...options, signal })),
+    output: (options?: Omit<TerminalOutputOptions, 'signal'>) =>
+      stream('terminal.output', (signal) => terminal.output({ ...options, signal })),
     waitForExit: Effect.fn(
-      "Sandbox.terminal.waitForExit",
-      spanOptions("terminal.waitForExit"),
-    )(function* (options?: Omit<WaitForExitOptions, "signal">) {
-      return yield* attempt("terminal.waitForExit", (signal) =>
-        terminal.waitForExit({ ...options, signal }),
-      );
+      'Sandbox.terminal.waitForExit',
+      spanOptions('terminal.waitForExit'),
+    )(function*(options?: Omit<WaitForExitOptions, 'signal'>) {
+      return yield* attempt('terminal.waitForExit', (signal) => terminal.waitForExit({ ...options, signal }))
     }),
-    interrupt: attempt("terminal.interrupt", () => terminal.interrupt()).pipe(
-      Effect.withSpan("Sandbox.terminal.interrupt", spanOptions("terminal.interrupt")),
+    interrupt: attempt('terminal.interrupt', () => terminal.interrupt()).pipe(
+      Effect.withSpan('Sandbox.terminal.interrupt', spanOptions('terminal.interrupt')),
     ),
-    terminate: attempt("terminal.terminate", () => terminal.terminate()).pipe(
-      Effect.withSpan("Sandbox.terminal.terminate", spanOptions("terminal.terminate")),
+    terminate: attempt('terminal.terminate', () => terminal.terminate()).pipe(
+      Effect.withSpan('Sandbox.terminal.terminate', spanOptions('terminal.terminate')),
     ),
     connect: Effect.fn(
-      "Sandbox.terminal.connect",
-      spanOptions("terminal.connect"),
-    )(function* (
+      'Sandbox.terminal.connect',
+      spanOptions('terminal.connect'),
+    )(function*(
       request: Request,
       options?: {
-        readonly cursor?: TerminalOutputCursor;
-        readonly cols?: number;
-        readonly rows?: number;
+        readonly cursor?: TerminalOutputCursor
+        readonly cols?: number
+        readonly rows?: number
       },
     ) {
-      return yield* attempt("terminal.connect", () => terminal.connect(request, options));
+      return yield* attempt('terminal.connect', () => terminal.connect(request, options))
     }),
-  };
-};
+  }
+}
 
 export const fromSandboxClient = (
   client: SandboxClientResource,
   definition: SandboxDefinition,
   instance: string,
-): SandboxInstanceClient =>
-  makeSandboxClient(Effect.succeed({ client, target: client }), definition, instance);
+): SandboxInstanceClient => makeSandboxClient(Effect.succeed({ client, target: client }), definition, instance)
 
 const makeSandboxClient = (
   resolve: Effect.Effect<
     {
-      readonly client: SandboxClientResource;
-      readonly target: SandboxClientResource | SandboxNamespaceResource;
+      readonly client: SandboxClientResource
+      readonly target: SandboxClientResource | SandboxNamespaceResource
     },
     SandboxOperationError
   >,
@@ -649,293 +641,280 @@ const makeSandboxClient = (
         operation,
         (signal) => evaluate(client, signal, target),
         target,
-      ),
-    );
+      ))
   const stream = <A>(
     operation: string,
     acquire: (client: SandboxClientResource, signal: AbortSignal) => PromiseLike<ReadableStream<A>>,
   ) =>
     Stream.unwrap(
       Effect.map(resolve, ({ client, target }) =>
-        sandboxStream(definition, instance, operation, (signal) => acquire(client, signal), target),
-      ),
-    );
+        sandboxStream(definition, instance, operation, (signal) =>
+          acquire(client, signal), target)),
+    )
   const spanOptions = (operation: string) => ({
     attributes: { binding: definition.binding, instance, operation },
-  });
+  })
 
   return {
     rawUnsafe: Effect.map(resolve, ({ client }) => client),
     exec: Effect.fn(
-      "Sandbox.exec",
-      spanOptions("exec"),
-    )(function* (command: SandboxCommand, options?: ExecOptions) {
-      return yield* attempt("exec", (client, _signal, target) =>
+      'Sandbox.exec',
+      spanOptions('exec'),
+    )(function*(command: SandboxCommand, options?: ExecOptions) {
+      return yield* attempt('exec', (client, _signal, target) =>
         client
           .exec(command, options)
-          .then((process) => makeProcessHandle(definition, instance, process, target)),
-      );
+          .then((process) => makeProcessHandle(definition, instance, process, target)))
     }),
     getProcess: Effect.fn(
-      "Sandbox.getProcess",
-      spanOptions("getProcess"),
-    )(function* (id: string) {
-      return yield* attempt("getProcess", (client, _signal, target) =>
+      'Sandbox.getProcess',
+      spanOptions('getProcess'),
+    )(function*(id: string) {
+      return yield* attempt('getProcess', (client, _signal, target) =>
         client
           .getProcess(id)
           .then((process) =>
-            Option.map(Option.fromNullishOr(process), (found) =>
-              makeProcessHandle(definition, instance, found, target),
-            ),
-          ),
-      );
+            Option.map(Option.fromNullishOr(process), (found) => makeProcessHandle(definition, instance, found, target))
+          ))
     }),
-    listProcesses: attempt("listProcesses", (client) => client.listProcesses()).pipe(
-      Effect.withSpan("Sandbox.listProcesses", spanOptions("listProcesses")),
+    listProcesses: attempt('listProcesses', (client) => client.listProcesses()).pipe(
+      Effect.withSpan('Sandbox.listProcesses', spanOptions('listProcesses')),
     ),
     writeFile: Effect.fn(
-      "Sandbox.writeFile",
-      spanOptions("writeFile"),
-    )(function* (
+      'Sandbox.writeFile',
+      spanOptions('writeFile'),
+    )(function*(
       path: string,
       content: string | ReadableStream<Uint8Array>,
       options?: { readonly encoding?: string },
     ) {
-      yield* Effect.annotateCurrentSpan("path", path);
+      yield* Effect.annotateCurrentSpan('path', path)
 
-      return yield* attempt("writeFile", (client) => client.writeFile(path, content, options));
+      return yield* attempt('writeFile', (client) => client.writeFile(path, content, options))
     }),
     readFile: Effect.fn(
-      "Sandbox.readFile",
-      spanOptions("readFile"),
-    )(function* (path: string, options?: { readonly encoding?: ReadFileEncoding }) {
-      yield* Effect.annotateCurrentSpan("path", path);
+      'Sandbox.readFile',
+      spanOptions('readFile'),
+    )(function*(path: string, options?: { readonly encoding?: ReadFileEncoding }) {
+      yield* Effect.annotateCurrentSpan('path', path)
 
-      return yield* attempt("readFile", (client) => client.readFile(path, options));
+      return yield* attempt('readFile', (client) => client.readFile(path, options))
     }),
-    readFileStream: (path: string) =>
-      stream("readFileStream", (client) => client.readFileStream(path)),
+    readFileStream: (path: string) => stream('readFileStream', (client) => client.readFileStream(path)),
     mkdir: Effect.fn(
-      "Sandbox.mkdir",
-      spanOptions("mkdir"),
-    )(function* (path: string, options?: { readonly recursive?: boolean }) {
-      yield* Effect.annotateCurrentSpan("path", path);
+      'Sandbox.mkdir',
+      spanOptions('mkdir'),
+    )(function*(path: string, options?: { readonly recursive?: boolean }) {
+      yield* Effect.annotateCurrentSpan('path', path)
 
-      return yield* attempt("mkdir", (client) => client.mkdir(path, options));
+      return yield* attempt('mkdir', (client) => client.mkdir(path, options))
     }),
     deleteFile: Effect.fn(
-      "Sandbox.deleteFile",
-      spanOptions("deleteFile"),
-    )(function* (path: string) {
-      yield* Effect.annotateCurrentSpan("path", path);
+      'Sandbox.deleteFile',
+      spanOptions('deleteFile'),
+    )(function*(path: string) {
+      yield* Effect.annotateCurrentSpan('path', path)
 
-      return yield* attempt("deleteFile", (client) => client.deleteFile(path));
+      return yield* attempt('deleteFile', (client) => client.deleteFile(path))
     }),
     renameFile: Effect.fn(
-      "Sandbox.renameFile",
-      spanOptions("renameFile"),
-    )(function* (oldPath: string, newPath: string) {
-      yield* Effect.annotateCurrentSpan({ oldPath, newPath });
+      'Sandbox.renameFile',
+      spanOptions('renameFile'),
+    )(function*(oldPath: string, newPath: string) {
+      yield* Effect.annotateCurrentSpan({ oldPath, newPath })
 
-      return yield* attempt("renameFile", (client) => client.renameFile(oldPath, newPath));
+      return yield* attempt('renameFile', (client) => client.renameFile(oldPath, newPath))
     }),
     moveFile: Effect.fn(
-      "Sandbox.moveFile",
-      spanOptions("moveFile"),
-    )(function* (sourcePath: string, destinationPath: string) {
-      yield* Effect.annotateCurrentSpan({ sourcePath, destinationPath });
+      'Sandbox.moveFile',
+      spanOptions('moveFile'),
+    )(function*(sourcePath: string, destinationPath: string) {
+      yield* Effect.annotateCurrentSpan({ sourcePath, destinationPath })
 
-      return yield* attempt("moveFile", (client) => client.moveFile(sourcePath, destinationPath));
+      return yield* attempt('moveFile', (client) => client.moveFile(sourcePath, destinationPath))
     }),
     listFiles: Effect.fn(
-      "Sandbox.listFiles",
-      spanOptions("listFiles"),
-    )(function* (path: string, options?: ListFilesOptions) {
-      yield* Effect.annotateCurrentSpan("path", path);
+      'Sandbox.listFiles',
+      spanOptions('listFiles'),
+    )(function*(path: string, options?: ListFilesOptions) {
+      yield* Effect.annotateCurrentSpan('path', path)
 
-      return yield* attempt("listFiles", (client) => client.listFiles(path, options));
+      return yield* attempt('listFiles', (client) => client.listFiles(path, options))
     }),
     exists: Effect.fn(
-      "Sandbox.exists",
-      spanOptions("exists"),
-    )(function* (path: string) {
-      yield* Effect.annotateCurrentSpan("path", path);
+      'Sandbox.exists',
+      spanOptions('exists'),
+    )(function*(path: string) {
+      yield* Effect.annotateCurrentSpan('path', path)
 
-      return yield* attempt("exists", (client) => client.exists(path));
+      return yield* attempt('exists', (client) => client.exists(path))
     }),
     watch: (path: string, options?: WatchOptions) =>
       decodeSseEvents<FileWatchSSEEvent, SandboxOperationError, never>(
-        stream("watch", (client) => client.watch(path, options)),
+        stream('watch', (client) => client.watch(path, options)),
       ),
     checkChanges: Effect.fn(
-      "Sandbox.checkChanges",
-      spanOptions("checkChanges"),
-    )(function* (path: string, options?: CheckChangesOptions) {
-      yield* Effect.annotateCurrentSpan("path", path);
+      'Sandbox.checkChanges',
+      spanOptions('checkChanges'),
+    )(function*(path: string, options?: CheckChangesOptions) {
+      yield* Effect.annotateCurrentSpan('path', path)
 
-      return yield* attempt("checkChanges", (client) => client.checkChanges(path, options));
+      return yield* attempt('checkChanges', (client) => client.checkChanges(path, options))
     }),
     setEnvVars: Effect.fn(
-      "Sandbox.setEnvVars",
-      spanOptions("setEnvVars"),
-    )(function* (envVars: Record<string, string | undefined>) {
-      return yield* attempt("setEnvVars", (client) => client.setEnvVars(envVars));
+      'Sandbox.setEnvVars',
+      spanOptions('setEnvVars'),
+    )(function*(envVars: Record<string, string | undefined>) {
+      return yield* attempt('setEnvVars', (client) => client.setEnvVars(envVars))
     }),
     exposePort: Effect.fn(
-      "Sandbox.exposePort",
-      spanOptions("exposePort"),
-    )(function* (port: number, options: ExposePortOptions) {
-      yield* Effect.annotateCurrentSpan("port", port);
+      'Sandbox.exposePort',
+      spanOptions('exposePort'),
+    )(function*(port: number, options: ExposePortOptions) {
+      yield* Effect.annotateCurrentSpan('port', port)
 
-      return yield* attempt("exposePort", (client) => client.exposePort(port, options));
+      return yield* attempt('exposePort', (client) => client.exposePort(port, options))
     }),
     unexposePort: Effect.fn(
-      "Sandbox.unexposePort",
-      spanOptions("unexposePort"),
-    )(function* (port: number) {
-      yield* Effect.annotateCurrentSpan("port", port);
+      'Sandbox.unexposePort',
+      spanOptions('unexposePort'),
+    )(function*(port: number) {
+      yield* Effect.annotateCurrentSpan('port', port)
 
-      return yield* attempt("unexposePort", (client) => client.unexposePort(port));
+      return yield* attempt('unexposePort', (client) => client.unexposePort(port))
     }),
     getExposedPorts: Effect.fn(
-      "Sandbox.getExposedPorts",
-      spanOptions("getExposedPorts"),
-    )(function* (hostname: string) {
-      return yield* attempt("getExposedPorts", (client) => client.getExposedPorts(hostname));
+      'Sandbox.getExposedPorts',
+      spanOptions('getExposedPorts'),
+    )(function*(hostname: string) {
+      return yield* attempt('getExposedPorts', (client) => client.getExposedPorts(hostname))
     }),
     isPortExposed: Effect.fn(
-      "Sandbox.isPortExposed",
-      spanOptions("isPortExposed"),
-    )(function* (port: number) {
-      yield* Effect.annotateCurrentSpan("port", port);
+      'Sandbox.isPortExposed',
+      spanOptions('isPortExposed'),
+    )(function*(port: number) {
+      yield* Effect.annotateCurrentSpan('port', port)
 
-      return yield* attempt("isPortExposed", (client) => client.isPortExposed(port));
+      return yield* attempt('isPortExposed', (client) => client.isPortExposed(port))
     }),
     validatePortToken: Effect.fn(
-      "Sandbox.validatePortToken",
-      spanOptions("validatePortToken"),
-    )(function* (port: number, token: string) {
-      yield* Effect.annotateCurrentSpan("port", port);
+      'Sandbox.validatePortToken',
+      spanOptions('validatePortToken'),
+    )(function*(port: number, token: string) {
+      yield* Effect.annotateCurrentSpan('port', port)
 
-      return yield* attempt("validatePortToken", (client) => client.validatePortToken(port, token));
+      return yield* attempt('validatePortToken', (client) => client.validatePortToken(port, token))
     }),
     containerFetch: Effect.fn(
-      "Sandbox.containerFetch",
-      spanOptions("containerFetch"),
-    )(function* (requestOrUrl: Request | string | URL, port?: number) {
-      return yield* attempt("containerFetch", (client) =>
-        client.containerFetch(requestOrUrl, port),
-      );
+      'Sandbox.containerFetch',
+      spanOptions('containerFetch'),
+    )(function*(requestOrUrl: Request | string | URL, port?: number) {
+      return yield* attempt('containerFetch', (client) => client.containerFetch(requestOrUrl, port))
     }),
     wsConnect: Effect.fn(
-      "Sandbox.wsConnect",
-      spanOptions("wsConnect"),
-    )(function* (request: Request, port: number) {
-      yield* Effect.annotateCurrentSpan("port", port);
+      'Sandbox.wsConnect',
+      spanOptions('wsConnect'),
+    )(function*(request: Request, port: number) {
+      yield* Effect.annotateCurrentSpan('port', port)
 
-      return yield* attempt("wsConnect", (client) => client.wsConnect(request, port));
+      return yield* attempt('wsConnect', (client) => client.wsConnect(request, port))
     }),
     mountBucket: Effect.fn(
-      "Sandbox.mountBucket",
-      spanOptions("mountBucket"),
-    )(function* (bucket: string, mountPath: string, options: MountBucketOptions) {
-      yield* Effect.annotateCurrentSpan({ bucket, mountPath });
+      'Sandbox.mountBucket',
+      spanOptions('mountBucket'),
+    )(function*(bucket: string, mountPath: string, options: MountBucketOptions) {
+      yield* Effect.annotateCurrentSpan({ bucket, mountPath })
 
-      return yield* attempt("mountBucket", (client) =>
-        client.mountBucket(bucket, mountPath, options),
-      );
+      return yield* attempt('mountBucket', (client) => client.mountBucket(bucket, mountPath, options))
     }),
     unmountBucket: Effect.fn(
-      "Sandbox.unmountBucket",
-      spanOptions("unmountBucket"),
-    )(function* (mountPath: string) {
-      yield* Effect.annotateCurrentSpan("mountPath", mountPath);
+      'Sandbox.unmountBucket',
+      spanOptions('unmountBucket'),
+    )(function*(mountPath: string) {
+      yield* Effect.annotateCurrentSpan('mountPath', mountPath)
 
-      return yield* attempt("unmountBucket", (client) => client.unmountBucket(mountPath));
+      return yield* attempt('unmountBucket', (client) => client.unmountBucket(mountPath))
     }),
     createBackup: Effect.fn(
-      "Sandbox.createBackup",
-      spanOptions("createBackup"),
-    )(function* (options: BackupOptions) {
-      yield* Effect.annotateCurrentSpan("dir", options.dir);
+      'Sandbox.createBackup',
+      spanOptions('createBackup'),
+    )(function*(options: BackupOptions) {
+      yield* Effect.annotateCurrentSpan('dir', options.dir)
 
-      return yield* attempt("createBackup", (client) => client.createBackup(options));
+      return yield* attempt('createBackup', (client) => client.createBackup(options))
     }),
     restoreBackup: Effect.fn(
-      "Sandbox.restoreBackup",
-      spanOptions("restoreBackup"),
-    )(function* (backup: DirectoryBackup) {
-      yield* Effect.annotateCurrentSpan({ backupId: backup.id, dir: backup.dir });
+      'Sandbox.restoreBackup',
+      spanOptions('restoreBackup'),
+    )(function*(backup: DirectoryBackup) {
+      yield* Effect.annotateCurrentSpan({ backupId: backup.id, dir: backup.dir })
 
-      return yield* attempt("restoreBackup", (client) => client.restoreBackup(backup));
+      return yield* attempt('restoreBackup', (client) => client.restoreBackup(backup))
     }),
     createTerminal: Effect.fn(
-      "Sandbox.createTerminal",
-      spanOptions("createTerminal"),
-    )(function* (options: CreateTerminalOptions) {
-      return yield* attempt("createTerminal", (client, _signal, target) =>
+      'Sandbox.createTerminal',
+      spanOptions('createTerminal'),
+    )(function*(options: CreateTerminalOptions) {
+      return yield* attempt('createTerminal', (client, _signal, target) =>
         client
           .createTerminal(options)
-          .then((terminal) => makeTerminalHandle(definition, instance, terminal, target)),
-      );
+          .then((terminal) => makeTerminalHandle(definition, instance, terminal, target)))
     }),
     getTerminal: Effect.fn(
-      "Sandbox.getTerminal",
-      spanOptions("getTerminal"),
-    )(function* (id: string) {
-      return yield* attempt("getTerminal", (client, _signal, target) =>
+      'Sandbox.getTerminal',
+      spanOptions('getTerminal'),
+    )(function*(id: string) {
+      return yield* attempt('getTerminal', (client, _signal, target) =>
         client
           .getTerminal(id)
           .then((terminal) =>
-            Option.map(Option.fromNullishOr(terminal), (found) =>
-              makeTerminalHandle(definition, instance, found, target),
-            ),
-          ),
-      );
+            Option.map(
+              Option.fromNullishOr(terminal),
+              (found) => makeTerminalHandle(definition, instance, found, target),
+            )
+          ))
     }),
-    listTerminals: attempt("listTerminals", (client, _signal, target) =>
+    listTerminals: attempt('listTerminals', (client, _signal, target) =>
       client
         .listTerminals()
-        .then((terminals) =>
-          terminals.map((terminal) => makeTerminalHandle(definition, instance, terminal, target)),
-        ),
-    ).pipe(Effect.withSpan("Sandbox.listTerminals", spanOptions("listTerminals"))),
+        .then((terminals) => terminals.map((terminal) => makeTerminalHandle(definition, instance, terminal, target))))
+      .pipe(Effect.withSpan('Sandbox.listTerminals', spanOptions('listTerminals'))),
     tunnels: {
       get: Effect.fn(
-        "Sandbox.tunnels.get",
-        spanOptions("tunnels.get"),
-      )(function* (port: number, options?: TunnelOptions) {
-        yield* Effect.annotateCurrentSpan("port", port);
+        'Sandbox.tunnels.get',
+        spanOptions('tunnels.get'),
+      )(function*(port: number, options?: TunnelOptions) {
+        yield* Effect.annotateCurrentSpan('port', port)
 
-        return yield* attempt("tunnels.get", (client) => client.tunnels.get(port, options));
+        return yield* attempt('tunnels.get', (client) => client.tunnels.get(port, options))
       }),
-      list: attempt("tunnels.list", (client) => client.tunnels.list()).pipe(
-        Effect.withSpan("Sandbox.tunnels.list", spanOptions("tunnels.list")),
+      list: attempt('tunnels.list', (client) => client.tunnels.list()).pipe(
+        Effect.withSpan('Sandbox.tunnels.list', spanOptions('tunnels.list')),
       ),
       destroy: Effect.fn(
-        "Sandbox.tunnels.destroy",
-        spanOptions("tunnels.destroy"),
-      )(function* (portOrInfo: number | TunnelInfo) {
-        return yield* attempt("tunnels.destroy", (client) => client.tunnels.destroy(portOrInfo));
+        'Sandbox.tunnels.destroy',
+        spanOptions('tunnels.destroy'),
+      )(function*(portOrInfo: number | TunnelInfo) {
+        return yield* attempt('tunnels.destroy', (client) => client.tunnels.destroy(portOrInfo))
       }),
     },
     start: Effect.fn(
-      "Sandbox.start",
-      spanOptions("start"),
-    )(function* (options?: ContainerStartOptions) {
-      return yield* attempt("start", (client) => client.start(options));
+      'Sandbox.start',
+      spanOptions('start'),
+    )(function*(options?: ContainerStartOptions) {
+      return yield* attempt('start', (client) => client.start(options))
     }),
     stop: Effect.fn(
-      "Sandbox.stop",
-      spanOptions("stop"),
-    )(function* (signal?: ContainerStopSignal) {
-      return yield* attempt("stop", (client) => client.stop(signal));
+      'Sandbox.stop',
+      spanOptions('stop'),
+    )(function*(signal?: ContainerStopSignal) {
+      return yield* attempt('stop', (client) => client.stop(signal))
     }),
-    destroy: attempt("destroy", (client) => client.destroy()).pipe(
-      Effect.withSpan("Sandbox.destroy", spanOptions("destroy")),
+    destroy: attempt('destroy', (client) => client.destroy()).pipe(
+      Effect.withSpan('Sandbox.destroy', spanOptions('destroy')),
     ),
-  };
-};
+  }
+}
 
 /**
  * Lazily imports `@cloudflare/sandbox`.
@@ -946,95 +925,92 @@ const makeSandboxClient = (
  */
 const importSandboxModule = (definition: SandboxDefinition, instance: string) =>
   Effect.tryPromise({
-    try: () => import("@cloudflare/sandbox"),
+    try: () => import('@cloudflare/sandbox'),
     catch: (cause) =>
       new SandboxOperationError({
         binding: definition.binding,
         instance,
-        operation: "import",
+        operation: 'import',
         cause,
       }),
-  });
+  })
 
 export const isSandboxNamespaceResource = <Candidate>(
   value: Candidate,
 ): value is Candidate & SandboxNamespaceResource =>
-  Predicate.hasProperty(value, "idFromName") &&
+  Predicate.hasProperty(value, 'idFromName') &&
   Predicate.isFunction(value.idFromName) &&
-  Predicate.hasProperty(value, "get") &&
-  Predicate.isFunction(value.get);
+  Predicate.hasProperty(value, 'get') &&
+  Predicate.isFunction(value.get)
 
-export const makeClient =
-  (definition: SandboxDefinition) =>
-  <Namespace extends SandboxNamespaceResource>(
-    namespace: Namespace,
-  ): SandboxNamespaceClient<Namespace> => {
-    const get = Effect.fn("Sandbox.get", {
-      attributes: { binding: definition.binding, operation: "get" },
-    })(function* (name: string, options?: SandboxOptions) {
-      yield* Effect.annotateCurrentSpan("instance", name);
+export const makeClient = (definition: SandboxDefinition) =>
+<Namespace extends SandboxNamespaceResource>(
+  namespace: Namespace,
+): SandboxNamespaceClient<Namespace> => {
+  const get = Effect.fn('Sandbox.get', {
+    attributes: { binding: definition.binding, operation: 'get' },
+  })(function*(name: string, options?: SandboxOptions) {
+    yield* Effect.annotateCurrentSpan('instance', name)
 
-      const sandboxModule = yield* importSandboxModule(definition, name);
-      // Resolve through the invocation cache on each operation. A retained client
-      // must observe invalidation after a native stub fails; failed work is not replayed.
-      const resolve = Effect.gen(function* () {
-        const targets = yield* Effect.serviceOption(CurrentTargets);
-        const scopedNamespace = yield* RpcTargets.get(namespace, "sandbox-namespace", () => {
-          const adapter: SandboxNamespaceResource = {
-            idFromName: (name) => namespace.idFromName(name),
-            get: (id, options) =>
-              Option.isSome(targets)
-                ? targets.value.get(adapter, JSON.stringify([id.toString(), options]), () =>
-                    namespace.get(id, options),
-                  )
-                : namespace.get(id, options),
-          };
+    const sandboxModule = yield* importSandboxModule(definition, name)
+    // Resolve through the invocation cache on each operation. A retained client
+    // must observe invalidation after a native stub fails; failed work is not replayed.
+    const resolve = Effect.gen(function*() {
+      const targets = yield* Effect.serviceOption(CurrentTargets)
+      const scopedNamespace = yield* RpcTargets.get(namespace, 'sandbox-namespace', () => {
+        const adapter: SandboxNamespaceResource = {
+          idFromName: (name) => namespace.idFromName(name),
+          get: (id, options) =>
+            Option.isSome(targets)
+              ? targets.value.get(adapter, JSON.stringify([id.toString(), options]), () => namespace.get(id, options))
+              : namespace.get(id, options),
+        }
 
-          return adapter;
-        }).pipe(
-          Effect.mapError(
-            (error) =>
-              new SandboxOperationError({
-                binding: definition.binding,
-                instance: name,
-                operation: "get",
-                cause: error.cause,
-              }),
-          ),
-        );
-        const nativeNamespace: unknown = scopedNamespace;
-        const client = yield* Effect.try({
-          try: () =>
-            sandboxModule.getSandbox(
-              // SAFETY: the layer validated the binding as a Durable Object
-              // namespace, and getSandbox only requires idFromName() and get();
-              // the structural namespace type is narrower than the SDK's nominal
-              // one, so the conversion goes through unknown.
-              nativeNamespace as Parameters<typeof sandboxModule.getSandbox>[0],
-              name,
-              options,
-            ),
-          catch: (cause) =>
+        return adapter
+      }).pipe(
+        Effect.mapError(
+          (error) =>
             new SandboxOperationError({
               binding: definition.binding,
               instance: name,
-              operation: "get",
-              cause,
+              operation: 'get',
+              cause: error.cause,
             }),
-        });
+        ),
+      )
+      const nativeNamespace: unknown = scopedNamespace
+      const client = yield* Effect.try({
+        try: () =>
+          sandboxModule.getSandbox(
+            // SAFETY: the layer validated the binding as a Durable Object
+            // namespace, and getSandbox only requires idFromName() and get();
+            // the structural namespace type is narrower than the SDK's nominal
+            // one, so the conversion goes through unknown.
+            nativeNamespace as Parameters<typeof sandboxModule.getSandbox>[0],
+            name,
+            options,
+          ),
+        catch: (cause) =>
+          new SandboxOperationError({
+            binding: definition.binding,
+            instance: name,
+            operation: 'get',
+            cause,
+          }),
+      })
 
-        return { client, target: scopedNamespace };
-      });
+      return { client, target: scopedNamespace }
+    })
 
-      return makeSandboxClient(resolve, definition, name);
-    });
+    return makeSandboxClient(resolve, definition, name)
+  })
 
-    return {
-      definition,
-      get,
-      rawUnsafe: Effect.succeed(namespace),
-    };
-  };
+  return {
+    definition,
+    get,
+    rawUnsafe: Effect.succeed(namespace),
+  }
+}
 
 export const layer = <Self, Namespace extends SandboxNamespaceResource>(
   tag: Context.Service<Self, SandboxNamespaceClient<Namespace>>,
@@ -1048,33 +1024,32 @@ export const layer = <Self, Namespace extends SandboxNamespaceResource>(
     {
       expected: expectedSandboxNamespace,
     },
-  );
+  )
 
-export const make = <Id extends string>(id: Id) => Tag<SandboxNamespaceService<Id>>()<Id>(id);
+export const make = <Id extends string>(id: Id) => Tag<SandboxNamespaceService<Id>>()<Id>(id)
 
-declare const SandboxNamespaceServiceTypeId: unique symbol;
+declare const SandboxNamespaceServiceTypeId: unique symbol
 
 export interface SandboxNamespaceService<Id extends string> {
   readonly [SandboxNamespaceServiceTypeId]: {
-    readonly id: Id;
-  };
+    readonly id: Id
+  }
 }
 
 export const Tag =
-  <Self, Namespace extends SandboxNamespaceResource = SandboxNamespaceResource>() =>
-  <Id extends string>(id: Id) => {
+  <Self, Namespace extends SandboxNamespaceResource = SandboxNamespaceResource>() => <Id extends string>(id: Id) => {
     const tag = Context.Service<Self, SandboxNamespaceClient<Namespace>>()(
       `effect-cf/Sandbox/${id}` as const,
-    );
-    const makeLayer = (definition: LayerOptions) => layer(tag, definition);
+    )
+    const makeLayer = (definition: LayerOptions) => layer(tag, definition)
 
-    const get = Effect.fnUntraced(function* (name: string, options?: SandboxOptions) {
-      const namespace = yield* tag;
+    const get = Effect.fnUntraced(function*(name: string, options?: SandboxOptions) {
+      const namespace = yield* tag
 
-      return yield* namespace.get(name, options);
-    });
+      return yield* namespace.get(name, options)
+    })
 
-    const rawUnsafe = Effect.flatMap(tag, (namespace) => namespace.rawUnsafe);
+    const rawUnsafe = Effect.flatMap(tag, (namespace) => namespace.rawUnsafe)
 
     // SAFETY: the assigned namespace helpers exactly implement TagClass for this service tag.
     return Object.assign(tag, {
@@ -1082,10 +1057,10 @@ export const Tag =
       layer: makeLayer,
       get,
       rawUnsafe,
-    }) as TagClass<Self, Id, Namespace>;
-  };
+    }) as TagClass<Self, Id, Namespace>
+  }
 
-export const Sandbox = Tag;
+export const Sandbox = Tag
 
 /**
  * Routes sandbox preview-URL requests (`https://<port>-<sandbox-id>-<token>.<host>`)
@@ -1094,24 +1069,23 @@ export const Sandbox = Tag;
  * Call this before any other routing in a Worker `fetch` handler; it resolves
  * to `Option.none()` for requests that are not preview-URL traffic.
  */
-export const proxyToSandbox = Effect.fn("Sandbox.proxyToSandbox")(function* (
+export const proxyToSandbox = Effect.fn('Sandbox.proxyToSandbox')(function*(
   request: Request,
   options?: { readonly binding?: string },
 ) {
-  const binding = options?.binding ?? "Sandbox";
-  const definition: SandboxDefinition = { binding };
-  const env = yield* WorkerEnvironment;
-  const resource = Predicate.hasProperty(env, binding) ? env[binding] : undefined;
-  const sandboxModule = yield* importSandboxModule(definition, "preview");
-  const response = yield* trySandboxPromise(definition, "preview", "proxyToSandbox", () =>
+  const binding = options?.binding ?? 'Sandbox'
+  const definition: SandboxDefinition = { binding }
+  const env = yield* WorkerEnvironment
+  const resource = Predicate.hasProperty(env, binding) ? env[binding] : undefined
+  const sandboxModule = yield* importSandboxModule(definition, 'preview')
+  const response = yield* trySandboxPromise(definition, 'preview', 'proxyToSandbox', () =>
     sandboxModule.proxyToSandbox(
       request,
       // SAFETY: proxyToSandbox reads exactly one binding, hardcoded as
       // env.Sandbox; this adapts the configured binding name to that shape,
       // and getSandbox validates the binding value when a preview route hits it.
       { Sandbox: resource } as Parameters<typeof sandboxModule.proxyToSandbox>[1],
-    ),
-  );
+    ))
 
-  return Option.fromNullishOr(response);
-});
+  return Option.fromNullishOr(response)
+})

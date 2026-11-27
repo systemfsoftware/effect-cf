@@ -1,12 +1,12 @@
-import * as Context from "effect/Context";
-import * as Effect from "effect/Effect";
-import * as Exit from "effect/Exit";
-import * as FiberSet from "effect/FiberSet";
-import * as Scheduler from "effect/Scheduler";
+import * as Context from 'effect/Context'
+import * as Effect from 'effect/Effect'
+import * as Exit from 'effect/Exit'
+import * as FiberSet from 'effect/FiberSet'
+import * as Scheduler from 'effect/Scheduler'
 
-type RunCallback<A, E, R> = (effect: Effect.Effect<A, E, R>) => Promise<Exit.Exit<A, E>>;
+type RunCallback<A, E, R> = (effect: Effect.Effect<A, E, R>) => Promise<Exit.Exit<A, E>>
 
-const callbackScheduler = new Scheduler.MixedScheduler("sync");
+const callbackScheduler = new Scheduler.MixedScheduler('sync')
 
 /**
  * Runs an Effect callback owned by a native Promise operation.
@@ -15,7 +15,7 @@ const callbackScheduler = new Scheduler.MixedScheduler("sync");
  * fiber. Closing that scope interrupts and joins the callback before awaiting
  * the native operation's settlement.
  */
-export const runNativeCallback = Effect.fnUntraced(function* <A, E, R, B>(
+export const runNativeCallback = Effect.fnUntraced(function*<A, E, R, B>(
   operation: (run: RunCallback<A, E, R>) => Promise<B>,
 ): Effect.fn.Return<B, unknown, R> {
   // An older timer in the blocked parent input gate prevents later timers in
@@ -25,46 +25,46 @@ export const runNativeCallback = Effect.fnUntraced(function* <A, E, R, B>(
     yield* Effect.context<R>(),
     Scheduler.Scheduler,
     callbackScheduler,
-  );
+  )
 
   return yield* Effect.scoped(
-    Effect.gen(function* () {
-      let nativePromise: Promise<B> | undefined;
+    Effect.gen(function*() {
+      let nativePromise: Promise<B> | undefined
 
       // Registered before the FiberSet so scope closure first interrupts and
       // joins the callback, then waits for the native rollback/gate to settle.
       yield* Effect.addFinalizer(() => {
-        const promise = nativePromise;
+        const promise = nativePromise
 
         return promise === undefined
           ? Effect.void
           : Effect.promise(() =>
-              promise.then(
-                () => undefined,
-                () => undefined,
-              ),
-            );
-      });
-      const runPromise = yield* FiberSet.makeRuntimePromise<never, Exit.Exit<A, E>, never>();
+            promise.then(
+              () => undefined,
+              () => undefined,
+            )
+          )
+      })
+      const runPromise = yield* FiberSet.makeRuntimePromise<never, Exit.Exit<A, E>, never>()
 
       return yield* Effect.callback<B, unknown>((resume) => {
         try {
           nativePromise = operation((effect) =>
             runPromise(Effect.provideContext(Effect.exit(effect), callbackContext), {
               scheduler: callbackScheduler,
-            }),
-          );
+            })
+          )
         } catch (cause) {
-          resume(Effect.fail(cause));
+          resume(Effect.fail(cause))
 
-          return;
+          return
         }
 
         nativePromise.then(
           (value) => resume(Effect.succeed(value)),
           (cause) => resume(Effect.fail(cause)),
-        );
-      });
+        )
+      })
     }),
-  );
-});
+  )
+})
