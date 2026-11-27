@@ -31,26 +31,52 @@ jobs:
           git fetch --no-tags origin main
           base=$(git merge-base HEAD origin/main)
           echo "sha=$base" >> "$GITHUB_OUTPUT"
-          unexpected=$(git diff --name-status "$base" HEAD | grep -Ev '^(M[[:space:]]+packages/[^/]+/(package\.json|CHANGELOG\.md)|D[[:space:]]+\.changeset/[^/]+\.md)$' || true)
+
+          # Disable rename heuristics so consumed changesets are always D and new changelog entries are always A.
+          unexpected=$(git diff --no-renames --name-status "$base" HEAD \
+            | grep -Ev '^(M[[:space:]]+packages/[^/]+/package\.json|D[[:space:]]+\.changeset/[^/]+\.md|A[[:space:]]+\.changeset/changelogs/(@[^/!]+!)?[^/!]+@[^/]+\.md)$' || true)
           if [ -n "$unexpected" ]; then
             echo "::error::the release branch changes files beyond the version surfaces, so main's verdict does not apply:"
             printf '%s\n' "$unexpected"
             exit 1
           fi
-          # A manifest may change its version value and nothing else, compared structurally so formatting and key
-          # order cannot hide a second change.
-          while IFS= read -r -d '' manifest; do
-            before=$(git show "$base:$manifest" | jq -S 'del(.version)')
-            after=$(jq -S 'del(.version)' "$manifest")
-            if [ "$before" != "$after" ]; then
+
+          mapfile -d '' -t manifests < <(git diff --no-renames -z --name-only "$base" HEAD -- 'packages/*/package.json')
+          mapfile -d '' -t consumed < <(git diff --no-renames --diff-filter=D -z --name-only "$base" HEAD -- '.changeset/*.md')
+          mapfile -d '' -t added_logs < <(git diff --no-renames --diff-filter=A -z --name-only "$base" HEAD -- '.changeset/changelogs/*.md')
+
+          if [ "${#manifests[@]}" -eq 0 ] || [ "${#consumed[@]}" -eq 0 ]; then
+            echo "::error::a release branch must bump at least one package.json and consume at least one .changeset/*.md"
+            exit 1
+          fi
+
+          expected_logs=()
+          for manifest in "${manifests[@]}"; do
+            before_json=$(git show "$base:$manifest")
+            before_rest=$(printf '%s' "$before_json" | jq -S 'del(.version)')
+            after_rest=$(jq -S 'del(.version)' "$manifest")
+            if [ "$before_rest" != "$after_rest" ]; then
               echo "::error::$manifest changes more than its version"
               exit 1
             fi
-            if [ "$(git show "$base:$manifest" | jq -r .version)" = "$(jq -r .version "$manifest")" ]; then
+            before_ver=$(printf '%s' "$before_json" | jq -r .version)
+            after_ver=$(jq -r .version "$manifest")
+            if [ "$before_ver" = "$after_ver" ]; then
               echo "::error::$manifest keeps its version"
               exit 1
             fi
-          done < <(git diff -z --name-only "$base" HEAD -- 'packages/*/package.json')
+            pkg_id=$(jq -r '.name | gsub("/"; "!")' "$manifest")
+            expected_logs+=(".changeset/changelogs/${pkg_id}@${after_ver}.md")
+          done
+
+          # Confirm the set of added changelog entries matches the bumped manifests 1-to-1.
+          sorted_expected=$(printf '%s\n' "${expected_logs[@]}" | LC_ALL=C sort)
+          sorted_added=$(printf '%s\n' "${added_logs[@]}" | LC_ALL=C sort)
+          if [ "$sorted_expected" != "$sorted_added" ]; then
+            echo "::error::added .changeset/changelogs entries do not match bumped package versions"
+            printf 'expected:\n%s\nactual:\n%s\n' "$sorted_expected" "$sorted_added"
+            exit 1
+          fi
       - name: Main's CI on the base commit passed
         env:
           BASE: ${{ steps.base.outputs.sha }}
