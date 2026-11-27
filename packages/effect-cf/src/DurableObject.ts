@@ -1,13 +1,17 @@
 import { DurableObject as CloudflareDurableObject } from "cloudflare:workers";
+import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import type { Digest, SecureRandom } from "effect/crypto";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Tracer from "effect/Tracer";
 import type { Scope } from "effect";
 
 import { NativeRequest } from "./Worker";
 import { WorkerEnvironment, type WorkerEnv } from "./Environment";
 import { DurableObjectState } from "./DurableObjectState";
 import {
+  AlarmSlot,
   DurableObjectAlarm,
   type AlarmRegistration,
   type AlarmService,
@@ -21,7 +25,7 @@ import {
   type DurableObjectInstance,
 } from "./internal/Instance";
 import * as Runtime from "./internal/Runtime";
-import type { ReceiverOptions, RpcInvocationInfo } from "./RpcTracing";
+import type { ReceiverOptions, RpcInvocationInfo, RpcTraceContext } from "./RpcTracing";
 
 export type { BindingNotFoundError, BindingValidationError } from "./Binding";
 export type {
@@ -50,6 +54,7 @@ type FetchContext<ROut> = HandlerContext<ROut> | NativeRequest;
 /** Metadata available before an event effect or its event layer starts. */
 export interface RunOptions extends Runtime.RunOptions {
   readonly eventLayer?: boolean;
+  readonly signal?: AbortSignal;
   readonly event?:
     | "fetch"
     | "rpc"
@@ -337,6 +342,167 @@ export function make<
   return Entrypoint.assumeEntrypointClass<DurableObjectClass<Rpc, ROut | REvent | RAlarm>>(
     EffectDurableObject,
   );
+}
+
+export type ReservedMountKey =
+  | RpcDefinition.ReservedMethodName
+  | "toString"
+  | "toLocaleString"
+  | "valueOf"
+  | "hasOwnProperty"
+  | "isPrototypeOf"
+  | "propertyIsEnumerable"
+  | "__defineGetter__"
+  | "__defineSetter__"
+  | "__lookupGetter__"
+  | "__lookupSetter__"
+  | "__proto__"
+  | "ctx"
+  | "env"
+  | "runAlarms";
+
+const reservedMountKeys: ReadonlySet<string> = new Set<string>([
+  ...RpcDefinition.reservedMethodNames,
+  ...Object.getOwnPropertyNames(Object.prototype),
+  "ctx",
+  "env",
+  "runAlarms",
+]);
+
+export interface MountHost {
+  readonly state: globalThis.DurableObjectState;
+  readonly env: WorkerEnv;
+}
+
+export type MountedMethod<Handler> = Handler extends (
+  ...args: infer Args
+) => Effect.Effect<infer A, infer _E, infer _R>
+  ? (...args: Args) => Effect.Effect<A, unknown>
+  : never;
+
+export type MountedRecord<Rpc> = {
+  readonly [K in keyof Rpc]: MountedMethod<Rpc[K]>;
+} & {
+  readonly alarm?: (alarmInfo?: globalThis.AlarmInvocationInfo) => Effect.Effect<void, unknown>;
+  readonly runAlarms?: Effect.Effect<void, never>;
+};
+
+const MOUNT_SERVICE = "Durable Object";
+
+export function mount<
+  ROut,
+  LayerError,
+  REvent = never,
+  EventLayerError = never,
+  const Rpc extends DurableObjectRpc<NoInfer<ROut> | REvent | NoInfer<RAlarm>> = Record<
+    never,
+    never
+  >,
+  RAlarm = never,
+>(
+  layer: Layer.Layer<ROut, LayerError, RuntimeContext<NoInfer<RAlarm>>>,
+  options: DurableObjectOptionsBase<ROut, REvent, EventLayerError, Rpc, RAlarm> & {
+    readonly slot: AlarmSlot;
+  },
+): (host: MountHost) => Effect.Effect<MountedRecord<Rpc>, unknown> {
+  return (host) =>
+    Effect.gen(function* () {
+      const instance = makeInstance(
+        layer,
+        options,
+        { state: host.state, env: host.env, gate: (run) => run() },
+        options.slot,
+      );
+
+      if (instance.hasInitialize) {
+        yield* Effect.promise(() => instance.prepareContext());
+        yield* Effect.promise(() => instance.runInitialize());
+      }
+
+      const rpcTracing = options.rpcTracing;
+      // SAFETY: the options' `rpc` record was already validated by `make`'s typing; here it is read structurally as handler effects.
+      const handlers = (options.rpc ?? {}) as Record<
+        string,
+        (...args: Array<any>) => Effect.Effect<any, any, any>
+      >;
+      const record: Record<
+        string,
+        ((...args: Array<unknown>) => Effect.Effect<unknown, unknown>) | Effect.Effect<void, never>
+      > = {};
+
+      for (const [key, handler] of Object.entries(handlers)) {
+        if (reservedMountKeys.has(key)) {
+          throw new Error(`Cannot mount a Durable Object method named "${key}"`);
+        }
+        record[key] = (...args: Array<unknown>) =>
+          Effect.withFiber((fiber) => {
+            const prepared = Entrypoint.prepareEntrypointRpcHandler(
+              handler,
+              args,
+              MOUNT_SERVICE,
+              key,
+              rpcTracing ?? { service: MOUNT_SERVICE },
+            );
+            const hostSpan = Option.getOrUndefined(
+              Context.getOption(fiber.context, Tracer.ParentSpan),
+            );
+            const parent: RpcTraceContext | undefined =
+              prepared.invocation.parent ??
+              (hostSpan === undefined
+                ? undefined
+                : {
+                    _tag: "effect-cf/RpcTraceContext/v1",
+                    traceId: hostSpan.traceId,
+                    spanId: hostSpan.spanId,
+                    sampled: hostSpan.sampled,
+                  });
+            const controller = new AbortController();
+
+            return Effect.callback<unknown, unknown>((resume) => {
+              // SAFETY: the prepared handler is an event effect over this instance's handler context.
+              instance
+                .run(
+                  prepared.handler as Effect.Effect<
+                    unknown,
+                    unknown,
+                    HandlerContext<ROut | REvent | RAlarm>
+                  >,
+                  {
+                    event: "rpc",
+                    rpc: { ...prepared.invocation, parent },
+                    signal: controller.signal,
+                  },
+                )
+                .then(
+                  (value) => resume(Effect.succeed(value)),
+                  (error) => resume(Effect.fail(error)),
+                );
+
+              return Effect.sync(() => controller.abort());
+            });
+          });
+      }
+
+      if (options.slot._tag === "Exclusive") {
+        record.alarm = (alarmInfo?: globalThis.AlarmInvocationInfo) =>
+          Effect.callback<void, unknown>((resume) => {
+            instance.runAlarm(true, alarmInfo).then(
+              () => resume(Effect.void),
+              (error) => resume(Effect.fail(error)),
+            );
+          });
+      } else {
+        record.runAlarms = Effect.callback<void>((resume) => {
+          instance.runAlarm(true).then(
+            () => resume(Effect.void),
+            () => resume(Effect.void),
+          );
+        });
+      }
+
+      // SAFETY: `record` holds one mounted method per rpc key plus the slot's alarm entry, matching `MountedRecord`.
+      return record as MountedRecord<Rpc>;
+    });
 }
 
 export type {

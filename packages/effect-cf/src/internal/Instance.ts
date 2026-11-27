@@ -8,6 +8,7 @@ import { NativeRequest } from "../Worker";
 import type { WorkerEnv } from "../Environment";
 import { DurableObjectState, fromDurableObjectState } from "../DurableObjectState";
 import {
+  AlarmSlot,
   DurableObjectAlarm,
   DispatchAfterEvent,
   HasDueAlarms,
@@ -32,6 +33,20 @@ export const scheduleTelemetryFlush: Effect.Effect<void, never, DurableObjectSta
   Telemetry.scheduleTelemetryFlush((flush) =>
     Effect.flatMap(DurableObjectState, (state) => state.waitUntil(flush)),
   );
+
+const abortOnSignal = (signal: AbortSignal): Effect.Effect<never> =>
+  Effect.callback<never>((resume) => {
+    if (signal.aborted) {
+      resume(Effect.interrupt);
+
+      return;
+    }
+    const onAbort = () => resume(Effect.interrupt);
+
+    signal.addEventListener("abort", onAbort, { once: true });
+
+    return Effect.sync(() => signal.removeEventListener("abort", onAbort));
+  });
 
 export interface InstanceHost {
   readonly state: globalThis.DurableObjectState;
@@ -75,6 +90,7 @@ export function makeInstance<
   layer: Layer.Layer<ROut, LayerError, RuntimeContext<NoInfer<RAlarm>>>,
   options: DurableObjectOptionsBase<ROut, REvent, EventLayerError, Rpc, RAlarm>,
   host: InstanceHost,
+  slot?: AlarmSlot,
 ): DurableObjectInstance<ROut, REvent, RAlarm, LayerError> {
   const { state, env } = host;
   const registration =
@@ -83,7 +99,12 @@ export function makeInstance<
     ? options.alarms.pipe(Effect.asVoid)
     : undefined;
 
-  const baseServices = DurableObjectAlarm.layer.pipe(
+  const effectiveSlot: AlarmSlot = slot ?? { _tag: "Exclusive" };
+  // SAFETY: providing `AlarmSlot` only widens the layer's output context; it stays a `DurableObjectAlarm` layer over `DurableObjectState`.
+  const alarmLayer = DurableObjectAlarm.layer.pipe(
+    Layer.provideMerge(Layer.succeed(AlarmSlot, effectiveSlot)),
+  ) as Layer.Layer<DurableObjectAlarm, never, DurableObjectState>;
+  const baseServices = alarmLayer.pipe(
     Layer.provideMerge(Layer.succeed(DurableObjectState, fromDurableObjectState(state))),
   );
   // SAFETY: RAlarm is inferred only from the registration's layer; without a registration it is never.
@@ -107,8 +128,12 @@ export function makeInstance<
     const parentSpan = parent === undefined ? undefined : Tracer.externalSpan(parent);
     const afterResponse = runOptions.event === "rpc" || runOptions.event === "fetch";
     let dispatchAfterEvent = false;
+    const runEffect =
+      runOptions.signal === undefined
+        ? effect
+        : Effect.raceFirst(effect, abortOnSignal(runOptions.signal));
     const handler = afterResponse
-      ? effect.pipe(
+      ? runEffect.pipe(
           Effect.provideService(ResponseEvent, true),
           Effect.onExit(() =>
             Effect.flatMap(DurableObjectAlarm, (alarms) =>
@@ -118,7 +143,7 @@ export function makeInstance<
             ),
           ),
         )
-      : effect;
+      : runEffect;
     let response: Promise<A>;
 
     if (eventLayer === undefined) {

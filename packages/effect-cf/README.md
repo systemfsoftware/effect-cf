@@ -97,6 +97,23 @@ Scheduling accepts decoded payloads, encodes them with the declared schema, and 
 
 Unknown stored tags produce `StoredAlarmDecodeError` and follow the configured delivery failure policy rather than being acknowledged silently. Use the raw scheduler's `cancelAlarm` to remove retired tags, including repeating alarms.
 
+## Hosted Durable Objects
+
+`DurableObject.mount` builds the same options as `DurableObject.make` for a host that constructs the object itself and already holds the object's concurrency gate. It returns `(host) => Effect<Record>`; the record's own properties are Effect-returning methods. Because the host already gated construction, `mount` runs `initialize` inline before returning the record and never opens a nested gate.
+
+```ts
+const build = DurableObject.mount(AppLayer, {
+  slot: { _tag: "Exclusive" },
+  rpc: {
+    ping: () => Effect.succeed("pong"),
+  },
+});
+
+const record = yield * build({ state: nativeState, env });
+```
+
+An object has one physical alarm slot. `Exclusive` keeps `make`'s `getAlarm`/`setAlarm`/`deleteAlarm`. `Delegated` hands the slot to a host dispatcher: the scheduler records the deadline it hands off and calls the delegate inside its own storage transaction, and never touches the native alarm. A `Delegated` record omits `alarm` and instead exposes a `runAlarms` Effect your host callback runs; it always succeeds, so the host's own retry policy never applies to library work. See the [hosted object guide](https://github.com/danieljvdm/effect-cf/blob/main/docs/hosted-durable-objects.md).
+
 ## Cloudflare Observability traces
 
 `CloudflareTracer.layer` sends existing `Effect.withSpan` and named `Effect.fn`
