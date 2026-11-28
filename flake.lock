@@ -601,17 +601,17 @@
         "nixpkgs": "nixpkgs_7"
       },
       "locked": {
-        "lastModified": 1795640288,
-        "narHash": "sha256-K0QG1WOVInQ1nemUK+RE/2EFHQpXa0DVt3h+gwJ9dw8=",
+        "lastModified": 1795889021,
+        "narHash": "sha256-pCPNr7mzKPuRQ1LxiwPCr3WW8YThm8KY/7y/p727Db4=",
         "owner": "systemfsoftware",
         "repo": "pnpm-release-management",
-        "rev": "ea9d020a3ffd18fa34b85e39c1655b0756109f2b",
+        "rev": "3da32f4fa6f01af0a9a0cdab5cc8eb5d134b2de3",
         "type": "github"
       },
       "original": {
         "owner": "systemfsoftware",
         "repo": "pnpm-release-management",
-        "rev": "ea9d020a3ffd18fa34b85e39c1655b0756109f2b",
+        "rev": "3da32f4fa6f01af0a9a0cdab5cc8eb5d134b2de3",
         "type": "github"
       }
     },

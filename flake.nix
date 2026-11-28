@@ -5,7 +5,7 @@
   inputs = {
     core.url = "github:systemfsoftware/systemfsoftware/15b4d2ab1e2af0a154fad2b9af7bd1f6449b3606";
     nixpkgs.follows = "core/nixpkgs";
-    pnpm-release-management.url = "github:systemfsoftware/pnpm-release-management/ea9d020a3ffd18fa34b85e39c1655b0756109f2b";
+    pnpm-release-management.url = "github:systemfsoftware/pnpm-release-management/3da32f4fa6f01af0a9a0cdab5cc8eb5d134b2de3";
   };
 
   outputs = { self, nixpkgs, pnpm-release-management, ... }:
